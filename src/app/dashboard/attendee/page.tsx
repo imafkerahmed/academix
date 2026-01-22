@@ -1,15 +1,47 @@
-import { getSession } from "@auth0/nextjs-auth0";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import pb, { getCurrentUser, logout, type User } from "@/lib/pocketbase";
 
-export default async function AttendeeDashboard() {
-  const session = await getSession();
+export default function AttendeeDashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!session) {
-    redirect("/api/auth/login");
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+      router.push("/login");
+      return;
+    }
+
+    if (currentUser.role !== "attendee") {
+      router.push("/dashboard/host");
+      return;
+    }
+
+    setUser(currentUser);
+    setLoading(false);
+  }, [router]);
+
+  const handleLogout = () => {
+    logout();
+    router.push("/");
+  };
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
   }
-
-  const user = session.user;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -39,39 +71,39 @@ export default async function AttendeeDashboard() {
 
             <div className="flex items-center gap-4">
               <div className="hidden sm:flex items-center gap-2">
-                {user.picture && (
+                {user.avatar && (
                   <img
-                    src={user.picture}
-                    alt={user.name || "User"}
-                    className="w-8 h-8 rounded-full"
+                    src={`${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${user.id}/${user.avatar}`}
+                    alt={user.full_name || "User"}
+                    className="w-8 h-8 rounded-full object-cover"
                   />
                 )}
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {user.name}
+                    {user.full_name || user.email}
                   </span>
-                  <span className="text-xs text-gray-500 dark: text-gray-400">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     Student
                   </span>
                 </div>
               </div>
-              <Link
-                href="/api/auth/logout"
+              <button
+                onClick={handleLogout}
                 className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium"
               >
                 Logout
-              </Link>
+              </button>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg: px-8">
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Welcome, {user.name?.split(" ")[0]}! 👋
+            Welcome, {user.full_name?.split(" ")[0] || "Student"}! 👋
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
             View and join your scheduled classes
@@ -80,7 +112,7 @@ export default async function AttendeeDashboard() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark: bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark: border-gray-700">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
@@ -99,7 +131,7 @@ export default async function AttendeeDashboard() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark: text-gray-400 mb-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                   Upcoming Today
                 </p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -115,7 +147,7 @@ export default async function AttendeeDashboard() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark: text-gray-400 mb-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                   Attended
                 </p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -130,7 +162,7 @@ export default async function AttendeeDashboard() {
         </div>
 
         {/* Upcoming Classes */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark: border-gray-700 mb-8">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">
               Upcoming Classes
@@ -149,7 +181,11 @@ export default async function AttendeeDashboard() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-8 text-white">
+          {/* View Schedule Card */}
+          <Link
+            href="/dashboard/attendee/schedule"
+            className="group bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg shadow-lg p-8 text-white transition-all hover:shadow-xl"
+          >
             <div className="flex items-center gap-4 mb-4">
               <div className="w-14 h-14 bg-white/20 rounded-lg flex items-center justify-center text-3xl">
                 📅
@@ -159,13 +195,10 @@ export default async function AttendeeDashboard() {
             <p className="text-blue-100 mb-4">
               See all your upcoming classes and sessions
             </p>
-            <Link
-              href="/dashboard/attendee/schedule"
-              className="inline-flex items-center text-sm font-medium hover:gap-2 transition-all"
-            >
+            <span className="inline-flex items-center text-sm font-medium group-hover:gap-2 transition-all">
               View Calendar
               <svg
-                className="w-4 h-4 ml-1"
+                className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -177,10 +210,14 @@ export default async function AttendeeDashboard() {
                   d="M9 5l7 7-7 7"
                 />
               </svg>
-            </Link>
-          </div>
+            </span>
+          </Link>
 
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-8 text-white">
+          {/* Attendance History Card */}
+          <Link
+            href="/dashboard/attendee/attendance"
+            className="group bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 rounded-lg shadow-lg p-8 text-white transition-all hover:shadow-xl"
+          >
             <div className="flex items-center gap-4 mb-4">
               <div className="w-14 h-14 bg-white/20 rounded-lg flex items-center justify-center text-3xl">
                 📖
@@ -190,13 +227,10 @@ export default async function AttendeeDashboard() {
             <p className="text-purple-100 mb-4">
               Track your attendance and participation
             </p>
-            <Link
-              href="/dashboard/attendee/attendance"
-              className="inline-flex items-center text-sm font-medium hover:gap-2 transition-all"
-            >
+            <span className="inline-flex items-center text-sm font-medium group-hover:gap-2 transition-all">
               View History
               <svg
-                className="w-4 h-4 ml-1"
+                className="w-4 h-4 ml-1 group-hover: translate-x-1 transition-transform"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -208,7 +242,43 @@ export default async function AttendeeDashboard() {
                   d="M9 5l7 7-7 7"
                 />
               </svg>
-            </Link>
+            </span>
+          </Link>
+        </div>
+
+        {/* User Info Card (for verification) */}
+        <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark: border-blue-800 rounded-lg p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
+                <span className="text-2xl">ℹ️</span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                Your Account Details
+              </h4>
+              <div className="space-y-1 text-sm text-blue-800 dark:text-blue-200">
+                <p>
+                  <strong>Email:</strong> {user.email}
+                </p>
+                <p>
+                  <strong>Name:</strong> {user.full_name || "Not set"}
+                </p>
+                <p>
+                  <strong>Role:</strong> {user.role}
+                </p>
+                <p>
+                  <strong>Verified:</strong>{" "}
+                  {user.verified ? "✅ Yes" : "⚠️ Not verified"}
+                </p>
+                {!user.verified && (
+                  <p className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                    Check your email to verify your account
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </main>

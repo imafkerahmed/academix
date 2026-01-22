@@ -1,38 +1,29 @@
-import {
-  withMiddlewareAuthRequired,
-  getSession,
-} from "@auth0/nextjs-auth0/edge";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export default withMiddlewareAuthRequired(async function middleware(
-  req: NextRequest,
-) {
-  const session = await getSession(req, new NextResponse());
+export function middleware(request: NextRequest) {
+  const pbAuth = request.cookies.get("pb_auth");
+  const pathname = request.nextUrl.pathname;
 
-  if (!session) {
-    return NextResponse.redirect(new URL("/api/auth/login", req.url));
+  // Public routes
+  const publicPaths = ["/", "/login", "/signup"];
+  const isPublicPath = publicPaths.includes(pathname);
+
+  // If not authenticated and trying to access protected route
+  if (!pbAuth && !isPublicPath && pathname.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  const user = session.user;
-  const pathname = req.nextUrl.pathname;
-
-  // Get role from Auth0 custom claims
-  const role = user["https://yourapp.com/role"] || "attendee";
-
-  // Protect host routes
-  if (pathname.startsWith("/dashboard/host") && role !== "host") {
-    return NextResponse.redirect(new URL("/dashboard/attendee", req.url));
-  }
-
-  // Protect attendee routes
-  if (pathname.startsWith("/dashboard/attendee") && role === "host") {
-    return NextResponse.redirect(new URL("/dashboard/host", req.url));
+  // If authenticated and trying to access login/signup
+  if (pbAuth && (pathname === "/login" || pathname === "/signup")) {
+    // Redirect to appropriate dashboard based on role
+    // We'll handle this in the client side
+    return NextResponse.redirect(new URL("/dashboard/host", request.url));
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/login", "/signup"],
 };

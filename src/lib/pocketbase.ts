@@ -4,19 +4,27 @@ const pb = new PocketBase(
   process.env.NEXT_PUBLIC_POCKETBASE_URL || "http://localhost:8090",
 );
 
-// Disable auto cancellation
+// Enable auto-refresh
 pb.autoCancellation(false);
+
+// Store auth in cookie (persists across page refreshes)
+if (typeof window !== "undefined") {
+  pb.authStore.onChange(() => {
+    document.cookie = pb.authStore.exportToCookie({ httpOnly: false });
+  });
+}
 
 export default pb;
 
-// Type definitions for our collections
+// Type definitions
 export interface User {
   id: string;
   email: string;
-  name: string;
+  username: string;
+  full_name?: string;
   role: "host" | "attendee";
-  auth0_id: string;
   avatar?: string;
+  verified: boolean;
   created: string;
   updated: string;
 }
@@ -58,3 +66,12 @@ export interface ClassAttendee {
   created: string;
   updated: string;
 }
+
+// Helper functions
+export const isAuthenticated = () => pb.authStore.isValid;
+
+export const getCurrentUser = () => pb.authStore.model as User | null;
+
+export const logout = () => {
+  pb.authStore.clear();
+};
