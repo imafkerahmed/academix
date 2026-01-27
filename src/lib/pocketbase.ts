@@ -22,7 +22,7 @@ export interface User {
   email: string;
   username: string;
   full_name?: string;
-  role: "host" | "attendee";
+  role: "host" | "attendee" | "admin" | "student" | "lectuer";
   avatar?: string;
   verified: boolean;
   created: string;
@@ -68,43 +68,9 @@ export interface ClassAttendee {
 }
 
 // Helper functions
-export const isAuthenticated = () => pb.authStore.isValid;
+// Removed duplicate isAuthenticated and getCurrentUser
 
-export const getCurrentUser = () => pb.authStore.model as User | null;
-
-export const logout = () => {
-  pb.authStore.clear();
-};
-import PocketBase from "pocketbase";
-
-const pb = new PocketBase(
-  process.env.NEXT_PUBLIC_POCKETBASE_URL || "http://localhost:8090",
-);
-
-// Enable auto-refresh
-pb.autoCancellation(false);
-
-// Store auth in cookie (persists across page refreshes)
-if (typeof window !== "undefined") {
-  pb.authStore.onChange(() => {
-    document.cookie = pb.authStore.exportToCookie({ httpOnly: false });
-  });
-}
-
-export default pb;
-
-// Type definitions
-export interface User {
-  id: string;
-  email: string;
-  username: string;
-  full_name?: string;
-  role: "host" | "attendee";
-  avatar?: string;
-  verified: boolean;
-  created: string;
-  updated: string;
-}
+// Removed duplicate logout
 
 export interface ZoomToken {
   id: string;
