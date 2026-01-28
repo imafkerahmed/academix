@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import GradientText from "@/components/ui/GradientText";
+import StudentProfile from "@/components/student-profile";
 import NotificationButton from "@/components/ui/notification-button";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
@@ -41,7 +42,9 @@ export default function StudentDashboard() {
       <header className="flex items-center justify-between px-12 py-4 bg-white shadow mb-6 rounded-lg">
         {/* Left: Title with SplitText */}
         <div className="flex items-center">
-          <GradientText className="text-2xl font-bold ml-8">ACADEMIX</GradientText>
+          <GradientText className="text-2xl font-bold ml-8">
+            ACADEMIX
+          </GradientText>
         </div>
         {/* Right: Notification Button and Profile Icon */}
         <div className="flex items-center gap-4 mr-8 relative">
@@ -113,11 +116,53 @@ export default function StudentDashboard() {
       )}
       {/* Main Grid Layout */}
 
-      <div className="grid grid-cols-5 grid-rows-5 gap-4">
-        <div className="col-span-2 row-span-2">1</div>
-        <div className="col-span-3 row-span-2 col-start-3">2</div>
-        <div className="col-span-2 row-span-3 row-start-3">3</div>
-        <div className="col-span-3 row-span-3 col-start-3 row-start-3">4</div>
+      <div
+        className="grid gap-4 p-8"
+        style={{
+          gridTemplateColumns: "5fr 4fr", // Increased first column width
+          gridTemplateRows: "repeat(3, 1fr)",
+          display: "grid",
+        }}
+      >
+        <div
+          className="mb-6 border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-0 flex"
+          style={{ padding: 0 }}
+        >
+          <StudentProfile
+            name="Afker Ahmed"
+            role="Student"
+            imageUrl="/profile-img.jpg"
+            courses={[
+              {
+                code: "AMZ/B12/BED/0001",
+                title: "Bachelor of Education",
+                status: "Ongoing",
+                certificate: "Not Issued",
+              },
+              {
+                code: "AMZ/B11/HNDT/0002",
+                title: "HND (UK) in Teacher Training",
+                status: "Completed",
+                certificate: "Issued",
+              },
+              {
+                code: "AMZ/B10/AbeDET/0003",
+                title: "ABE (UK) Diploma in Education and Training",
+                status: "Completed",
+                certificate: "Issued",
+              },
+            ]}
+          />
+        </div>
+        <div className="mb-6 border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold">
+          2
+        </div>
+        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold">
+          3
+        </div>
+        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold">
+          4
+        </div>
       </div>
     </div>
   );
