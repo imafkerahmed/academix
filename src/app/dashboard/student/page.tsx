@@ -119,8 +119,8 @@ export default function StudentDashboard() {
       <div
         className="grid gap-4 p-8"
         style={{
-          gridTemplateColumns: "5fr 4fr", // Increased first column width
-          gridTemplateRows: "repeat(3, 1fr)",
+          gridTemplateColumns: "3fr 5fr", // Reduced first column width
+          gridTemplateRows: "300px 1fr 1fr", // Increased height of first row
           display: "grid",
         }}
       >
