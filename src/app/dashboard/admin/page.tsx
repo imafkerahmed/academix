@@ -14,7 +14,7 @@ export default function AdminDashboard() {
     const currentUser = getCurrentUser();
 
     if (!currentUser) {
-      router.push("/login");
+      router.push("/");
       return;
     }
 

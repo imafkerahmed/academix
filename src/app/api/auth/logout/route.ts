@@ -1,7 +1,5 @@
-import { NextResponse } from "next/server";
-import pb from "@/lib/pocketbase";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST() {
-  pb.authStore.clear();
-  return NextResponse.json({ message: "Logged out successfully" });
+export async function POST(_request: NextRequest) {
+  return NextResponse.json({ error: "Logout route removed" }, { status: 404 });
 }

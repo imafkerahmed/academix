@@ -5,25 +5,27 @@ export function middleware(request: NextRequest) {
   const pbAuth = request.cookies.get("pb_auth");
   const pathname = request.nextUrl.pathname;
 
-  // Public routes
-  const publicPaths = ["/", "/login", "/signup"];
-  const isPublicPath = publicPaths.includes(pathname);
-
-  // If not authenticated and trying to access protected route
-  if (!pbAuth && !isPublicPath && pathname.startsWith("/dashboard")) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  // Developer bypass: allow dashboard access when NEXT_PUBLIC_ALLOW_DASHBOARD=1
+  try {
+    if (process.env.NEXT_PUBLIC_ALLOW_DASHBOARD === "1") {
+      return NextResponse.next();
+    }
+  } catch (e) {
+    // ignore in edge runtime if env not available
   }
 
-  // If authenticated and trying to access login/signup
-  if (pbAuth && (pathname === "/login" || pathname === "/signup")) {
-    // Redirect to appropriate dashboard based on role
-    // We'll handle this in the client side
-    return NextResponse.redirect(new URL("/dashboard/host", request.url));
+  // Public routes (only home is public now)
+  const publicPaths = ["/"];
+  const isPublicPath = publicPaths.includes(pathname);
+
+  // If not authenticated and trying to access protected route, send to home
+  if (!pbAuth && !isPublicPath && pathname.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/signup"],
+  matcher: ["/dashboard/:path*"],
 };

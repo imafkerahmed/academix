@@ -2,9 +2,20 @@
 
 import React, { useState, useRef } from "react";
 import GradientText from "@/components/ui/GradientText";
-import StudentProfile from "@/components/student-profile";
 import NotificationButton from "@/components/ui/notification-button";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import CourseList from "@/components/CourseList";
+// Mock data for enrolled courses
+const courses = [
+  {
+    id: "1",
+    name: "Mathematics 101",
+    description: "Intro to Algebra and Calculus",
+  },
+  { id: "2", name: "Physics 201", description: "Mechanics and Thermodynamics" },
+  { id: "3", name: "History 101", description: "World History Overview" },
+  { id: "4", name: "Computer Science 101", description: "Programming Basics" },
+];
 
 export default function StudentDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -116,52 +127,33 @@ export default function StudentDashboard() {
       )}
       {/* Main Grid Layout */}
 
-      <div
-        className="grid gap-4 p-8"
-        style={{
-          gridTemplateColumns: "3fr 5fr", // Reduced first column width
-          gridTemplateRows: "300px 1fr 1fr", // Increased height of first row
-          display: "grid",
-        }}
-      >
-        <div
-          className="mb-6 border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-0 flex"
-          style={{ padding: 0 }}
-        >
-          <StudentProfile
-            name="Afker Ahmed"
-            role="Student"
-            imageUrl="/profile-img.jpg"
-            courses={[
-              {
-                code: "AMZ/B12/BED/0001",
-                title: "Bachelor of Education",
-                status: "Ongoing",
-                certificate: "Not Issued",
-              },
-              {
-                code: "AMZ/B11/HNDT/0002",
-                title: "HND (UK) in Teacher Training",
-                status: "Completed",
-                certificate: "Issued",
-              },
-              {
-                code: "AMZ/B10/AbeDET/0003",
-                title: "ABE (UK) Diploma in Education and Training",
-                status: "Completed",
-                certificate: "Issued",
-              },
-            ]}
-          />
+      <div className="grid gap-4 p-4 sm:p-6 md:p-8 grid-cols-1 grid-rows-none md:grid-cols-4 md:grid-rows-3">
+        {/* Section 1 (student profile removed) */}
+        <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-6 flex items-center justify-center col-span-1 md:col-span-2 md:col-start-1 md:row-start-1">
+          <div className="text-center text-gray-500">
+            Student profile removed. Will be redesigned later.
+          </div>
         </div>
-        <div className="mb-6 border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold">
-          2
+        {/* Section 2: Enrolled Courses */}
+        <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-4 md:row-span-2 md:col-start-1 md:row-start-2 flex flex-col">
+          <h2 className="text-xl font-semibold mb-4">Enrolled Courses</h2>
+          <CourseList courses={courses} />
         </div>
-        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold">
+        {/* Section 3 */}
+        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:col-span-2 md:row-span-2 md:col-start-2 md:row-start-2">
           3
         </div>
-        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold">
+        {/* Section 4 */}
+        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:row-span-2 md:col-start-4 md:row-start-2">
           4
+        </div>
+        {/* Section 5 */}
+        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:col-start-3 md:row-start-1">
+          5
+        </div>
+        {/* Section 6 */}
+        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:col-start-4 md:row-start-1">
+          6
         </div>
       </div>
     </div>

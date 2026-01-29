@@ -14,7 +14,7 @@ export default function LectuerDashboard() {
     const currentUser = getCurrentUser();
 
     if (!currentUser) {
-      router.push("/login");
+      router.push("/");
       return;
     }
 

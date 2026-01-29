@@ -14,29 +14,8 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-4 w-full">
-          <Link
-            href="/login"
-            className="flex h-12 items-center justify-center rounded-lg bg-blue-600 px-6 text-white font-medium transition-colors hover:bg-blue-700"
-          >
-            Sign In
-          </Link>
-
-          <Link
-            href="/signup"
-            className="flex h-12 items-center justify-center rounded-lg border-2 border-blue-600 px-6 text-blue-600 font-medium transition-colors hover:bg-blue-50 dark:hover:bg-gray-700"
-          >
-            Sign Up
-          </Link>
-        </div>
-
-        <div className="text-sm text-gray-500 dark: text-gray-400 text-center space-y-1">
-          <p>
-            🎯 Sign up as a <strong>host</strong> to schedule classes
-          </p>
-          <p>
-            📚 Sign up as an <strong>attendee</strong> to join classes
-          </p>
+        <div className="text-sm text-gray-500 dark: text-gray-400 text-center">
+          <p>Welcome — explore the dashboard when available.</p>
         </div>
       </main>
     </div>
