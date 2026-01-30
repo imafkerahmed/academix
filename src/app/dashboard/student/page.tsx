@@ -5,16 +5,42 @@ import GradientText from "@/components/ui/GradientText";
 import NotificationButton from "@/components/ui/notification-button";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import CourseList from "@/components/CourseList";
+import Calendar from "@/components/Calendar";
+// import Calendar from "@/components/Calendar";
 // Mock data for enrolled courses
 const courses = [
   {
     id: "1",
     name: "Mathematics 101",
+    registrationNumber: "REG-2024-001",
     description: "Intro to Algebra and Calculus",
+    courseStatus: "Ongoing",
+    certificateStatus: "Not Issued",
   },
-  { id: "2", name: "Physics 201", description: "Mechanics and Thermodynamics" },
-  { id: "3", name: "History 101", description: "World History Overview" },
-  { id: "4", name: "Computer Science 101", description: "Programming Basics" },
+  {
+    id: "2",
+    name: "Physics 201",
+    registrationNumber: "REG-2024-002",
+    description: "Mechanics and Thermodynamics",
+    courseStatus: "Completed",
+    certificateStatus: "Issued",
+  },
+  {
+    id: "3",
+    name: "History 101",
+    registrationNumber: "REG-2024-003",
+    description: "World History Overview",
+    courseStatus: "Ongoing",
+    certificateStatus: "Not Issued",
+  },
+  {
+    id: "4",
+    name: "Computer Science 101",
+    registrationNumber: "REG-2024-004",
+    description: "Programming Basics",
+    courseStatus: "Completed",
+    certificateStatus: "Issued",
+  },
 ];
 
 export default function StudentDashboard() {
@@ -139,13 +165,12 @@ export default function StudentDashboard() {
           <h2 className="text-xl font-semibold mb-4">Enrolled Courses</h2>
           <CourseList courses={courses} />
         </div>
-        {/* Section 3 */}
-        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:col-span-2 md:row-span-2 md:col-start-2 md:row-start-2">
-          3
-        </div>
-        {/* Section 4 */}
-        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:row-span-2 md:col-start-4 md:row-start-2">
-          4
+        {/* Merged Section 3 & 4: Calendar */}
+        <div className="border border-gray-300 rounded-xl min-w-0 w-full h-full md:col-span-3 md:row-span-2 md:col-start-2 md:row-start-2 p-4 flex flex-col">
+          <h2 className="text-xl font-semibold mb-4">Calendar</h2>
+          <div className="flex-1 min-h-0">
+            <Calendar />
+          </div>
         </div>
         {/* Section 5 */}
         <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:col-start-3 md:row-start-1">

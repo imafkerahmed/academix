@@ -1,0 +1,490 @@
+import React, { useState } from "react";
+
+// Mock event data structure
+const mockEvents = [
+  {
+    id: 1,
+    title: "Zoom Math Class",
+    topic: "Algebra: Quadratic Equations",
+    type: "Online Zoom Class",
+    date: "2024-01-10",
+    startTime: "10:00",
+    endTime: "11:00",
+    platform: "Zoom",
+  },
+  {
+    id: 2,
+    title: "Assignment: Algebra HW",
+    type: "Assignment",
+    date: "2024-01-10",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+  {
+    id: 3,
+    title: "Zoom Science Class",
+    topic: "Physics: Newton's Laws",
+    type: "Online Zoom Class",
+    date: "2024-01-12",
+    startTime: "09:00",
+    endTime: "10:00",
+    platform: "Zoom",
+  },
+  {
+    id: 4,
+    title: "Assignment: Lab Report",
+    type: "Assignment",
+    date: "2024-01-12",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+  {
+    id: 5,
+    title: "Zoom English Class",
+    topic: "Literature: Shakespeare",
+    type: "Online Zoom Class",
+    date: "2024-01-14",
+    startTime: "13:00",
+    endTime: "14:00",
+    platform: "Zoom",
+  },
+  {
+    id: 6,
+    title: "Physical Chemistry Class",
+    topic: "Lab: Acids & Bases",
+    type: "Physical Class",
+    date: "2024-01-15",
+    startTime: "08:00",
+    endTime: "09:30",
+    platform: "Room 204",
+  },
+  {
+    id: 7,
+    title: "Holiday: Republic Day",
+    type: "Holiday",
+    date: "2024-01-26",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+  {
+    id: 8,
+    title: "Physical Math Class",
+    topic: "Geometry: Circles",
+    type: "Physical Class",
+    date: "2024-01-18",
+    startTime: "11:00",
+    endTime: "12:00",
+    platform: "Room 101",
+  },
+  {
+    id: 9,
+    title: "Holiday: Sports Day",
+    type: "Holiday",
+    date: "2024-01-20",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+];
+
+// Helper to get days in month
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+// Helper to get start day of week for month (0=Sun, 1=Mon...)
+function getStartDay(year: number, month: number) {
+  return new Date(year, month, 1).getDay();
+}
+
+// Helper to get week days
+const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Event badge color
+const typeBadge: Record<string, string> = {
+  "Online Zoom Class": "bg-blue-100 text-blue-700 border-blue-200",
+  "Physical Class": "bg-yellow-100 text-yellow-700 border-yellow-200",
+  Holiday: "bg-purple-100 text-purple-700 border-purple-200",
+  Assignment: "bg-green-100 text-green-700 border-green-200",
+};
+
+// EventItem component
+function EventItem({ event }: { event: (typeof mockEvents)[0] }) {
+  return (
+    <div
+      className={`flex items-center gap-2 mt-1 px-1 py-0.5 rounded text-xs bg-gray-50 border ${typeBadge[event.type] || "border-gray-200"}`}
+    >
+      <span
+        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${typeBadge[event.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
+      >
+        {event.type}
+      </span>
+      <span className="font-medium truncate">{event.title}</span>
+      {/* Show topic for Zoom class */}
+      {event.type === "Online Zoom Class" && event.topic && (
+        <span className="ml-2 text-blue-500 font-medium truncate">
+          {event.topic}
+        </span>
+      )}
+      {event.startTime && (
+        <span className="ml-auto text-gray-400">
+          {event.startTime}
+          {event.endTime ? ` - ${event.endTime}` : ""}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// DayCell component
+function DayCell({
+  day,
+  date,
+  events,
+  isToday,
+  isSelected,
+  onClick,
+  onDoubleClick,
+}: {
+  day: number;
+  date: string;
+  events: typeof mockEvents;
+  isToday: boolean;
+  isSelected: boolean;
+  onClick: () => void;
+  onDoubleClick?: () => void;
+}) {
+  return (
+    <button
+      className={`w-full h-24 p-1 rounded-lg border border-transparent flex flex-col items-start text-left relative transition
+        ${isToday ? "bg-indigo-100 border-indigo-400" : "hover:bg-gray-50"}
+        ${isSelected ? "ring-2 ring-indigo-400" : ""}
+      `}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+    >
+      <span
+        className={`text-lg font-bold ${isToday ? "text-indigo-600" : "text-gray-700"}`}
+      >
+        {day}
+      </span>
+      <div className="flex-1 w-full overflow-y-auto">
+        {events.slice(0, 3).map((event) => (
+          <EventItem key={event.id} event={event} />
+        ))}
+        {events.length > 3 && (
+          <span className="text-xs text-gray-400">
+            +{events.length - 3} more
+          </span>
+        )}
+      </div>
+      {events.length > 0 && (
+        <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-400 rounded-full"></span>
+      )}
+    </button>
+  );
+}
+
+// Main Calendar component
+interface CalendarProps {
+  onModalOpenChange?: (open: boolean) => void;
+}
+
+const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
+  // Render day view (must be inside Calendar to access state)
+  function renderDay() {
+    const d = new Date(current.year, current.month, current.day);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const events = getEventsForDate(dateStr);
+    return (
+      <div className="grid grid-cols-1 gap-2">
+        <DayCell
+          key={dateStr}
+          day={d.getDate()}
+          date={dateStr}
+          events={events}
+          isToday={dateStr === todayStr}
+          isSelected={selected === dateStr}
+          onClick={() => setSelected(dateStr)}
+          onDoubleClick={() => {
+            setSelected(dateStr);
+            setModalDate(dateStr);
+          }}
+        />
+      </div>
+    );
+  }
+  // State for view, date, and selected day
+  const [view, setView] = useState<"month" | "week" | "day">("month");
+  const [current, setCurrent] = useState(() => {
+    const now = new Date();
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth(),
+      day: now.getDate(),
+    };
+  });
+  const [selected, setSelected] = useState<string | null>(null);
+  const [modalDate, setModalDate] = useState<string | null>(null);
+
+  // Get today string for highlight
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Get events for a date
+  const getEventsForDate = (date: string) =>
+    mockEvents.filter((e) => e.date === date);
+
+  // Navigation handlers
+  function prev() {
+    if (view === "month") {
+      setCurrent((c) => {
+        const m = c.month === 0 ? 11 : c.month - 1;
+        const y = c.month === 0 ? c.year - 1 : c.year;
+        return { ...c, year: y, month: m };
+      });
+    } else if (view === "week" || view === "day") {
+      setCurrent((c) => {
+        const d = new Date(c.year, c.month, c.day - (view === "week" ? 7 : 1));
+        return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+      });
+    }
+  }
+  function next() {
+    if (view === "month") {
+      setCurrent((c) => {
+        const m = c.month === 11 ? 0 : c.month + 1;
+        const y = c.month === 11 ? c.year + 1 : c.year;
+        return { ...c, year: y, month: m };
+      });
+    } else if (view === "week" || view === "day") {
+      setCurrent((c) => {
+        const d = new Date(c.year, c.month, c.day + (view === "week" ? 7 : 1));
+        return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+      });
+    }
+  }
+
+  // Modal for expanded day events
+  const closeModal = () => {
+    setModalDate(null);
+    if (onModalOpenChange) onModalOpenChange(false);
+  };
+
+  // Render month view
+  function renderMonth() {
+    const days = getDaysInMonth(current.year, current.month);
+    const start = getStartDay(current.year, current.month);
+    const cells = [];
+    for (let i = 0; i < start; i++) cells.push(<div key={"empty-" + i}></div>);
+    for (let d = 1; d <= days; d++) {
+      const dateStr = `${current.year}-${String(current.month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const events = getEventsForDate(dateStr);
+      cells.push(
+        <DayCell
+          key={dateStr}
+          day={d}
+          date={dateStr}
+          events={events}
+          isToday={dateStr === todayStr}
+          isSelected={selected === dateStr}
+          onClick={() => setSelected(dateStr)}
+          onDoubleClick={() => {
+            setSelected(dateStr);
+            setModalDate(dateStr);
+            if (onModalOpenChange) onModalOpenChange(true);
+          }}
+        />,
+      );
+    }
+    return (
+      <div className="grid grid-cols-7 gap-2">
+        {weekDays.map((w) => (
+          <div
+            key={w}
+            className="text-xs font-bold text-gray-400 text-center mb-1"
+          >
+            {w}
+          </div>
+        ))}
+        {cells}
+      </div>
+    );
+  }
+
+  // Render week view
+  function renderWeek() {
+    const refDate = new Date(current.year, current.month, current.day);
+    const weekStart = new Date(refDate);
+    weekStart.setDate(refDate.getDate() - weekStart.getDay());
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const events = getEventsForDate(dateStr);
+      days.push(
+        <DayCell
+          key={dateStr}
+          day={d.getDate()}
+          date={dateStr}
+          events={events}
+          isToday={dateStr === todayStr}
+          isSelected={selected === dateStr}
+          onClick={() => setSelected(dateStr)}
+          onDoubleClick={() => {
+            setSelected(dateStr);
+            setModalDate(dateStr);
+          }}
+        />,
+      );
+    }
+    return (
+      <div className="grid grid-cols-7 gap-2">
+        {weekDays.map((w) => (
+          <div
+            key={w}
+            className="text-xs font-bold text-gray-400 text-center mb-1"
+          >
+            {w}
+          </div>
+        ))}
+        {days}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      id="calendar-root"
+      className="w-full h-full bg-white rounded-2xl p-4 flex flex-col"
+    >
+      {/* Header: Navigation & View Switch */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={prev}
+            className="p-2 rounded hover:bg-gray-100 text-gray-500"
+          >
+            <span className="sr-only">Previous</span>
+            <svg width="20" height="20" fill="none" viewBox="0 0 20 20">
+              <path
+                d="M12 15l-5-5 5-5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <div className="text-lg font-semibold text-gray-700">
+            {view === "month" &&
+              `${new Date(current.year, current.month).toLocaleString("default", { month: "long" })} ${current.year}`}
+            {view === "week" &&
+              `Week of ${new Date(current.year, current.month, current.day).toLocaleDateString()}`}
+            {view === "day" &&
+              `${new Date(current.year, current.month, current.day).toLocaleDateString()}`}
+          </div>
+          <button
+            onClick={next}
+            className="p-2 rounded hover:bg-gray-100 text-gray-500"
+          >
+            <span className="sr-only">Next</span>
+            <svg width="20" height="20" fill="none" viewBox="0 0 20 20">
+              <path
+                d="M8 5l5 5-5 5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setView("day")}
+            className={`px-3 py-1 rounded-lg text-sm font-medium ${view === "day" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-700"}`}
+          >
+            Day
+          </button>
+          <button
+            onClick={() => setView("week")}
+            className={`px-3 py-1 rounded-lg text-sm font-medium ${view === "week" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-700"}`}
+          >
+            Week
+          </button>
+          <button
+            onClick={() => setView("month")}
+            className={`px-3 py-1 rounded-lg text-sm font-medium ${view === "month" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-700"}`}
+          >
+            Month
+          </button>
+        </div>
+      </div>
+      {/* Calendar Body */}
+      <div className="flex-1">
+        {view === "month" && renderMonth()}
+        {view === "week" && renderWeek()}
+        {view === "day" && renderDay()}
+      </div>
+
+      {/* Modal for expanded day events */}
+      {modalDate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,41,59,0.25)] backdrop-blur-sm"
+          onClick={closeModal}
+        >
+          <div
+            className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
+            style={{ minHeight: "340px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 text-2xl font-bold"
+              onClick={() => {
+                const modal = document.getElementById("calendar-modal");
+                if (modal) {
+                  modal.classList.remove("animate-zoomIn");
+                  modal.classList.add("animate-zoomOut");
+                  const calendar = document.getElementById("calendar-root");
+                  if (calendar) {
+                    calendar.classList.remove("animate-zoomOut");
+                    calendar.classList.add("animate-zoomIn");
+                  }
+                  setTimeout(() => closeModal(), 200);
+                } else {
+                  closeModal();
+                }
+              }}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <div id="calendar-modal" className="animate-zoomIn">
+              <div className="mb-4 text-lg font-bold text-gray-700 flex items-center gap-2">
+                {(() => {
+                  const d = new Date(modalDate);
+                  return `${weekDays[d.getDay()]}, ${d.toLocaleDateString()}`;
+                })()}
+              </div>
+              <div className="flex flex-col gap-2">
+                {getEventsForDate(modalDate).length === 0 ? (
+                  <div className="text-gray-400">No events for this day.</div>
+                ) : (
+                  getEventsForDate(modalDate).map((event) => (
+                    <EventItem key={event.id} event={event} />
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Calendar;
