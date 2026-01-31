@@ -88,6 +88,111 @@ const mockEvents = [
     endTime: "",
     platform: "",
   },
+  {
+    id: 10,
+    title: "Zoom Biology Class",
+    topic: "Cell Structure",
+    type: "Online Zoom Class",
+    date: "2026-01-31",
+    startTime: "15:00",
+    endTime: "16:00",
+    platform: "Zoom",
+  },
+  {
+    id: 11,
+    title: "Assignment: Chemistry HW",
+    type: "Assignment",
+    date: "2026-02-02",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+  {
+    id: 12,
+    title: "Physical Physics Class",
+    topic: "Electromagnetism",
+    type: "Physical Class",
+    date: "2026-02-05",
+    startTime: "10:00",
+    endTime: "11:30",
+    platform: "Room 303",
+  },
+  {
+    id: 13,
+    title: "Holiday: Founders Day",
+    type: "Holiday",
+    date: "2026-02-10",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+  {
+    id: 14,
+    title: "Zoom Math Revision",
+    topic: "Exam Prep",
+    type: "Online Zoom Class",
+    date: "2026-02-12",
+    startTime: "09:00",
+    endTime: "10:00",
+    platform: "Zoom",
+  },
+  {
+    id: 15,
+    title: "Assignment: English Essay",
+    type: "Assignment",
+    date: "2026-02-13",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+  {
+    id: 16,
+    title: "Physical Chemistry Lab",
+    topic: "Organic Compounds",
+    type: "Physical Class",
+    date: "2026-02-14",
+    startTime: "11:00",
+    endTime: "12:30",
+    platform: "Lab 2",
+  },
+  {
+    id: 17,
+    title: "Holiday: Spring Break",
+    type: "Holiday",
+    date: "2026-02-15",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+  {
+    id: 18,
+    title: "Zoom History Class",
+    topic: "World War II",
+    type: "Online Zoom Class",
+    date: "2026-02-16",
+    startTime: "14:00",
+    endTime: "15:00",
+    platform: "Zoom",
+  },
+  {
+    id: 19,
+    title: "Assignment: Physics Quiz",
+    type: "Assignment",
+    date: "2026-02-17",
+    startTime: "",
+    endTime: "",
+    platform: "",
+  },
+  {
+    id: 20,
+    title: "Physical Math Class",
+    topic: "Trigonometry",
+    type: "Physical Class",
+    date: "2026-02-18",
+    startTime: "10:00",
+    endTime: "11:30",
+    platform: "Room 105",
+  },
 ];
 
 // Helper to get days in month
@@ -99,6 +204,8 @@ function getDaysInMonth(year: number, month: number) {
 function getStartDay(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
+
+export { mockEvents };
 
 // Helper to get week days
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -159,7 +266,8 @@ function DayCell({
 }) {
   return (
     <button
-      className={`w-full h-24 p-1 rounded-lg border border-transparent flex flex-col items-start text-left relative transition
+      className={`w-full h-24 p-1 rounded-lg border flex flex-col items-start text-left relative transition
+        border-gray-300
         ${isToday ? "bg-indigo-100 border-indigo-400" : "hover:bg-gray-50"}
         ${isSelected ? "ring-2 ring-indigo-400" : ""}
       `}

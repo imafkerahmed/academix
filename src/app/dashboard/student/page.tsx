@@ -6,8 +6,8 @@ import NotificationButton from "@/components/ui/notification-button";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import CourseList from "@/components/CourseList";
 import Calendar from "@/components/Calendar";
-// import Calendar from "@/components/Calendar";
-// Mock data for enrolled courses
+import Section5Schedules from "@/components/Schedules";
+
 const courses = [
   {
     id: "1",
@@ -173,9 +173,8 @@ export default function StudentDashboard() {
           </div>
         </div>
         {/* Section 5 */}
-        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:col-start-3 md:row-start-1">
-          5
-        </div>
+        {/* Section 5: Upcoming Schedules */}
+        <Section5Schedules />
         {/* Section 6 */}
         <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:col-start-4 md:row-start-1">
           6
