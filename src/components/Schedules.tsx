@@ -1,3 +1,7 @@
+import dynamic from "next/dynamic";
+const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList.jsx"), {
+  ssr: false,
+});
 // Badge color mapping (referenced from Calendar.tsx)
 const typeBadge: Record<string, string> = {
   "Online Zoom Class": "bg-blue-100 text-blue-700 border-blue-200",
@@ -77,11 +81,11 @@ export default function Section5Schedules() {
       </button>
       {modalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm"
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
+            className="bg-white rounded-2xl p-8 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
             style={{ minHeight: "340px" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -95,29 +99,47 @@ export default function Section5Schedules() {
             <h3 className="text-lg font-bold mb-4 uppercase">
               ALL UPCOMING SCHEDULES
             </h3>
-            <ul className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-400 scrollbar-track-gray-200">
-              {getUpcomingSchedules(mockEvents).map((ev: EventType) => (
-                <li
-                  key={ev.id}
-                  className={`p-3 rounded-lg border flex flex-col ${ev.date === today ? "bg-indigo-50 border-indigo-400" : "bg-gray-50 border-gray-200"}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-base">{ev.title}</span>
-                    <span
-                      className={`text-xs px-2 py-1 rounded border ml-2 font-semibold ${typeBadge[ev.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
-                    >
-                      {ev.type}
-                    </span>
+            <div className="max-h-[400px] overflow-y-auto no-scrollbar">
+              <AnimatedList
+                items={getUpcomingSchedules(mockEvents).map((ev: EventType) => (
+                  <div
+                    key={ev.id}
+                    className={`p-3 rounded-lg border-4 flex flex-col bg-white w-full ${
+                      ev.type === "Online Zoom Class"
+                        ? "border-blue-200"
+                        : ev.type === "Physical Class"
+                          ? "border-yellow-200"
+                          : ev.type === "Assignment"
+                            ? "border-green-200"
+                            : ev.type === "Holiday"
+                              ? "border-purple-200"
+                              : "border-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-base">{ev.title}</span>
+                      <span
+                        className={`text-xs px-2 py-1 rounded border ml-2 font-semibold ${typeBadge[ev.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
+                      >
+                        {ev.type}
+                      </span>
+                    </div>
+                    {ev.topic && (
+                      <div className="text-sm text-blue-600 mt-1">
+                        {ev.topic}
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-500 mt-1">
+                      {ev.date} {ev.startTime && `| ${ev.startTime}`}
+                    </div>
                   </div>
-                  {ev.topic && (
-                    <div className="text-sm text-blue-600 mt-1">{ev.topic}</div>
-                  )}
-                  <div className="text-xs text-gray-500 mt-1">
-                    {ev.date} {ev.startTime && `| ${ev.startTime}`}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                ))}
+                displayScrollbar={false}
+                showGradients={false}
+                itemClassName=""
+                onItemSelect={() => {}}
+              />
+            </div>
           </div>
         </div>
       )}

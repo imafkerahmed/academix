@@ -1,5 +1,10 @@
 import React, { useState } from "react";
 
+import dynamic from "next/dynamic";
+const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList.jsx"), {
+  ssr: false,
+});
+
 // Mock event data structure
 const mockEvents = [
   {
@@ -546,7 +551,7 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
           onClick={closeModal}
         >
           <div
-            className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
+            className="bg-white rounded-2xl p-8 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
             style={{ minHeight: "340px" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -571,22 +576,55 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
             >
               &times;
             </button>
-            <div id="calendar-modal" className="animate-zoomIn">
-              <div className="mb-4 text-lg font-bold text-gray-700 flex items-center gap-2">
-                {(() => {
-                  const d = new Date(modalDate);
-                  return `${weekDays[d.getDay()]}, ${d.toLocaleDateString()}`;
-                })()}
-              </div>
-              <div className="flex flex-col gap-2">
-                {getEventsForDate(modalDate).length === 0 ? (
-                  <div className="text-gray-400">No events for this day.</div>
-                ) : (
-                  getEventsForDate(modalDate).map((event) => (
-                    <EventItem key={event.id} event={event} />
-                  ))
-                )}
-              </div>
+            <h3 className="text-lg font-bold mb-4 uppercase">
+              {(() => {
+                const d = new Date(modalDate);
+                return `${weekDays[d.getDay()]}, ${d.toLocaleDateString()}`;
+              })()}
+            </h3>
+            <div className="max-h-[400px] overflow-y-auto no-scrollbar">
+              <AnimatedList
+                items={getEventsForDate(modalDate).map((event) => (
+                  <div
+                    key={event.id}
+                    className={`p-3 rounded-lg border-4 flex flex-col bg-white w-full ${
+                      event.type === "Online Zoom Class"
+                        ? "border-blue-200"
+                        : event.type === "Physical Class"
+                          ? "border-yellow-200"
+                          : event.type === "Assignment"
+                            ? "border-green-200"
+                            : event.type === "Holiday"
+                              ? "border-purple-200"
+                              : "border-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-base">{event.title}</span>
+                      <span
+                        className={`text-xs px-2 py-1 rounded border ml-2 font-semibold ${typeBadge[event.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
+                      >
+                        {event.type}
+                      </span>
+                    </div>
+                    {event.topic && (
+                      <div className="text-sm text-blue-600 mt-1">
+                        {event.topic}
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-500 mt-1">
+                      {event.date} {event.startTime && `| ${event.startTime}`}
+                    </div>
+                  </div>
+                ))}
+                displayScrollbar={false}
+                showGradients={false}
+                itemClassName=""
+                onItemSelect={() => {}}
+              />
+              {getEventsForDate(modalDate).length === 0 && (
+                <div className="text-gray-400">No events for this day.</div>
+              )}
             </div>
           </div>
         </div>

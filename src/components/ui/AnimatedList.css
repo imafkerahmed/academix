@@ -33,13 +33,13 @@
 
 .item {
   padding: 16px;
-  background-color: #170d27;
+  background-color: transparent;
   border-radius: 8px;
   margin-bottom: 1rem;
 }
 
 .item.selected {
-  background-color: #271e37;
+  background-color: transparent;
 }
 
 .item-text {
