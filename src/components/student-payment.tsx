@@ -220,7 +220,7 @@ export default function StudentPayment() {
   };
 
   return (
-    <div className="border border-gray-300 shadow-lg rounded-xl w-full h-full p-4 bg-white flex flex-col">
+    <div className="border border-gray-300 shadow-lg rounded-xl w-full h-full px-6 py-4 bg-white flex flex-col">
       <div className="flex items-center">
         <h2 className="text-xl font-semibold">Payments</h2>
       </div>
@@ -269,31 +269,22 @@ export default function StudentPayment() {
               )}
             </AnimatePresence>
           </div>
-          {duesForRotation.length > 1 && (
-            <div className="mt-2 flex items-center gap-1">
-              {duesForRotation.map((_, idx) => (
-                <span
-                  key={`dot-${idx}`}
-                  className={`inline-block w-1.5 h-1.5 rounded-full ${idx === dueIndex ? "bg-red-600" : "bg-red-300"}`}
-                />
-              ))}
-            </div>
-          )}
+          {/* Dots removed per request to reduce visual height */}
         </div>
 
-        {/* Last Payment (compact) */}
-        <div className="border border-gray-200 bg-gray-50 rounded-lg p-3">
-          <div className="text-[11px] text-gray-700 font-semibold">
+        {/* Last Payment (extra-compact) */}
+        <div className="border border-gray-200 bg-gray-50 rounded-lg p-2">
+          <div className="text-[10px] text-gray-700 font-semibold">
             Last Payment
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <div className="text-xl font-bold text-gray-800 leading-tight">
+          <div className="flex items-center justify-between mt-0.5">
+            <div className="text-lg font-bold text-gray-800 leading-tight">
               {lastPaid
                 ? formatCurrency(lastPaid.amount, lastPaid.currency)
                 : "—"}
             </div>
             <div
-              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+              className={`text-[9px] px-2 py-0.5 rounded-full font-semibold ${
                 lastPaid?.status === "Paid"
                   ? "bg-green-100 text-green-700"
                   : lastPaid?.status === "Pending"
@@ -304,7 +295,7 @@ export default function StudentPayment() {
               {lastPaid?.status ?? "N/A"}
             </div>
           </div>
-          <div className="text-[11px] text-gray-600 mt-0.5 leading-snug truncate">
+          <div className="text-[10px] text-gray-600 mt-0 leading-snug truncate">
             {lastPaid
               ? `Date: ${lastPaid.date}${lastPaid.course ? ` — ${lastPaid.course}` : ""}`
               : "No payment history"}
@@ -329,146 +320,158 @@ export default function StudentPayment() {
       </div>
 
       {/* Submit Receipt Modal */}
-      {showPayModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={closePayModal}
-          aria-modal
-        >
-          <div
-            className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative"
-            onClick={(e) => e.stopPropagation()}
+      <AnimatePresence>
+        {showPayModal && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+            onClick={closePayModal}
+            aria-modal
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
           >
-            <button
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl font-bold"
-              onClick={closePayModal}
-              aria-label="Close"
+            <motion.div
+              className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ y: 24, scale: 0.98, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 16, scale: 0.98, opacity: 0 }}
+              transition={{ duration: 0.25 }}
             >
-              &times;
-            </button>
-            <div className="textt -lg font-semibold mb-4 uppercase">RAISE</div>
-            <div className="space-y-3">
-              {/* Course selection inside modal */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Course
-                </label>
-                <select
-                  className="mt-1 w-full border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={selectedCourse}
-                  onChange={(e) => setSelectedCourse(e.target.value)}
-                >
-                  <option value="">Select a course</option>
-                  {courseOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                {selectedCourse && (
-                  <div className="mt-3 border border-red-300 bg-red-50 rounded-lg p-3">
-                    {(() => {
-                      const d = mockDues.find(
-                        (x) => x.course === selectedCourse,
-                      );
-                      return d ? (
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-red-700 font-semibold">
-                              Outstanding
-                            </span>
-                            <span className="text-base font-bold text-red-700">
-                              {formatCurrency(d.amount, d.currency)}
-                            </span>
+              <button
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl font-bold"
+                onClick={closePayModal}
+                aria-label="Close"
+              >
+                &times;
+              </button>
+              <div className="textt -lg font-semibold mb-4 uppercase">
+                RAISE PAYMENT
+              </div>
+              <div className="space-y-3">
+                {/* Course selection inside modal */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Course
+                  </label>
+                  <select
+                    className="mt-1 w-full border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={selectedCourse}
+                    onChange={(e) => setSelectedCourse(e.target.value)}
+                  >
+                    <option value="">Select a course</option>
+                    {courseOptions.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedCourse && (
+                    <div className="mt-3 border border-red-300 bg-red-50 rounded-lg p-3">
+                      {(() => {
+                        const d = mockDues.find(
+                          (x) => x.course === selectedCourse,
+                        );
+                        return d ? (
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-red-700 font-semibold">
+                                Outstanding
+                              </span>
+                              <span className="text-base font-bold text-red-700">
+                                {formatCurrency(d.amount, d.currency)}
+                              </span>
+                            </div>
+                            <div className="text-xs text-red-600 mt-1">
+                              Due: {d.dueDate}
+                            </div>
                           </div>
-                          <div className="text-xs text-red-600 mt-1">
-                            Due: {d.dueDate}
+                        ) : (
+                          <div className="text-xs text-red-600">
+                            No outstanding for the selected course.
                           </div>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-red-600">
-                          No outstanding for the selected course.
-                        </div>
-                      );
-                    })()}
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload + remarks gated by course */}
+                {!courseOptions.length || selectedCourse ? (
+                  <>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Receipt Files
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,image/jpeg,image/png"
+                      multiple
+                      className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => onFilesSelected(e.target.files)}
+                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Remarks (optional)
+                      </label>
+                      <textarea
+                        className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        rows={3}
+                        placeholder="Any notes for the admin..."
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-xs text-red-600">
+                    Select a course to continue.
                   </div>
                 )}
-              </div>
 
-              {/* Upload + remarks gated by course */}
-              {!courseOptions.length || selectedCourse ? (
-                <>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Receipt Files
-                  </label>
-                  <input
-                    type="file"
-                    accept=".pdf,image/jpeg,image/png"
-                    multiple
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    onChange={(e) => onFilesSelected(e.target.files)}
-                  />
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Remarks (optional)
-                    </label>
-                    <textarea
-                      className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                      rows={3}
-                      placeholder="Any notes for the admin..."
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                    />
+                {fileError && (
+                  <div className="text-xs text-red-600">{fileError}</div>
+                )}
+                {previews.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {previews.map((src, idx) => (
+                      <img
+                        key={idx}
+                        src={src}
+                        alt="Receipt preview"
+                        className="w-full h-20 object-cover rounded border"
+                      />
+                    ))}
                   </div>
-                </>
-              ) : (
-                <div className="text-xs text-red-600">
-                  Select a course to continue.
-                </div>
-              )}
-
-              {fileError && (
-                <div className="text-xs text-red-600">{fileError}</div>
-              )}
-              {previews.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {previews.map((src, idx) => (
-                    <img
-                      key={idx}
-                      src={src}
-                      alt="Receipt preview"
-                      className="w-full h-20 object-cover rounded border"
-                    />
-                  ))}
-                </div>
-              )}
-              {files.length > 0 && (
-                <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>{files.length} file(s) selected</span>
-                  <button
-                    type="button"
-                    className="text-indigo-600 hover:underline"
-                    onClick={clearUploads}
-                  >
-                    Clear
-                  </button>
-                </div>
-              )}
-              <button
-                className="w-full mt-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-60 uppercase"
-                disabled={
-                  processing ||
-                  files.length === 0 ||
-                  (courseOptions.length > 0 && !selectedCourse)
-                }
-                onClick={handleSubmitReceipt}
-              >
-                {processing ? "Submitting..." : "Submit Receipt"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                )}
+                {files.length > 0 && (
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>{files.length} file(s) selected</span>
+                    <button
+                      type="button"
+                      className="text-indigo-600 hover:underline"
+                      onClick={clearUploads}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+                <button
+                  className="w-full mt-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-60 uppercase"
+                  disabled={
+                    processing ||
+                    files.length === 0 ||
+                    (courseOptions.length > 0 && !selectedCourse)
+                  }
+                  onClick={handleSubmitReceipt}
+                >
+                  {processing ? "Submitting..." : "Submit Receipt"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Success toast */}
       <AnimatePresence>
@@ -615,7 +618,7 @@ function PaymentHistoryModal({
         >
           &times;
         </button>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 pr-12">
           <div className="text-lg font-semibold uppercase">Payment History</div>
           <div>
             <select
@@ -726,7 +729,7 @@ function ReceiptPreviewModal({ preview, onClose }: ReceiptPreviewModalProps) {
         >
           &times;
         </button>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 pr-12">
           <div className="text-lg font-semibold">Receipt Preview</div>
           <div className="flex gap-2">
             <button
