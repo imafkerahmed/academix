@@ -90,6 +90,7 @@ const CourseList: React.FC<CourseListProps> = ({ courses }) => {
       <div className="hidden md:block">
         <AnimatedList
           items={items}
+          onItemSelect={() => {}}
           showGradients={false}
           displayScrollbar={true}
           className="w-full"
