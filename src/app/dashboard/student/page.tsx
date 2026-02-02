@@ -7,6 +7,7 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import CourseList from "@/components/CourseList";
 import Calendar from "@/components/Calendar";
 import Section5Schedules from "@/components/Schedules";
+import StudentPayment from "@/components/student-payment";
 
 const courses = [
   {
@@ -175,9 +176,9 @@ export default function StudentDashboard() {
         {/* Section 5 */}
         {/* Section 5: Upcoming Schedules */}
         <Section5Schedules />
-        {/* Section 6 */}
-        <div className="border border-gray-300 shadow-lg rounded-xl flex items-center justify-center min-w-0 w-full h-full text-3xl font-bold md:col-start-4 md:row-start-1">
-          6
+        {/* Section 6: Payments */}
+        <div className="md:col-start-4 md:row-start-1">
+          <StudentPayment />
         </div>
       </div>
     </div>
