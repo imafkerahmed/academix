@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { PaymentHistoryModal } from "./PaymentHistoryModal";
+// PaymentHistoryModal is now inlined below for easier maintenance
 
 type PaymentStatus = "Paid" | "Pending" | "Failed";
 
@@ -116,6 +116,20 @@ export default function StudentPayment() {
     return [...list].sort((a, b) => b.date.localeCompare(a.date))[0];
   }, [history]);
 
+  // Rotate through outstanding dues when multiple exist
+  const duesForRotation = useMemo(() => [...mockDues], [mockDues]);
+  const [dueIndex, setDueIndex] = useState(0);
+  React.useEffect(() => {
+    if (duesForRotation.length <= 1) {
+      setDueIndex(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setDueIndex((i) => (i + 1) % duesForRotation.length);
+    }, 3500);
+    return () => clearInterval(id);
+  }, [duesForRotation.length]);
+
   // Helper for consistent currency formatting (avoid SSR/CSR mismatch)
   const formatCurrency = (amount: number, currency: string) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
@@ -213,27 +227,58 @@ export default function StudentPayment() {
 
       {/* Summaries */}
       <div className="mt-4 space-y-3">
-        {/* Outstanding Summary */}
+        {/* Outstanding Summary (carousel per course) */}
         <div className="border border-red-300 bg-red-50 rounded-lg p-4">
           <div className="text-xs text-red-700 font-semibold">Outstanding</div>
-          <div className="flex items-end justify-between mt-1">
-            <div className="text-2xl font-bold text-red-700">
-              {outstandingTotal > 0 && (earliestDue?.currency || "USD")
-                ? formatCurrency(
-                    outstandingTotal,
-                    earliestDue?.currency || "USD",
-                  )
-                : "—"}
-            </div>
-            <div className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
-              {mockDues.length} due(s)
-            </div>
+          <div className="relative mt-2 h-16 overflow-hidden">
+            <AnimatePresence mode="wait" initial={false}>
+              {duesForRotation.length > 0 ? (
+                duesForRotation.slice(dueIndex, dueIndex + 1).map((d) => (
+                  <motion.div
+                    key={`${d.course}-${d.dueDate}`}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.35 }}
+                    className="absolute inset-0 flex flex-col"
+                  >
+                    <div className="flex items-end justify-between">
+                      <div className="text-2xl font-bold text-red-700">
+                        {formatCurrency(d.amount, d.currency)}
+                      </div>
+                      <div className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold max-w-[60%] truncate">
+                        {d.course || "Course"}
+                      </div>
+                    </div>
+                    <div className="text-xs text-red-700 mt-1">
+                      Due: {d.dueDate}
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <motion.div
+                  key="no-dues"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="absolute inset-0 flex items-center text-xs text-red-700"
+                >
+                  No outstanding dues
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <div className="text-xs text-red-700 mt-1">
-            {earliestDue
-              ? `Next due: ${earliestDue.dueDate}${earliestDue.course ? ` — ${earliestDue.course}` : ""}`
-              : "No outstanding dues"}
-          </div>
+          {duesForRotation.length > 1 && (
+            <div className="mt-2 flex items-center gap-1">
+              {duesForRotation.map((_, idx) => (
+                <span
+                  key={`dot-${idx}`}
+                  className={`inline-block w-1.5 h-1.5 rounded-full ${idx === dueIndex ? "bg-red-600" : "bg-red-300"}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Last Payment (compact) */}
@@ -273,7 +318,7 @@ export default function StudentPayment() {
           className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
           onClick={() => setShowPayModal(true)}
         >
-          SUBMIT RECEIPT
+          RAISE NEW PAYMENTS
         </button>
         <button
           className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
@@ -301,7 +346,7 @@ export default function StudentPayment() {
             >
               &times;
             </button>
-            <div className="text-lg font-semibold mb-4 uppercase">RAISE</div>
+            <div className="textt -lg font-semibold mb-4 uppercase">RAISE</div>
             <div className="space-y-3">
               {/* Course selection inside modal */}
               <div>
@@ -479,6 +524,285 @@ export default function StudentPayment() {
           courseOptions={courseOptions}
         />
       )}
+    </div>
+  );
+}
+
+// Inlined PaymentHistoryModal for easier maintenance
+type PaymentHistoryModalProps = {
+  onClose: () => void;
+  history: Array<{
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+    currency: string;
+    status: "Paid" | "Pending" | "Failed";
+    receiptUrl?: string;
+    course?: string;
+  }>;
+  mockDues: Array<{
+    amount: number;
+    currency: string;
+    dueDate: string;
+    description?: string;
+    course?: string;
+  }>;
+  courseOptions: string[];
+};
+
+function PaymentHistoryModal({
+  onClose,
+  history,
+  mockDues,
+  courseOptions,
+}: PaymentHistoryModalProps) {
+  type ModalPaymentStatus = "Paid" | "Pending" | "Failed" | "Outstanding";
+  type HistoryRow = {
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+    currency: string;
+    status: ModalPaymentStatus;
+    course?: string;
+    receiptUrl?: string;
+  };
+
+  const [filterCourse, setFilterCourse] = useState("");
+  const [preview, setPreview] = useState<null | { url: string; type: string }>(
+    null,
+  );
+
+  const formatCurrency = (amount: number, currency: string) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
+      amount,
+    );
+
+  const outstandingRows: HistoryRow[] = useMemo(
+    () =>
+      mockDues
+        .filter((d) => !filterCourse || d.course === filterCourse)
+        .map((d) => ({
+          id: `due-${d.course}-${d.dueDate}`,
+          date: d.dueDate,
+          description: d.description || d.course || "",
+          amount: d.amount,
+          currency: d.currency,
+          status: "Outstanding" as ModalPaymentStatus,
+          course: d.course,
+          receiptUrl: undefined,
+        })),
+    [mockDues, filterCourse],
+  );
+
+  const filteredHistory: HistoryRow[] = (
+    filterCourse ? history.filter((h) => h.course === filterCourse) : history
+  ).map((h) => ({ ...h }));
+
+  const allRows: HistoryRow[] = [...outstandingRows, ...filteredHistory];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div
+        className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl font-bold"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          &times;
+        </button>
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-lg font-semibold uppercase">Payment History</div>
+          <div>
+            <select
+              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              value={filterCourse}
+              onChange={(e) => setFilterCourse(e.target.value)}
+            >
+              <option value="">All Courses</option>
+              {courseOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-600">
+                <th className="py-2 px-3">Date</th>
+                <th className="py-2 px-3">Course</th>
+                <th className="py-2 px-3">Description</th>
+                <th className="py-2 px-3">Amount</th>
+                <th className="py-2 px-3">Status</th>
+                <th className="py-2 px-3">Receipt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allRows.map((row) => (
+                <tr key={row.id} className="border-t border-gray-200">
+                  <td className="py-2 px-3 text-gray-700">{row.date}</td>
+                  <td className="py-2 px-3 text-gray-700">
+                    {row.course || "—"}
+                  </td>
+                  <td className="py-2 px-3 text-gray-700">{row.description}</td>
+                  <td className="py-2 px-3 font-medium">
+                    {row.status === "Outstanding" ? (
+                      <span className="text-red-700 font-bold">
+                        {formatCurrency(row.amount, row.currency)}
+                      </span>
+                    ) : row.status === "Pending" && row.amount === 0 ? (
+                      "—"
+                    ) : (
+                      formatCurrency(row.amount, row.currency)
+                    )}
+                  </td>
+                  <td className="py-2 px-3">
+                    {row.status === "Outstanding" ? (
+                      <span className="text-red-600 font-semibold">
+                        Outstanding
+                      </span>
+                    ) : (
+                      <span>{row.status}</span>
+                    )}
+                  </td>
+                  <td className="py-2 px-3">
+                    {row.receiptUrl ? (
+                      <button
+                        className="text-indigo-600 hover:underline"
+                        onClick={() =>
+                          setPreview({
+                            url: row.receiptUrl!,
+                            type: row.receiptUrl!.endsWith(".pdf")
+                              ? "pdf"
+                              : "image",
+                          })
+                        }
+                      >
+                        View
+                      </button>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {preview && (
+          <ReceiptPreviewModal
+            preview={preview}
+            onClose={() => setPreview(null)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+type ReceiptPreviewModalProps = {
+  preview: { url: string; type: string };
+  onClose: () => void;
+};
+
+function ReceiptPreviewModal({ preview, onClose }: ReceiptPreviewModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div
+        className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl font-bold"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          &times;
+        </button>
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-lg font-semibold">Receipt Preview</div>
+          <div className="flex gap-2">
+            <button
+              className="text-gray-600 hover:text-indigo-600"
+              onClick={() => window.print()}
+              title="Print"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                className="w-6 h-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 9V2h12v7"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"
+                />
+                <rect width="12" height="8" x="6" y="14" rx="2" />
+              </svg>
+            </button>
+            <a
+              className="text-gray-600 hover:text-indigo-600"
+              href={preview.url}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Download"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                className="w-6 h-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 10l5 5 5-5M12 15V3"
+                />
+              </svg>
+            </a>
+          </div>
+        </div>
+        <div className="flex justify-center items-center min-h-[300px]">
+          {preview.type === "pdf" ? (
+            <iframe
+              src={preview.url}
+              className="w-full h-[400px] border rounded"
+              title="PDF Preview"
+            />
+          ) : (
+            <img
+              src={preview.url}
+              alt="Receipt"
+              className="max-h-[400px] w-auto rounded border"
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
