@@ -92,7 +92,7 @@ const CourseList: React.FC<CourseListProps> = ({ courses }) => {
           items={items}
           onItemSelect={() => {}}
           showGradients={false}
-          displayScrollbar={true}
+          displayScrollbar={false}
           className="w-full"
           itemClassName=""
         />
