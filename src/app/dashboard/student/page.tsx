@@ -155,7 +155,7 @@ export default function StudentDashboard() {
       )}
       {/* Main Grid Layout */}
 
-      <div className="pt-20 grid gap-4 p-4 sm:p-6 md:p-8 grid-cols-1 grid-rows-none md:grid-cols-4 md:grid-rows-3">
+      <div className="grid gap-4 p-4 sm:p-6 md:p-8 grid-cols-1 grid-rows-none md:grid-cols-4 md:grid-rows-3">
         {/* Section 1: Student Profile */}
         <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-4 md:p-6 col-span-1 md:col-span-2 md:col-start-1 md:row-start-1">
           <StudentProfile
