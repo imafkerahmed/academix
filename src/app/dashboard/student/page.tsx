@@ -7,6 +7,7 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import CourseList from "@/components/CourseList";
 import Calendar from "@/components/Calendar";
 import Section5Schedules from "@/components/Schedules";
+import StudentProfile from "@/components/student-profile";
 import StudentPayment from "@/components/student-payment";
 
 const courses = [
@@ -75,9 +76,9 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div>
+    <div className="min-h-screen pt-20">
       {/* Header */}
-      <header className="flex items-center justify-between px-12 py-4 bg-white shadow mb-6 rounded-lg">
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-12 py-4 bg-white shadow">
         {/* Left: Title with SplitText */}
         <div className="flex items-center">
           <GradientText className="text-2xl font-bold ml-8">
@@ -125,7 +126,7 @@ export default function StudentDashboard() {
       {drawerVisible && (
         <div
           className={`
-            fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-lg z-50 flex flex-col border-l border-gray-200
+            fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-lg z-40 flex flex-col border-l border-gray-200
             transition-transform transition-opacity
             ${
               showNotifications
@@ -154,12 +155,18 @@ export default function StudentDashboard() {
       )}
       {/* Main Grid Layout */}
 
-      <div className="grid gap-4 p-4 sm:p-6 md:p-8 grid-cols-1 grid-rows-none md:grid-cols-4 md:grid-rows-3">
-        {/* Section 1 (student profile removed) */}
-        <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-6 flex items-center justify-center col-span-1 md:col-span-2 md:col-start-1 md:row-start-1">
-          <div className="text-center text-gray-500">
-            Student profile removed. Will be redesigned later.
-          </div>
+      <div className="pt-20 grid gap-4 p-4 sm:p-6 md:p-8 grid-cols-1 grid-rows-none md:grid-cols-4 md:grid-rows-3">
+        {/* Section 1: Student Profile */}
+        <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-4 md:p-6 col-span-1 md:col-span-2 md:col-start-1 md:row-start-1">
+          <StudentProfile
+            fullName="Mohammed Inayathullah Afker Ahmed"
+            studentId="REG-2024-XYZ"
+            role="STUDENT"
+            avatarUrl="/profile-img.jpg"
+            accountStatus="Active"
+            advisorName="Dr. Sarah Johnson"
+            advisorEmail="sarah.johnson@academix.edu"
+          />
         </div>
         {/* Section 2: Enrolled Courses */}
         <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-4 md:row-span-2 md:col-start-1 md:row-start-2 flex flex-col">
