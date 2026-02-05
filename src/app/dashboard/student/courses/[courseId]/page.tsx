@@ -255,26 +255,17 @@ export default function CoursePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back Button */}
-        <RouteLink
-          href="/dashboard/student"
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {/* Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 text-sm text-gray-600 mb-6">
+          <RouteLink
+            href="/dashboard/student"
+            className="hover:text-gray-900 transition-colors"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          <span className="font-medium">Back to Dashboard</span>
-        </RouteLink>
+            Dashboard
+          </RouteLink>
+          <span>/</span>
+          <span className="text-gray-900 font-medium">{course.name}</span>
+        </div>
 
         {/* Course Title and Info Card */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">

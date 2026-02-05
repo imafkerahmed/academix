@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import dynamic from "next/dynamic";
 const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList.jsx"), {
@@ -342,6 +342,18 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
   });
   const [selected, setSelected] = useState<string | null>(null);
   const [modalDate, setModalDate] = useState<string | null>(null);
+
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (modalDate) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [modalDate]);
 
   // Get today string for highlight
   const todayStr = new Date().toISOString().slice(0, 10);

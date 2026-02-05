@@ -297,6 +297,28 @@ export default function SubjectPage() {
     return () => clearTimeout(t);
   }, [showSuccessModal]);
 
+  // Prevent background scrolling when modals are open
+  React.useEffect(() => {
+    if (
+      showAssignmentModal ||
+      showSuccessModal ||
+      showMaterialModal ||
+      showVideoModal
+    ) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [
+    showAssignmentModal,
+    showSuccessModal,
+    showMaterialModal,
+    showVideoModal,
+  ]);
+
   // Helper function to extract YouTube video ID
   const getYouTubeVideoId = (url: string) => {
     const regExp =

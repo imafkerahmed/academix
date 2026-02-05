@@ -14,6 +14,12 @@ type PaymentDue = {
   course?: string;
 };
 
+type CourseInfo = {
+  courseName: string;
+  totalFee: number;
+  currency: string;
+};
+
 type PaymentHistoryItem = {
   id: string;
   date: string; // YYYY-MM-DD
@@ -40,17 +46,31 @@ export default function StudentPayment() {
   const [processing, setProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Mock data for outstanding dues
+  // Mock data for course fees
+  const courseFees: CourseInfo[] = [
+    {
+      courseName: "Spring 2026 Tuition",
+      totalFee: 3600, // Total course fee
+      currency: "USD",
+    },
+    {
+      courseName: "Physics Lab",
+      totalFee: 600,
+      currency: "USD",
+    },
+  ];
+
+  // Mock data for outstanding dues (current installment)
   const mockDues: PaymentDue[] = [
     {
-      amount: 1200,
+      amount: 1200, // Current installment due
       currency: "USD",
       dueDate: "2026-02-15",
       description: "Spring 2026 Tuition (Installment 2)",
       course: "Spring 2026 Tuition",
     },
     {
-      amount: 300,
+      amount: 300, // Current installment due
       currency: "USD",
       dueDate: "2026-02-20",
       description: "Physics Lab Fee",
@@ -168,6 +188,18 @@ export default function StudentPayment() {
     const t = setTimeout(() => setShowSuccess(false), 3000);
     return () => clearTimeout(t);
   }, [showSuccess]);
+
+  // Prevent background scrolling when modals are open
+  React.useEffect(() => {
+    if (showPayModal || showSuccess || showHistoryModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [showPayModal, showSuccess, showHistoryModal]);
 
   // Pre-select if only one course
   React.useEffect(() => {
@@ -524,6 +556,7 @@ export default function StudentPayment() {
           onClose={() => setShowHistoryModal(false)}
           history={history}
           mockDues={mockDues}
+          courseFees={courseFees}
           courseOptions={courseOptions}
         />
       )}
@@ -551,6 +584,11 @@ type PaymentHistoryModalProps = {
     description?: string;
     course?: string;
   }>;
+  courseFees: Array<{
+    courseName: string;
+    totalFee: number;
+    currency: string;
+  }>;
   courseOptions: string[];
 };
 
@@ -558,6 +596,7 @@ function PaymentHistoryModal({
   onClose,
   history,
   mockDues,
+  courseFees,
   courseOptions,
 }: PaymentHistoryModalProps) {
   type ModalPaymentStatus = "Paid" | "Pending" | "Failed" | "Outstanding";
@@ -576,6 +615,14 @@ function PaymentHistoryModal({
   const [preview, setPreview] = useState<null | { url: string; type: string }>(
     null,
   );
+
+  // Prevent background scrolling when modal is open
+  React.useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
 
   const formatCurrency = (amount: number, currency: string) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
@@ -605,24 +652,152 @@ function PaymentHistoryModal({
 
   const allRows: HistoryRow[] = [...outstandingRows, ...filteredHistory];
 
+  // Calculate summary statistics
+  // Current Due = Current installment amount due
+  const currentDue = useMemo(
+    () =>
+      mockDues
+        .filter((d) => !filterCourse || d.course === filterCourse)
+        .reduce((sum, d) => sum + d.amount, 0),
+    [mockDues, filterCourse],
+  );
+
+  // Total Paid = Sum of all successful payments
+  const totalPaid = useMemo(
+    () =>
+      history
+        .filter((h) => h.status === "Paid")
+        .filter((h) => !filterCourse || h.course === filterCourse)
+        .reduce((sum, h) => sum + h.amount, 0),
+    [history, filterCourse],
+  );
+
+  // Balance = Total course fees - Total paid
+  const balance = useMemo(() => {
+    const totalCourseFees = courseFees
+      .filter((c) => !filterCourse || c.courseName === filterCourse)
+      .reduce((sum, c) => sum + c.totalFee, 0);
+    return totalCourseFees - totalPaid;
+  }, [courseFees, totalPaid, filterCourse]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div
-        className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-gradient-to-br from-white to-gray-50 rounded-2xl md:rounded-3xl w-full max-w-4xl shadow-2xl relative max-h-[95vh] md:max-h-[90vh] flex flex-col m-2 md:m-4"
         onClick={(e) => e.stopPropagation()}
+        initial={{ y: 50, scale: 0.95, opacity: 0 }}
+        animate={{ y: 0, scale: 1, opacity: 1 }}
+        exit={{ y: 30, scale: 0.95, opacity: 0 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
       >
-        <button
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl font-bold"
-          onClick={onClose}
-          aria-label="Close"
-        >
-          &times;
-        </button>
-        <div className="flex items-center justify-between mb-4 pr-12">
-          <div className="text-lg font-semibold uppercase">Payment History</div>
-          <div>
+        {/* Header */}
+        <div className="relative p-4 md:p-6 pb-3 md:pb-4 border-b border-gray-200">
+          <button
+            className="absolute top-4 md:top-6 right-4 md:right-6 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-all z-10"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+
+          <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4 pr-10">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
+              <svg
+                className="w-5 h-5 md:w-7 md:h-7 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg md:text-2xl font-bold text-gray-900 truncate">
+                Payment History
+              </h2>
+              <p className="text-xs md:text-sm text-gray-500 truncate">
+                View transactions & dues
+              </p>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-3 gap-2 md:gap-3 mb-3 md:mb-4">
+            <div
+              className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg md:rounded-xl p-2 md:p-3 border-2 border-red-200"
+              title="Current installment due"
+            >
+              <div className="text-[10px] md:text-xs font-semibold text-red-700 mb-0.5 md:mb-1 uppercase tracking-wide">
+                Due Now
+              </div>
+              <div className="text-sm md:text-xl font-bold text-red-700 truncate">
+                {formatCurrency(currentDue, "USD")}
+              </div>
+            </div>
+            <div
+              className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg md:rounded-xl p-2 md:p-3 border-2 border-green-200"
+              title="Total amount paid so far"
+            >
+              <div className="text-[10px] md:text-xs font-semibold text-green-700 mb-0.5 md:mb-1 uppercase tracking-wide">
+                Total Paid
+              </div>
+              <div className="text-sm md:text-xl font-bold text-green-700 truncate">
+                {formatCurrency(totalPaid, "USD")}
+              </div>
+            </div>
+            <div
+              className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg md:rounded-xl p-2 md:p-3 border-2 border-blue-200"
+              title="Remaining balance to pay"
+            >
+              <div className="text-[10px] md:text-xs font-semibold text-blue-700 mb-0.5 md:mb-1 uppercase tracking-wide">
+                Remaining
+              </div>
+              <div className="text-sm md:text-xl font-bold text-blue-700 truncate">
+                {formatCurrency(balance, "USD")}
+              </div>
+            </div>
+          </div>
+
+          {/* Filter */}
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-4 h-4 md:w-5 md:h-5 text-gray-400 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
+            </svg>
             <select
-              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="flex-1 text-xs md:text-sm border-2 border-gray-200 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-2.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               value={filterCourse}
               onChange={(e) => setFilterCourse(e.target.value)}
             >
@@ -635,50 +810,301 @@ function PaymentHistoryModal({
             </select>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-600">
-                <th className="py-2 px-3">Date</th>
-                <th className="py-2 px-3">Course</th>
-                <th className="py-2 px-3">Description</th>
-                <th className="py-2 px-3">Amount</th>
-                <th className="py-2 px-3">Status</th>
-                <th className="py-2 px-3">Receipt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allRows.map((row) => (
-                <tr key={row.id} className="border-t border-gray-200">
-                  <td className="py-2 px-3 text-gray-700">{row.date}</td>
-                  <td className="py-2 px-3 text-gray-700">
-                    {row.course || "—"}
-                  </td>
-                  <td className="py-2 px-3 text-gray-700">{row.description}</td>
-                  <td className="py-2 px-3 font-medium">
+
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-3 md:space-y-3">
+          {allRows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                <svg
+                  className="w-10 h-10 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              </div>
+              <p className="text-gray-500 text-lg font-medium">
+                No payment records found
+              </p>
+              <p className="text-gray-400 text-sm mt-1">
+                Your payment history will appear here
+              </p>
+            </div>
+          ) : (
+            allRows.map((row, idx) => (
+              <motion.div
+                key={row.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.03 }}
+                className={`relative rounded-lg md:rounded-2xl transition-all hover:shadow-lg overflow-hidden ${
+                  row.status === "Outstanding"
+                    ? "bg-gradient-to-r from-red-50 to-orange-50 border-l-4 md:border-l-0 md:border-2 border-red-500 md:border-red-300 md:hover:border-red-400"
+                    : row.status === "Paid"
+                      ? "bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 md:border-l-0 md:border-2 border-green-500 md:border-green-300 md:hover:border-green-400"
+                      : row.status === "Pending"
+                        ? "bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 md:border-l-0 md:border-2 border-amber-500 md:border-amber-300 md:hover:border-amber-400"
+                        : "bg-gradient-to-r from-gray-50 to-slate-50 border-l-4 md:border-l-0 md:border-2 border-gray-500 md:border-gray-300 md:hover:border-gray-400"
+                }`}
+              >
+                {/* Mobile Compact Bar View */}
+                <div className="md:hidden">
+                  <div className="flex items-center justify-between p-2.5">
+                    <div className="flex-1 min-w-0">
+                      {/* Course Tag & Description */}
+                      <div className="flex items-center gap-2 mb-1">
+                        {row.course && (
+                          <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/70 text-gray-700 border border-gray-300 uppercase tracking-wide">
+                            {row.course}
+                          </span>
+                        )}
+                        {row.status === "Outstanding" ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold">
+                            <svg
+                              className="w-2.5 h-2.5"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            DUE
+                          </span>
+                        ) : row.status === "Paid" ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-500 text-white text-[9px] font-bold">
+                            <svg
+                              className="w-2.5 h-2.5"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            PAID
+                          </span>
+                        ) : row.status === "Pending" ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold">
+                            <svg
+                              className="w-2.5 h-2.5 animate-spin"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            PENDING
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-500 text-white text-[9px] font-bold">
+                            FAILED
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-xs font-semibold text-gray-900 leading-tight truncate mb-0.5">
+                        {row.description}
+                      </h3>
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
+                        <span className="font-mono">{row.id}</span>
+                        <span>•</span>
+                        <span>{row.date}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 ml-2">
+                      <div
+                        className={`text-base font-bold whitespace-nowrap ${
+                          row.status === "Outstanding"
+                            ? "text-red-700"
+                            : row.status === "Paid"
+                              ? "text-green-700"
+                              : "text-gray-700"
+                        }`}
+                      >
+                        {row.status === "Pending" && row.amount === 0
+                          ? "—"
+                          : formatCurrency(row.amount, row.currency)}
+                      </div>
+                      {row.receiptUrl && (
+                        <button
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-bold shadow-sm"
+                          onClick={() =>
+                            setPreview({
+                              url: row.receiptUrl!,
+                              type: row.receiptUrl!.endsWith(".pdf")
+                                ? "pdf"
+                                : "image",
+                            })
+                          }
+                        >
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
+                          </svg>
+                          VIEW
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Desktop View (existing design) */}
+                <div className="hidden md:block p-5">
+                  {/* Status Badge */}
+                  <div className="absolute top-5 right-5">
                     {row.status === "Outstanding" ? (
-                      <span className="text-red-700 font-bold">
-                        {formatCurrency(row.amount, row.currency)}
-                      </span>
-                    ) : row.status === "Pending" && row.amount === 0 ? (
-                      "—"
-                    ) : (
-                      formatCurrency(row.amount, row.currency)
-                    )}
-                  </td>
-                  <td className="py-2 px-3">
-                    {row.status === "Outstanding" ? (
-                      <span className="text-red-600 font-semibold">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500 text-white text-xs font-bold shadow-md">
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
                         Outstanding
                       </span>
+                    ) : row.status === "Paid" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500 text-white text-xs font-bold shadow-md">
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Paid
+                      </span>
+                    ) : row.status === "Pending" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500 text-white text-xs font-bold shadow-md">
+                        <svg
+                          className="w-3.5 h-3.5 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Pending
+                      </span>
                     ) : (
-                      <span>{row.status}</span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-500 text-white text-xs font-bold shadow-md">
+                        Failed
+                      </span>
                     )}
-                  </td>
-                  <td className="py-2 px-3">
-                    {row.receiptUrl ? (
+                  </div>
+
+                  <div className="pr-32">
+                    {/* Payment ID & Course Tag */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                        {row.id}
+                      </span>
+                      {row.course && (
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/60 backdrop-blur-sm text-gray-700 border border-gray-200">
+                          {row.course}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <h3 className="text-base font-semibold text-gray-900 mb-1 leading-tight line-clamp-2">
+                      {row.description}
+                    </h3>
+
+                    {/* Date and Amount */}
+                    <div className="flex items-center gap-4 mt-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <svg
+                          className="w-4 h-4 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <span className="font-medium">{row.date}</span>
+                      </div>
+
+                      <div
+                        className={`text-xl font-bold ${
+                          row.status === "Outstanding"
+                            ? "text-red-700"
+                            : row.status === "Paid"
+                              ? "text-green-700"
+                              : "text-gray-700"
+                        }`}
+                      >
+                        {row.status === "Pending" && row.amount === 0
+                          ? "—"
+                          : formatCurrency(row.amount, row.currency)}
+                      </div>
+                    </div>
+
+                    {/* Receipt Button */}
+                    {row.receiptUrl && (
                       <button
-                        className="text-indigo-600 hover:underline"
+                        className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md transition-all hover:shadow-lg"
                         onClick={() =>
                           setPreview({
                             url: row.receiptUrl!,
@@ -688,25 +1114,43 @@ function PaymentHistoryModal({
                           })
                         }
                       >
-                        View
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        View Receipt
                       </button>
-                    ) : (
-                      <span className="text-gray-400">—</span>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
+
         {preview && (
           <ReceiptPreviewModal
             preview={preview}
             onClose={() => setPreview(null)}
           />
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -716,6 +1160,14 @@ type ReceiptPreviewModalProps = {
 };
 
 function ReceiptPreviewModal({ preview, onClose }: ReceiptPreviewModalProps) {
+  // Prevent background scrolling when modal is open
+  React.useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div

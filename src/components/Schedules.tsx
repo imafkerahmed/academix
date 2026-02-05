@@ -9,7 +9,7 @@ const typeBadge: Record<string, string> = {
   Holiday: "bg-purple-100 text-purple-700 border-purple-200",
   Assignment: "bg-green-100 text-green-700 border-green-200",
 };
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Calendar, { mockEvents } from "@/components/Calendar";
 
 interface EventType {
@@ -40,6 +40,18 @@ export default function Section5Schedules() {
   const [modalOpen, setModalOpen] = useState(false);
   const upcoming = getUpcomingSchedules(mockEvents).slice(0, 2);
   const today = new Date().toISOString().slice(0, 10);
+
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (modalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [modalOpen]);
 
   return (
     <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-6 flex flex-col md:col-start-3 md:row-start-1 bg-white">
