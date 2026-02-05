@@ -17,6 +17,18 @@ import {
   Ban,
   ArrowLeft,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export interface Subject {
   id: string;
@@ -185,11 +197,79 @@ function SubjectDetailsView({
   const assignments = mockAssignmentsPerSubject[subject.id] || [];
   const [activeTab, setActiveTab] = useState("assignments");
 
+  const [materials, setMaterials] = useState<SubjectMaterial[]>(allMaterials);
+  const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
+  const [newMaterialTitle, setNewMaterialTitle] = useState("");
+  const [newMaterialDescription, setNewMaterialDescription] = useState("");
+  const [newMaterialType, setNewMaterialType] =
+    useState<SubjectMaterial["type"]>("document");
+  const [newMaterialUrl, setNewMaterialUrl] = useState("");
+  const [newMaterialCanDownload, setNewMaterialCanDownload] = useState(true);
+  const [newMaterialFileName, setNewMaterialFileName] = useState("");
+
+  const [previewMaterial, setPreviewMaterial] =
+    useState<SubjectMaterial | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  React.useEffect(() => {
+    setMaterials(allMaterials);
+    setNewMaterialTitle("");
+    setNewMaterialDescription("");
+    setNewMaterialType("document");
+    setNewMaterialUrl("");
+    setNewMaterialCanDownload(true);
+    setIsAddMaterialOpen(false);
+    setNewMaterialFileName("");
+    setPreviewMaterial(null);
+    setIsPreviewOpen(false);
+  }, [subject.id]);
+
+  const handleAddMaterial = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newMaterialTitle.trim()) return;
+
+    const now = new Date().toISOString();
+
+    const isDocument = newMaterialType === "document";
+    const isVideoUpload = newMaterialType === "video-upload";
+    const isVideoLinkType =
+      newMaterialType === "youtube-link" || newMaterialType === "video-link";
+
+    const newMaterial: SubjectMaterial = {
+      id: `new-${Date.now()}`,
+      title: newMaterialTitle.trim(),
+      description: newMaterialDescription.trim(),
+      type: newMaterialType,
+      canDownload: newMaterialCanDownload,
+      visible: true,
+      createdAt: now,
+      ...(isDocument || isVideoUpload
+        ? {
+            filePlaceholder:
+              newMaterialFileName ||
+              (isDocument ? "document.pdf" : "video-file.mp4"),
+          }
+        : {}),
+      ...(isVideoLinkType && newMaterialUrl.trim()
+        ? { videoUrl: newMaterialUrl.trim() }
+        : {}),
+    };
+
+    setMaterials((prev) => [newMaterial, ...prev]);
+    setIsAddMaterialOpen(false);
+    setNewMaterialTitle("");
+    setNewMaterialDescription("");
+    setNewMaterialUrl("");
+    setNewMaterialType("document");
+    setNewMaterialCanDownload(true);
+    setNewMaterialFileName("");
+  };
+
   // Separate materials into study materials and video materials
-  const studyMaterials = allMaterials.filter(
+  const studyMaterials = materials.filter(
     (material) => material.type === "document",
   );
-  const videoMaterials = allMaterials.filter(
+  const videoMaterials = materials.filter(
     (material) =>
       material.type === "youtube-link" ||
       material.type === "video-link" ||
@@ -209,6 +289,18 @@ function SubjectDetailsView({
       default:
         return <FileText size={18} className="text-gray-600" />;
     }
+  };
+
+  const getYouTubeVideoId = (url: string) => {
+    const regExp =
+      /^.*(youtu.be\/.+|v\/.+|u\/\w\/.+|embed\/.+|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return match && match[2].length === 11 ? match[2] : null;
+  };
+
+  const openPreview = (material: SubjectMaterial) => {
+    setPreviewMaterial(material);
+    setIsPreviewOpen(true);
   };
 
   return (
@@ -251,7 +343,7 @@ function SubjectDetailsView({
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
             }`}
           >
-            Materials ({allMaterials.length})
+            Materials ({materials.length})
           </button>
         </div>
       </div>
@@ -307,6 +399,282 @@ function SubjectDetailsView({
 
         {activeTab === "materials" && (
           <div className="space-y-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base font-semibold text-gray-800">
+                Materials overview
+              </h3>
+              <Dialog
+                open={isAddMaterialOpen}
+                onOpenChange={setIsAddMaterialOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button size="sm" className="shadow-sm">
+                    + Add material
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-lg">
+                      <span className="inline-flex size-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-xs font-semibold">
+                        NEW
+                      </span>
+                      Add material
+                    </DialogTitle>
+                    <DialogDescription className="text-sm text-gray-500">
+                      Create a new study or video material for this subject.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleAddMaterial} className="mt-4 space-y-5">
+                    <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4 space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Basic details
+                      </p>
+                      <div className="space-y-2">
+                        <Label htmlFor="material-title">Title</Label>
+                        <Input
+                          id="material-title"
+                          value={newMaterialTitle}
+                          onChange={(event) =>
+                            setNewMaterialTitle(event.target.value)
+                          }
+                          required
+                          placeholder="e.g. Week 1 Lecture Notes"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="material-description">
+                          Description
+                        </Label>
+                        <textarea
+                          id="material-description"
+                          className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input min-h-[80px] w-full min-w-0 rounded-md border bg-white px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                          value={newMaterialDescription}
+                          onChange={(event) =>
+                            setNewMaterialDescription(event.target.value)
+                          }
+                          placeholder="Optional short summary for students"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-100 bg-white p-4 space-y-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Type & attachment
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="material-type">Type</Label>
+                          <select
+                            id="material-type"
+                            className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                            value={newMaterialType}
+                            onChange={(event) =>
+                              setNewMaterialType(
+                                event.target.value as SubjectMaterial["type"],
+                              )
+                            }
+                          >
+                            <option value="document">Document</option>
+                            <option value="youtube-link">YouTube link</option>
+                            <option value="video-link">Video link</option>
+                            <option value="video-upload">Video upload</option>
+                          </select>
+                          <p className="text-[11px] text-gray-500">
+                            Choose how students will access this material.
+                          </p>
+                        </div>
+
+                        {(newMaterialType === "youtube-link" ||
+                          newMaterialType === "video-link") && (
+                          <div className="space-y-2">
+                            <Label htmlFor="material-url">Video URL</Label>
+                            <Input
+                              id="material-url"
+                              value={newMaterialUrl}
+                              onChange={(event) =>
+                                setNewMaterialUrl(event.target.value)
+                              }
+                              placeholder="https://youtu.be/..."
+                            />
+                            <p className="text-[11px] text-gray-500">
+                              Paste a public YouTube or video link.
+                            </p>
+                          </div>
+                        )}
+
+                        {(newMaterialType === "document" ||
+                          newMaterialType === "video-upload") && (
+                          <div className="space-y-2 sm:col-span-1">
+                            <Label htmlFor="material-file">Attach file</Label>
+                            <input
+                              id="material-file"
+                              type="file"
+                              accept={
+                                newMaterialType === "document"
+                                  ? ".pdf,.doc,.docx,.ppt,.pptx,.txt"
+                                  : "video/*"
+                              }
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                setNewMaterialFileName(file ? file.name : "");
+                              }}
+                              className="block w-full text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                            />
+                            {newMaterialFileName && (
+                              <p className="text-[11px] text-gray-500">
+                                Selected: {newMaterialFileName}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="material-can-download"
+                          type="checkbox"
+                          checked={newMaterialCanDownload}
+                          onChange={(event) =>
+                            setNewMaterialCanDownload(event.target.checked)
+                          }
+                          className="h-4 w-4 rounded border-input text-primary focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                        />
+                        <Label
+                          htmlFor="material-can-download"
+                          className="m-0 text-sm"
+                        >
+                          Allow download
+                        </Label>
+                      </div>
+                      <DialogFooter className="gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsAddMaterialOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit">Save material</Button>
+                      </DialogFooter>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+            {previewMaterial && (
+              <Dialog
+                open={isPreviewOpen}
+                onOpenChange={(open) => {
+                  setIsPreviewOpen(open);
+                  if (!open) {
+                    setPreviewMaterial(null);
+                  }
+                }}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{previewMaterial.title}</DialogTitle>
+                    <DialogDescription>
+                      {previewMaterial.description ||
+                        "Preview of the selected material."}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-2">
+                    <div className="text-xs text-gray-500">
+                      <p>
+                        Type:{" "}
+                        <span className="font-semibold">
+                          {previewMaterial.type}
+                        </span>
+                      </p>
+                      <p>
+                        Created on:{" "}
+                        {new Date(
+                          previewMaterial.createdAt,
+                        ).toLocaleDateString()}
+                      </p>
+                    </div>
+
+                    {previewMaterial.type === "document" && (
+                      <div className="border-2 border-gray-200 rounded-lg p-6 bg-gray-50 text-center">
+                        <p className="text-gray-800 font-semibold mb-2">
+                          {previewMaterial.filePlaceholder ||
+                            "Attached document"}
+                        </p>
+                        <p className="text-sm text-gray-500 mb-4">
+                          Document preview is not available in this view.
+                        </p>
+                        {previewMaterial.canDownload && (
+                          <Button type="button" size="sm">
+                            Download (placeholder)
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {(previewMaterial.type === "youtube-link" ||
+                      previewMaterial.type === "video-link" ||
+                      previewMaterial.type === "video-upload") && (
+                      <div className="space-y-3">
+                        {previewMaterial.type === "youtube-link" &&
+                          previewMaterial.videoUrl && (
+                            <div className="relative w-full pb-[56.25%] bg-black rounded-lg overflow-hidden">
+                              {getYouTubeVideoId(previewMaterial.videoUrl) ? (
+                                <iframe
+                                  className="absolute top-0 left-0 w-full h-full"
+                                  src={`https://www.youtube.com/embed/${getYouTubeVideoId(previewMaterial.videoUrl)}`}
+                                  title={previewMaterial.title}
+                                  frameBorder="0"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                ></iframe>
+                              ) : (
+                                <div className="flex items-center justify-center h-40 text-sm text-gray-200">
+                                  Invalid YouTube URL
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                        {(previewMaterial.type === "video-link" ||
+                          previewMaterial.type === "video-upload") && (
+                          <div className="relative w-full bg-black rounded-lg overflow-hidden">
+                            {previewMaterial.videoUrl ? (
+                              <video
+                                className="w-full"
+                                controls
+                                controlsList="nodownload"
+                                src={previewMaterial.videoUrl}
+                              >
+                                Your browser does not support the video tag.
+                              </video>
+                            ) : (
+                              <div className="flex items-center justify-center h-40 text-sm text-gray-200">
+                                No video URL available
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsPreviewOpen(false);
+                        setPreviewMaterial(null);
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
             {/* Study Materials Section */}
             <div>
               <h3 className="text-base font-semibold text-gray-800 mb-3">
@@ -321,7 +689,8 @@ function SubjectDetailsView({
                   {studyMaterials.map((material) => (
                     <div
                       key={material.id}
-                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => openPreview(material)}
                     >
                       <div className="flex items-start gap-3 mb-3">
                         {getTypeIcon(material.type)}
@@ -373,17 +742,19 @@ function SubjectDetailsView({
                         <div className="flex gap-2">
                           <button
                             className="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded font-semibold hover:bg-yellow-200 transition"
-                            onClick={() =>
-                              console.log("Edit material:", material.id)
-                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              console.log("Edit material:", material.id);
+                            }}
                           >
                             Edit
                           </button>
                           <button
                             className="px-3 py-1 text-xs bg-red-100 text-red-700 border border-red-300 rounded font-semibold hover:bg-red-200 transition"
-                            onClick={() =>
-                              console.log("Delete material:", material.id)
-                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              console.log("Delete material:", material.id);
+                            }}
                           >
                             Delete
                           </button>
@@ -409,7 +780,8 @@ function SubjectDetailsView({
                   {videoMaterials.map((material) => (
                     <div
                       key={material.id}
-                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => openPreview(material)}
                     >
                       <div className="flex items-start gap-3 mb-3">
                         {getTypeIcon(material.type)}
@@ -461,17 +833,19 @@ function SubjectDetailsView({
                         <div className="flex gap-2">
                           <button
                             className="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded font-semibold hover:bg-yellow-200 transition"
-                            onClick={() =>
-                              console.log("Edit material:", material.id)
-                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              console.log("Edit material:", material.id);
+                            }}
                           >
                             Edit
                           </button>
                           <button
                             className="px-3 py-1 text-xs bg-red-100 text-red-700 border border-red-300 rounded font-semibold hover:bg-red-200 transition"
-                            onClick={() =>
-                              console.log("Delete material:", material.id)
-                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              console.log("Delete material:", material.id);
+                            }}
                           >
                             Delete
                           </button>

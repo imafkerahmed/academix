@@ -215,6 +215,52 @@ const mockAvailableSubjects = [
   { id: "subject-6", name: "Calculus I (MATH101-A)" },
 ];
 
+function DateTimeCard() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    // Only start the clock on the client to avoid SSR hydration mismatches
+    setNow(new Date());
+
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!now) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow flex items-center justify-center text-center">
+        <p className="text-sm text-gray-400">Loading time...</p>
+      </div>
+    );
+  }
+
+  const dateLabel = now.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  const timeLabel = now.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col items-center justify-center text-center">
+      <p className="text-5xl font-extrabold text-blue-600 leading-tight mb-3">
+        {timeLabel}
+      </p>
+      <p className="text-lg font-semibold text-gray-800">{dateLabel}</p>
+    </div>
+  );
+}
+
 export default function LecturerDashboard() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<MockUser | null>(mockUser); // Set initial user data
@@ -335,12 +381,13 @@ export default function LecturerDashboard() {
         return (
           <>
             {/* Bento Grid Layout */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 mb-4 items-stretch">
               <BentoStats stats={stats} />
+              <DateTimeCard />
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
               {/* Upcoming Classes - Takes 2 columns */}
               <div className="lg:col-span-2">
                 <UpcomingClasses
@@ -351,24 +398,23 @@ export default function LecturerDashboard() {
 
               {/* Right Column - 2 sections stacked */}
               <div className="space-y-4">
-                {/*Section 1 - Placeholder */}
-                {/* Section 1 - Placeholder */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                {/* Recent Activity */}
+                <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">
                     Recent Activity
                   </h3>
-                  <div className="text-xs text-gray-500">
-                    Activity feed will appear here
+                  <div className="text-sm text-gray-500">
+                    Activity feed will appear here.
                   </div>
                 </div>
 
-                {/* Section 2 - Placeholder */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                {/* Announcements */}
+                <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">
                     Announcements
                   </h3>
-                  <div className="text-xs text-gray-500">
-                    Important announcements will appear here
+                  <div className="text-sm text-gray-500">
+                    Important announcements will appear here.
                   </div>
                 </div>
               </div>
@@ -390,12 +436,12 @@ export default function LecturerDashboard() {
         return (
           <>
             {/* Bento Grid Layout */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-4">
               <BentoStats stats={stats} />
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
               {/* Upcoming Classes - Takes 2 columns */}
               <div className="lg:col-span-2">
                 <UpcomingClasses
@@ -442,50 +488,8 @@ export default function LecturerDashboard() {
         setIsSidebarOpen={setIsSidebarOpen}
       />
 
-      {/* Main Content Area */}
+      {/* Main Content Area (no top header) */}
       <div className="flex-1 lg:ml-64">
-        {/* Top Bar */}
-        <header className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="flex items-center justify-between px-4 md:px-8 py-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden text-gray-600 hover:text-gray-900"
-                aria-label="Open sidebar"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800">
-                  {activeTab}
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Welcome back, {user.name.split(" ")[0]}!
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <NotificationButton
-                onClick={() => setShowNotifications(true)}
-                aria-label="Show notifications"
-              />
-            </div>
-          </div>
-        </header>
-
-        {/* Content */}
         <main className="p-4 md:p-6">{renderContent()}</main>
       </div>
 

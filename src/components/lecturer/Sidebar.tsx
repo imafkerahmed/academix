@@ -53,10 +53,14 @@ export default function Sidebar({
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-bold text-gray-900">ACADEMIX</h1>
+            <div className="flex-1 text-center">
+              <h1 className="text-xl font-bold text-gray-900 tracking-wide">
+                ACADEMIX
+              </h1>
+            </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className="lg:hidden text-gray-500 hover:text-gray-700 ml-2"
               aria-label="Close sidebar"
             >
               <svg
@@ -74,16 +78,14 @@ export default function Sidebar({
               </svg>
             </button>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center text-white font-semibold text-sm">
+          <div className="mt-2 flex flex-col items-center text-center">
+            <div className="w-20 h-20 rounded-full bg-gray-900 flex items-center justify-center text-white font-semibold text-xl">
               {lecturerName.charAt(0)}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-800 truncate">
-                {lecturerName}
-              </p>
-              <p className="text-xs text-gray-500">Lecturer</p>
-            </div>
+            <p className="mt-2 text-sm font-semibold text-gray-800 truncate max-w-full">
+              {lecturerName}
+            </p>
+            <p className="text-xs text-gray-500">Lecturer</p>
           </div>
         </div>
 
