@@ -57,6 +57,14 @@ const subjectsData = {
         feedback:
           "Excellent work! Your solutions are clear and well-explained. Minor arithmetic error in question 3.",
         isLate: false,
+        isClosed: true,
+        submissionHistory: [
+          {
+            submittedDate: "2024-02-14T18:30:00",
+            fileName: "john-doe-matrix-solutions.pdf",
+            version: 1,
+          },
+        ],
       },
       {
         id: "assign-2",
@@ -67,14 +75,27 @@ const subjectsData = {
           "• Provide formal proofs\n• Include diagrams for visual problems\n• Submit as PDF\n• Due by 11:59 PM",
         dueDate: "2024-02-28",
         status: "Submitted",
-        grade: "88/100",
+        grade: "35/100",
         totalMarks: 100,
         submittedDate: "2024-02-27T20:15:00",
         assignmentFile: "vector-spaces-assignment.pdf",
         submittedFile: "john-doe-vector-solutions.pdf",
         feedback:
-          "Good understanding of concepts. Work on theorem proofs - they need more rigor.",
+          "Incomplete work. Missing several proofs and diagrams. Please review the requirements and resubmit.",
         isLate: false,
+        isClosed: false,
+        submissionHistory: [
+          {
+            submittedDate: "2024-02-27T14:20:00",
+            fileName: "john-doe-vector-v1.pdf",
+            version: 1,
+          },
+          {
+            submittedDate: "2024-02-27T20:15:00",
+            fileName: "john-doe-vector-solutions.pdf",
+            version: 2,
+          },
+        ],
       },
       {
         id: "assign-3",
@@ -92,6 +113,8 @@ const subjectsData = {
         submittedFile: null,
         feedback: null,
         isLate: false,
+        isClosed: false,
+        submissionHistory: [],
       },
     ],
     materials: [
@@ -100,18 +123,24 @@ const subjectsData = {
         title: "Lecture Notes - Week 1",
         type: "PDF",
         uploadDate: "2024-01-15",
+        fileUrl: "/materials/lecture-notes-week1.pdf",
+        size: "2.5 MB",
       },
       {
         id: "mat-2",
         title: "Practice Problems Set 1",
         type: "PDF",
         uploadDate: "2024-01-20",
+        fileUrl: "/materials/practice-problems-1.pdf",
+        size: "1.8 MB",
       },
       {
         id: "mat-3",
         title: "Midterm Study Guide",
         type: "PDF",
         uploadDate: "2024-02-01",
+        fileUrl: "/materials/midterm-study-guide.pdf",
+        size: "3.2 MB",
       },
     ],
     videos: [
@@ -121,6 +150,9 @@ const subjectsData = {
         duration: "45:30",
         uploadDate: "2024-01-15",
         thumbnail: "/video-thumb.jpg",
+        videoType: "youtube",
+        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        description: "A comprehensive introduction to linear algebra concepts.",
       },
       {
         id: "vid-2",
@@ -128,6 +160,9 @@ const subjectsData = {
         duration: "38:15",
         uploadDate: "2024-01-22",
         thumbnail: "/video-thumb.jpg",
+        videoType: "file",
+        videoUrl: "/videos/matrix-operations.mp4",
+        description: "Learn basic and advanced matrix operations.",
       },
       {
         id: "vid-3",
@@ -135,6 +170,9 @@ const subjectsData = {
         duration: "52:40",
         uploadDate: "2024-02-05",
         thumbnail: "/video-thumb.jpg",
+        videoType: "youtube",
+        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        description: "Multiple methods for solving systems of equations.",
       },
     ],
   },
@@ -241,6 +279,11 @@ export default function SubjectPage() {
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
+  const [showMaterialModal, setShowMaterialModal] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation durations (ms)
@@ -254,20 +297,152 @@ export default function SubjectPage() {
     return () => clearTimeout(t);
   }, [showSuccessModal]);
 
+  // Helper function to extract YouTube video ID
+  const getYouTubeVideoId = (url: string) => {
+    const regExp =
+      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return match && match[2].length === 11 ? match[2] : null;
+  };
+
+  // Helper function to convert numeric grade to letter grade
+  const getLetterGrade = (grade: string): string => {
+    if (grade === "-" || grade === "Pending") {
+      return grade;
+    }
+
+    // Check for fraction format (e.g., "95/100", "35/100")
+    const fractionMatch = grade.match(/(\d+)\/(\d+)/);
+    if (fractionMatch) {
+      const scored = parseInt(fractionMatch[1]);
+      const total = parseInt(fractionMatch[2]);
+      const percentage = (scored / total) * 100;
+
+      if (percentage >= 90) return "A";
+      if (percentage >= 80) return "B";
+      if (percentage >= 70) return "C";
+      if (percentage >= 60) return "D";
+      return "F";
+    }
+
+    // If already a letter grade, return as is
+    if (grade.match(/^[A-F][+-]?$/)) {
+      return grade;
+    }
+
+    // Check for direct percentage (e.g., "95%")
+    const percentMatch = grade.match(/(\d+)%/);
+    if (percentMatch) {
+      const percentage = parseInt(percentMatch[1]);
+      if (percentage >= 90) return "A";
+      if (percentage >= 80) return "B";
+      if (percentage >= 70) return "C";
+      if (percentage >= 60) return "D";
+      return "F";
+    }
+
+    return grade;
+  };
+
+  // Helper function to get badge color for letter grade
+  const getGradeBadgeColor = (letterGrade: string): string => {
+    switch (letterGrade) {
+      case "A":
+        return "bg-green-500 text-white";
+      case "B":
+        return "bg-blue-500 text-white";
+      case "C":
+        return "bg-yellow-500 text-white";
+      case "D":
+        return "bg-orange-500 text-white";
+      case "F":
+        return "bg-red-500 text-white";
+      default:
+        return "bg-gray-500 text-white";
+    }
+  };
+
+  // Helper function to check if a grade indicates failure
+  const isFailingGrade = (grade: string): boolean => {
+    if (grade === "-" || grade === "Pending") {
+      return false;
+    }
+
+    // Check for fraction format (e.g., "35/100", "40/80")
+    const fractionMatch = grade.match(/(\d+)\/(\d+)/);
+    if (fractionMatch) {
+      const scored = parseInt(fractionMatch[1]);
+      const total = parseInt(fractionMatch[2]);
+      const percentage = (scored / total) * 100;
+      return percentage < 50; // Failing if less than 50%
+    }
+
+    // Check for letter grades
+    if (grade.includes("F") || grade.toLowerCase().includes("fail")) {
+      return true;
+    }
+
+    // Check for direct percentage (e.g., "45%")
+    const percentMatch = grade.match(/(\d+)%/);
+    if (percentMatch) {
+      const percentage = parseInt(percentMatch[1]);
+      return percentage < 50;
+    }
+
+    return false;
+  };
+
   // Handle assignment submission
   const handleSubmitAssignment = () => {
     if (!uploadedFile || !selectedAssignment) return;
+
+    // Check if assignment is closed
+    if (selectedAssignment.isClosed) {
+      alert("This assignment is closed and no longer accepts submissions.");
+      return;
+    }
 
     // Update the assignment status (in real app, this would be an API call)
     const today = new Date();
     const submittedDate = today.toISOString();
 
-    // Simulate submission
+    // Initialize submission history if it doesn't exist
+    if (!selectedAssignment.submissionHistory) {
+      selectedAssignment.submissionHistory = [];
+    }
+
+    // Check if this is a replacement before grading
+    const isReplacement =
+      selectedAssignment.status === "Submitted" &&
+      (selectedAssignment.grade === "Pending" ||
+        selectedAssignment.grade === "-");
+
+    // Add to submission history
+    const newSubmission = {
+      submittedDate: submittedDate,
+      fileName: uploadedFile.name,
+      version: selectedAssignment.submissionHistory.length + 1,
+      isReplacement: isReplacement,
+    };
+    selectedAssignment.submissionHistory.push(newSubmission);
+
+    // Update assignment details
     selectedAssignment.status = "Submitted";
     selectedAssignment.grade = "Pending";
     selectedAssignment.submittedDate = submittedDate;
     selectedAssignment.submittedFile = uploadedFile.name;
     selectedAssignment.isLate = new Date(selectedAssignment.dueDate) < today;
+
+    // Set success message based on action
+    if (isReplacement) {
+      setSuccessMessage(
+        "File replaced successfully! Your new submission will be reviewed by the instructor.",
+      );
+    } else {
+      setSuccessMessage(
+        "Assignment submitted successfully! Your submission will be reviewed by the instructor shortly.",
+      );
+    }
 
     // Close assignment modal and show success
     setShowAssignmentModal(false);
@@ -469,7 +644,7 @@ export default function SubjectPage() {
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >
-              Course Materials
+              Study Materials
             </button>
             <button
               onClick={() => setActiveTab(2)}
@@ -513,7 +688,7 @@ export default function SubjectPage() {
                         )}
                       </p>
                     </div>
-                    <div className="flex items-center gap-4 mt-2 md:mt-0">
+                    <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-0">
                       <Badge
                         className={
                           assignment.status === "Submitted"
@@ -525,11 +700,19 @@ export default function SubjectPage() {
                       >
                         {assignment.status}
                       </Badge>
-                      {assignment.grade !== "-" && (
-                        <span className="text-lg font-bold text-gray-900">
-                          {assignment.grade}
-                        </span>
-                      )}
+                      {assignment.grade !== "-" &&
+                        assignment.grade !== "Pending" && (
+                          <>
+                            <Badge
+                              className={`${getGradeBadgeColor(getLetterGrade(assignment.grade))} text-base md:text-lg font-bold px-3 py-1`}
+                            >
+                              {getLetterGrade(assignment.grade)}
+                            </Badge>
+                            <span className="text-sm md:text-base font-semibold text-gray-600">
+                              {assignment.grade}
+                            </span>
+                          </>
+                        )}
                     </div>
                   </div>
                 ))}
@@ -542,6 +725,10 @@ export default function SubjectPage() {
                 {subject.materials.map((material) => (
                   <div
                     key={material.id}
+                    onClick={() => {
+                      setSelectedMaterial(material);
+                      setShowMaterialModal(true);
+                    }}
                     className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
@@ -599,6 +786,10 @@ export default function SubjectPage() {
                 {subject.videos.map((video) => (
                   <div
                     key={video.id}
+                    onClick={() => {
+                      setSelectedVideo(video);
+                      setShowVideoModal(true);
+                    }}
                     className="flex flex-col md:flex-row gap-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <div className="w-full md:w-48 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
@@ -741,9 +932,16 @@ export default function SubjectPage() {
                       <p className="text-xs md:text-sm text-green-600 mb-1">
                         Your Grade
                       </p>
-                      <p className="font-bold text-xl md:text-2xl text-green-700">
-                        {selectedAssignment.grade}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        <Badge
+                          className={`${getGradeBadgeColor(getLetterGrade(selectedAssignment.grade))} text-2xl md:text-3xl font-bold px-4 py-2`}
+                        >
+                          {getLetterGrade(selectedAssignment.grade)}
+                        </Badge>
+                        <p className="font-bold text-xl md:text-2xl text-gray-700">
+                          {selectedAssignment.grade}
+                        </p>
+                      </div>
                     </div>
                   )}
               </div>
@@ -1035,8 +1233,493 @@ export default function SubjectPage() {
                         </p>
                       </div>
                     )}
+
+                    {/* Submission History */}
+                    {selectedAssignment.submissionHistory &&
+                      selectedAssignment.submissionHistory.length > 1 && (
+                        <div>
+                          <h4 className="text-sm md:text-base font-semibold text-gray-900 mb-2">
+                            Submission History (
+                            {selectedAssignment.submissionHistory.length}{" "}
+                            versions)
+                          </h4>
+                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {selectedAssignment.submissionHistory
+                              .slice()
+                              .reverse()
+                              .map((submission: any, index: number) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200"
+                                >
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <span className="text-xs font-semibold text-gray-500">
+                                      v{submission.version}
+                                    </span>
+                                    <span className="text-xs text-gray-700 truncate">
+                                      {submission.fileName}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
+                                    {new Date(
+                                      submission.submittedDate,
+                                    ).toLocaleString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Resubmit/Replace Section - Only if not closed */}
+                    {!selectedAssignment.isClosed &&
+                      (selectedAssignment.grade === "Pending" ||
+                        selectedAssignment.grade === "-" ||
+                        isFailingGrade(selectedAssignment.grade)) && (
+                        <div>
+                          <h4 className="text-sm md:text-base font-semibold text-gray-900 mb-2">
+                            {selectedAssignment.grade === "Pending" ||
+                            selectedAssignment.grade === "-"
+                              ? "Replace Submission"
+                              : "Resubmit Assignment"}
+                          </h4>
+                          <div className="space-y-3">
+                            <div
+                              className={`flex items-start gap-2 p-3 rounded-lg border ${
+                                selectedAssignment.grade === "Pending" ||
+                                selectedAssignment.grade === "-"
+                                  ? "bg-amber-50 border-amber-200"
+                                  : "bg-blue-50 border-blue-200"
+                              }`}
+                            >
+                              <svg
+                                className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                                  selectedAssignment.grade === "Pending" ||
+                                  selectedAssignment.grade === "-"
+                                    ? "text-amber-600"
+                                    : "text-blue-600"
+                                }`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                              <p
+                                className={`text-xs md:text-sm ${
+                                  selectedAssignment.grade === "Pending" ||
+                                  selectedAssignment.grade === "-"
+                                    ? "text-amber-900"
+                                    : "text-blue-900"
+                                }`}
+                              >
+                                {selectedAssignment.grade === "Pending" ||
+                                selectedAssignment.grade === "-"
+                                  ? "Submitted the wrong file? You can replace your submission before it's graded. The new file will replace the current one."
+                                  : "You did not pass this assignment. You can resubmit your work to improve your grade."}
+                              </p>
+                            </div>
+
+                            {/* Upload Area for Resubmission */}
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-6 text-center hover:border-blue-400 transition-colors">
+                              <input
+                                type="file"
+                                id="file-resubmit"
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    setUploadedFile(e.target.files[0]);
+                                  }
+                                }}
+                                accept=".pdf,.doc,.docx"
+                              />
+                              <label
+                                htmlFor="file-resubmit"
+                                className="cursor-pointer"
+                              >
+                                <svg
+                                  className="w-8 h-8 md:w-10 md:h-10 text-gray-400 mx-auto mb-2 md:mb-3"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12"
+                                  />
+                                </svg>
+                                <p className="text-xs md:text-sm text-gray-600 mb-1">
+                                  Upload new version
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  PDF, DOC, DOCX
+                                </p>
+                              </label>
+                            </div>
+
+                            {uploadedFile && (
+                              <div className="flex items-center gap-2 md:gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <svg
+                                  className="w-6 h-6 text-green-600 flex-shrink-0"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-900 truncate">
+                                    {uploadedFile.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {(uploadedFile.size / 1024 / 1024).toFixed(
+                                      2,
+                                    )}{" "}
+                                    MB
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setUploadedFile(null)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
+
+                            <button
+                              disabled={!uploadedFile}
+                              onClick={handleSubmitAssignment}
+                              className={`w-full py-2.5 px-6 rounded-lg text-sm md:text-base font-semibold transition-colors ${
+                                uploadedFile
+                                  ? "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
+                                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                              }`}
+                            >
+                              {selectedAssignment.grade === "Pending" ||
+                              selectedAssignment.grade === "-"
+                                ? "Replace File"
+                                : "Resubmit Assignment"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Closed Assignment Notice */}
+                    {selectedAssignment.isClosed && (
+                      <div className="flex items-start gap-2 md:gap-3 p-3 md:p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <svg
+                          className="w-5 h-5 md:w-6 md:h-6 text-red-600 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                          />
+                        </svg>
+                        <div>
+                          <p className="text-sm md:text-base font-semibold text-red-900">
+                            Assignment Closed
+                          </p>
+                          <p className="text-xs md:text-sm text-red-700">
+                            This assignment has been closed by the instructor
+                            and no longer accepts submissions.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Study Material Modal */}
+      {showMaterialModal && selectedMaterial && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm md:p-4">
+          <div className="bg-white md:rounded-xl shadow-2xl max-w-3xl w-full h-full md:h-auto md:max-h-[85vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between z-10">
+              <div className="flex-1 pr-2">
+                <h2 className="text-lg md:text-2xl font-bold text-gray-900 line-clamp-2">
+                  {selectedMaterial.title}
+                </h2>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge className="bg-blue-100 text-blue-700">
+                    {selectedMaterial.type}
+                  </Badge>
+                  {selectedMaterial.size && (
+                    <span className="text-sm text-gray-500">
+                      {selectedMaterial.size}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowMaterialModal(false);
+                  setSelectedMaterial(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 -mr-2 flex-shrink-0"
+              >
+                <svg
+                  className="w-5 h-5 md:w-6 md:h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="px-4 py-4 md:px-6 md:py-6">
+              {/* Upload Info */}
+              <div className="mb-6">
+                <p className="text-sm text-gray-600">
+                  Uploaded on{" "}
+                  {new Date(selectedMaterial.uploadDate).toLocaleDateString(
+                    "en-US",
+                    {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    },
+                  )}
+                </p>
+              </div>
+
+              {/* PDF Viewer or Preview */}
+              <div className="mb-6">
+                <div className="border-2 border-gray-200 rounded-lg p-8 md:p-12 bg-gray-50 text-center">
+                  <svg
+                    className="w-20 h-20 md:w-24 md:h-24 text-red-500 mx-auto mb-4"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <p className="text-gray-700 font-semibold mb-2">
+                    {selectedMaterial.title}
+                  </p>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Preview not available
+                  </p>
+                  <a
+                    href={selectedMaterial.fileUrl}
+                    download
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                    Download File
+                  </a>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <a
+                  href={selectedMaterial.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-center font-semibold text-sm md:text-base"
+                >
+                  Open in New Tab
+                </a>
+                <button
+                  onClick={() => {
+                    setShowMaterialModal(false);
+                    setSelectedMaterial(null);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-sm md:text-base"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Modal */}
+      {showVideoModal && selectedVideo && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm md:p-4">
+          <div className="bg-white md:rounded-xl shadow-2xl max-w-5xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between z-10">
+              <div className="flex-1 pr-2">
+                <h2 className="text-lg md:text-2xl font-bold text-gray-900 line-clamp-2">
+                  {selectedVideo.title}
+                </h2>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge
+                    className={
+                      selectedVideo.videoType === "youtube"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-purple-100 text-purple-700"
+                    }
+                  >
+                    {selectedVideo.videoType === "youtube"
+                      ? "YouTube"
+                      : "Video File"}
+                  </Badge>
+                  <span className="text-sm text-gray-500">
+                    {selectedVideo.duration}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowVideoModal(false);
+                  setSelectedVideo(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 -mr-2 flex-shrink-0"
+              >
+                <svg
+                  className="w-5 h-5 md:w-6 md:h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="px-4 py-4 md:px-6 md:py-6">
+              {/* Video Player */}
+              <div className="mb-6">
+                {selectedVideo.videoType === "youtube" ? (
+                  <div className="relative w-full pb-[56.25%] bg-black rounded-lg overflow-hidden">
+                    <iframe
+                      className="absolute top-0 left-0 w-full h-full"
+                      src={`https://www.youtube.com/embed/${getYouTubeVideoId(selectedVideo.videoUrl)}`}
+                      title={selectedVideo.title}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    ></iframe>
+                  </div>
+                ) : (
+                  <div className="relative w-full bg-black rounded-lg overflow-hidden">
+                    <video
+                      className="w-full"
+                      controls
+                      controlsList="nodownload"
+                      src={selectedVideo.videoUrl}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                )}
+              </div>
+
+              {/* Video Info */}
+              {selectedVideo.description && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                    Description
+                  </h4>
+                  <p className="text-sm text-gray-700">
+                    {selectedVideo.description}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Duration</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedVideo.duration}
+                  </p>
+                </div>
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Uploaded</p>
+                  <p className="font-semibold text-gray-900">
+                    {new Date(selectedVideo.uploadDate).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      },
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowVideoModal(false);
+                    setSelectedVideo(null);
+                  }}
+                  className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-sm md:text-base"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
@@ -1079,10 +1762,13 @@ export default function SubjectPage() {
                 </svg>
               </motion.div>
               <div className="text-lg font-semibold text-gray-800">
-                Assignment submitted successfully
+                {successMessage.includes("replaced")
+                  ? "File Replaced Successfully!"
+                  : "Assignment Submitted Successfully!"}
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Your submission will be reviewed by the instructor shortly.
+              <div className="text-xs text-gray-500 mt-1 px-2">
+                {successMessage ||
+                  "Your submission will be reviewed by the instructor shortly."}
               </div>
             </motion.div>
           </div>
