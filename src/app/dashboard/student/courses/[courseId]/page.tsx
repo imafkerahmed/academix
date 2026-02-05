@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import GradientText from "@/components/ui/GradientText";
 import NotificationButton from "@/components/ui/notification-button";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import { RouteLink } from "@/components/ui/route-link";
 
 // Mock data - will be replaced with actual API calls
 const coursesData = {
@@ -25,30 +26,52 @@ const coursesData = {
     intakeCode: "INT/JUL/2024",
     startDate: "2024-01-15",
     endDate: "2024-05-30",
-    subjects: [
+    semesters: [
       {
-        id: "sub-1",
-        name: "Linear Algebra",
-        code: "MATH-101-A",
-        instructor: "Prof. Sarah Johnson",
-        schedule: "Mon, Wed 10:00 AM - 11:30 AM",
-        progress: 65,
+        id: "sem-1",
+        name: "Semester 1",
+        startDate: "2024-01-15",
+        endDate: "2024-03-30",
+        status: "Completed",
+        subjects: [
+          {
+            id: "sub-1",
+            name: "Linear Algebra",
+            code: "MATH-101-A",
+            instructor: "Prof. Sarah Johnson",
+            progress: 100,
+          },
+          {
+            id: "sub-2",
+            name: "Calculus I",
+            code: "MATH-101-B",
+            instructor: "Dr. Michael Brown",
+            progress: 95,
+          },
+        ],
       },
       {
-        id: "sub-2",
-        name: "Calculus I",
-        code: "MATH-101-B",
-        instructor: "Dr. Michael Brown",
-        schedule: "Tue, Thu 2:00 PM - 3:30 PM",
-        progress: 48,
-      },
-      {
-        id: "sub-3",
-        name: "Differential Equations",
-        code: "MATH-101-C",
-        instructor: "Prof. Emily Davis",
-        schedule: "Fri 9:00 AM - 12:00 PM",
-        progress: 30,
+        id: "sem-2",
+        name: "Semester 2",
+        startDate: "2024-04-01",
+        endDate: "2024-05-30",
+        status: "Ongoing",
+        subjects: [
+          {
+            id: "sub-3",
+            name: "Differential Equations",
+            code: "MATH-101-C",
+            instructor: "Prof. Emily Davis",
+            progress: 65,
+          },
+          {
+            id: "sub-4",
+            name: "Advanced Calculus",
+            code: "MATH-101-D",
+            instructor: "Dr. Michael Brown",
+            progress: 48,
+          },
+        ],
       },
     ],
   },
@@ -63,22 +86,29 @@ const coursesData = {
     intakeName: "INTAKE SEPTEMBER 2023",
     startDate: "2023-09-01",
     endDate: "2023-12-20",
-    subjects: [
+    semesters: [
       {
-        id: "sub-4",
-        name: "Classical Mechanics",
-        code: "PHYS-201-A",
-        instructor: "Dr. Robert Wilson",
-        schedule: "Mon, Wed 1:00 PM - 2:30 PM",
-        progress: 100,
-      },
-      {
-        id: "sub-5",
-        name: "Thermodynamics",
-        code: "PHYS-201-B",
-        instructor: "Prof. Lisa Anderson",
-        schedule: "Tue, Thu 10:00 AM - 11:30 AM",
-        progress: 100,
+        id: "sem-1",
+        name: "Semester 1",
+        startDate: "2023-09-01",
+        endDate: "2023-12-20",
+        status: "Completed",
+        subjects: [
+          {
+            id: "sub-5",
+            name: "Classical Mechanics",
+            code: "PHYS-201-A",
+            instructor: "Dr. Robert Wilson",
+            progress: 100,
+          },
+          {
+            id: "sub-6",
+            name: "Thermodynamics",
+            code: "PHYS-201-B",
+            instructor: "Prof. Lisa Anderson",
+            progress: 100,
+          },
+        ],
       },
     ],
   },
@@ -91,6 +121,8 @@ export default function CoursePage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+  const [activeSemester, setActiveSemester] = useState(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation durations (ms)
@@ -224,8 +256,8 @@ export default function CoursePage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
-        <button
-          onClick={() => router.push("/dashboard/student")}
+        <RouteLink
+          href="/dashboard/student"
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <svg
@@ -242,7 +274,7 @@ export default function CoursePage() {
             />
           </svg>
           <span className="font-medium">Back to Dashboard</span>
-        </button>
+        </RouteLink>
 
         {/* Course Title and Info Card */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -325,58 +357,131 @@ export default function CoursePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                Intake
-              </h3>
-              <p className="text-base font-bold text-gray-900">
-                {course.intakeCode}
-              </p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                Start Date
-              </h3>
-              <p className="text-base font-medium text-gray-900">
-                {new Date(course.startDate).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                End Date
-              </h3>
-              <p className="text-base font-medium text-gray-900">
-                {new Date(course.endDate).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-          </div>
+          {/* More Button - Mobile Only */}
+          <button
+            onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+            className="md:hidden flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors mt-4"
+          >
+            <span>More</span>
+            <svg
+              className={`w-4 h-4 transition-transform duration-200 ${
+                isDetailsExpanded ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
 
-          {course.description && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                Description
-              </h3>
-              <p className="text-gray-700">{course.description}</p>
+          {/* Collapsible Content - Hidden on mobile unless expanded, always visible on desktop */}
+          <div
+            className={`transition-all duration-300 ease-in-out overflow-hidden md:!block md:!max-h-none md:!opacity-100 ${
+              isDetailsExpanded
+                ? "max-h-[1000px] opacity-100"
+                : "max-h-0 opacity-0"
+            }`}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 md:mt-0">
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
+                  Intake
+                </h3>
+                <p className="text-base font-bold text-gray-900">
+                  {course.intakeCode}
+                </p>
+              </div>
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
+                  Start Date
+                </h3>
+                <p className="text-base font-medium text-gray-900">
+                  {new Date(course.startDate).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
+                  End Date
+                </h3>
+                <p className="text-base font-medium text-gray-900">
+                  {new Date(course.endDate).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
             </div>
-          )}
+
+            {course.description && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
+                  Description
+                </h3>
+                <p className="text-gray-700">{course.description}</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Subjects Section */}
+        {/* Subjects Section with Semester Tabs */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Enrolled Subjects
           </h2>
+
+          {/* Semester Tabs */}
+          {course.semesters && course.semesters.length > 1 && (
+            <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
+              {course.semesters.map((semester, index) => (
+                <button
+                  key={semester.id}
+                  onClick={() => setActiveSemester(index)}
+                  className={`px-6 py-3 rounded-lg font-bold text-sm whitespace-nowrap transition-all duration-200 ${
+                    activeSemester === index
+                      ? "bg-white border-3 border-indigo-600 text-indigo-700 shadow-md"
+                      : "bg-white border-2 border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50 shadow-sm"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{semester.name}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        activeSemester === index
+                          ? semester.status === "Ongoing"
+                            ? "bg-orange-500 text-white"
+                            : semester.status === "Completed"
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-500 text-white"
+                          : semester.status === "Ongoing"
+                            ? "bg-orange-100 text-orange-700"
+                            : semester.status === "Completed"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {semester.status}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Subjects Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {course.subjects.map((subject) => (
+            {course.semesters &&
+              course.semesters[activeSemester]?.subjects.map((subject) => (
               <Card
                 key={subject.id}
                 className="hover:shadow-lg transition-shadow duration-200 cursor-pointer"

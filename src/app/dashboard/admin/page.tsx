@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { RouteLink } from "@/components/ui/route-link";
 import pb, { getCurrentUser, logout, type User } from "@/lib/pocketbase";
 
 export default function AdminDashboard() {
@@ -54,12 +54,12 @@ export default function AdminDashboard() {
                 🎓 Zoom Class
               </h1>
               <div className="hidden md:flex items-center gap-6">
-                <Link
+                <RouteLink
                   href="/dashboard/admin"
                   className="text-gray-900 dark:text-white font-medium"
                 >
                   Dashboard
-                </Link>
+                </RouteLink>
               </div>
             </div>
             <button

@@ -1,6 +1,6 @@
 import React from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
+import { RouteLink } from "./ui/route-link";
 import {
   Card,
   CardHeader,
@@ -29,7 +29,7 @@ const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList.jsx"), {
 
 const CourseList: React.FC<CourseListProps> = ({ courses }) => {
   const renderCard = (course: Course, mobile: boolean = false) => (
-    <Link
+    <RouteLink
       key={course.id}
       href={`/dashboard/student/courses/${course.id}`}
       className="block"
@@ -75,7 +75,7 @@ const CourseList: React.FC<CourseListProps> = ({ courses }) => {
           </div>
         </CardHeader>
       </Card>
-    </Link>
+    </RouteLink>
   );
 
   const items = courses.map((course) => renderCard(course));
