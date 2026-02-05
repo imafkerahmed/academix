@@ -361,6 +361,8 @@ export default function CoursePage() {
           <button
             onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
             className="md:hidden flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors mt-4"
+            aria-expanded={isDetailsExpanded}
+            aria-controls="course-details-collapsible"
           >
             <span>More</span>
             <svg
@@ -382,6 +384,7 @@ export default function CoursePage() {
 
           {/* Collapsible Content - Hidden on mobile unless expanded, always visible on desktop */}
           <div
+            id="course-details-collapsible"
             className={`transition-all duration-300 ease-in-out overflow-hidden md:!block md:!max-h-none md:!opacity-100 ${
               isDetailsExpanded
                 ? "max-h-[1000px] opacity-100"
@@ -480,12 +483,13 @@ export default function CoursePage() {
 
           {/* Subjects Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {course.semesters &&
-              course.semesters[activeSemester]?.subjects.map((subject) => (
-              <Card
+            {course.semesters?.[activeSemester]?.subjects?.map((subject) => (
+              <RouteLink
                 key={subject.id}
-                className="hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+                href={`/dashboard/student/courses/${courseId}/subjects/${subject.id}`}
+                className="block"
               >
+                <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer h-full">
                 <CardHeader>
                   <div className="flex items-start justify-between mb-2">
                     <CardTitle className="text-lg">{subject.name}</CardTitle>
@@ -533,6 +537,7 @@ export default function CoursePage() {
                   </div>
                 </CardHeader>
               </Card>
+              </RouteLink>
             ))}
           </div>
         </div>
