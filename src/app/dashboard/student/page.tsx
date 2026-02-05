@@ -59,7 +59,12 @@ export default function StudentDashboard() {
   React.useEffect(() => {
     if (showNotifications) {
       setDrawerVisible(true);
+      // Small delay to ensure the drawer is mounted before animation starts
+      const animationTimeout = setTimeout(() => {
+        // This forces a reflow, allowing the animation to play
+      }, 10);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      return () => clearTimeout(animationTimeout);
     } else if (drawerVisible) {
       timeoutRef.current = setTimeout(
         () => setDrawerVisible(false),
@@ -78,15 +83,15 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen pt-20">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-12 py-4 bg-white shadow">
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 md:px-12 py-4 bg-white shadow">
         {/* Left: Title with SplitText */}
         <div className="flex items-center">
-          <GradientText className="text-2xl font-bold ml-8">
+          <GradientText className="text-2xl font-bold ml-0 md:ml-8">
             ACADEMIX
           </GradientText>
         </div>
         {/* Right: Notification Button and Profile Icon */}
-        <div className="flex items-center gap-4 mr-8 relative">
+        <div className="flex items-center gap-2 md:gap-4 mr-0 md:mr-8 relative">
           <NotificationButton
             onClick={() => setShowNotifications(true)}
             aria-label="Show notifications"
@@ -126,16 +131,16 @@ export default function StudentDashboard() {
       {drawerVisible && (
         <div
           className={`
-            fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-lg z-40 flex flex-col border-l border-gray-200
-            transition-transform transition-opacity
+            fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-lg z-[60] flex flex-col border-l border-gray-200
+            transition-transform transition-opacity translate-x-full opacity-0
             ${
               showNotifications
-                ? `duration-[${OPEN_DURATION}ms] translate-x-0 opacity-100`
-                : `duration-[${CLOSE_DURATION}ms] translate-x-full opacity-0 pointer-events-none`
+                ? `duration-[${OPEN_DURATION}ms] !translate-x-0 !opacity-100`
+                : `duration-[${CLOSE_DURATION}ms] pointer-events-none`
             }
           `}
         >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 mt-0 pt-6">
             <span className="font-semibold text-lg">Notifications</span>
             <button
               className="text-gray-500 hover:text-gray-800 text-2xl font-bold"
