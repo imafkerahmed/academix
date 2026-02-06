@@ -15,12 +15,6 @@ import IntakesTree, {
   type Course,
   type Subject,
 } from "@/components/lecturer/IntakesTree";
-import AssignmentsList, {
-  type Assignment,
-} from "@/components/lecturer/AssignmentsList";
-import MaterialsManager, {
-  type StudyMaterial,
-} from "@/components/lecturer/MaterialsManager";
 import Loader from "@/components/ui/loader";
 import NotificationButton from "@/components/ui/notification-button";
 
@@ -149,70 +143,6 @@ const mockUpcomingClasses: UpcomingClass[] = [
     status: "scheduled",
     zoomJoinUrl: "https://zoom.us/j/mock-meeting-3",
   },
-];
-
-const mockAssignments: Assignment[] = [
-  {
-    id: "assign-1",
-    subjectCode: "CS101-A",
-    subjectName: "Programming Basics",
-    title: "Build a Calculator App",
-    dueDate: "2026-02-15",
-    pendingCount: 12,
-    markedCount: 8,
-  },
-  {
-    id: "assign-2",
-    subjectCode: "CS101-B",
-    subjectName: "Data Structures",
-    title: "Implement Binary Search Tree",
-    dueDate: "2026-02-20",
-    pendingCount: 5,
-    markedCount: 15,
-  },
-  {
-    id: "assign-3",
-    subjectCode: "WEB201-A",
-    subjectName: "Frontend Development",
-    title: "Create Portfolio Website",
-    dueDate: "2026-02-25",
-    pendingCount: 18,
-    markedCount: 2,
-  },
-];
-
-const mockMaterials: StudyMaterial[] = [
-  {
-    id: "mat-1",
-    title: "Introduction to Python",
-    description: "Basic Python programming concepts and syntax",
-    type: "document",
-    filePlaceholder: "python-intro.pdf",
-    canDownload: true,
-    visible: true,
-    courseSubjectId: "subject-1",
-    courseSubjectName: "Programming Basics",
-    createdAt: "2026-01-20T10:00:00Z",
-  },
-  {
-    id: "mat-2",
-    title: "Data Structures Tutorial",
-    description: "Comprehensive guide to data structures",
-    type: "youtube-link",
-    videoUrl: "https://youtube.com/watch?v=example",
-    canDownload: false,
-    visible: true,
-    courseSubjectId: "subject-2",
-    courseSubjectName: "Data Structures",
-    createdAt: "2026-01-22T14:30:00Z",
-  },
-];
-
-const mockAvailableSubjects = [
-  { id: "subject-1", name: "Programming Basics (CS101-A)" },
-  { id: "subject-2", name: "Data Structures (CS101-B)" },
-  { id: "subject-4", name: "Frontend Development (WEB201-A)" },
-  { id: "subject-6", name: "Calculus I (MATH101-A)" },
 ];
 
 function DateTimeCard() {
@@ -417,10 +347,7 @@ export default function LecturerDashboard() {
       0,
     ),
     upcomingClasses: mockUpcomingClasses.length,
-    assignmentsToMark: mockAssignments.reduce(
-      (sum, assignment) => sum + assignment.pendingCount,
-      0,
-    ),
+    assignmentsToMark: 0,
   };
 
   const renderContent = () => {
@@ -475,13 +402,30 @@ export default function LecturerDashboard() {
       case "Intakes":
         return <IntakesTree intakes={mockIntakes} />;
       case "Assignments":
-        return <AssignmentsList assignments={mockAssignments} />;
+        return (
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Coming Soon
+              </h2>
+              <p className="text-gray-600">
+                Assignments page is under development.
+              </p>
+            </div>
+          </div>
+        );
       case "Materials":
         return (
-          <MaterialsManager
-            initialMaterials={mockMaterials}
-            availableSubjects={mockAvailableSubjects}
-          />
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Coming Soon
+              </h2>
+              <p className="text-gray-600">
+                Materials page is under development.
+              </p>
+            </div>
+          </div>
         );
       default:
         return (
