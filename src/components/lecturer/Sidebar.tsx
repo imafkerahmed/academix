@@ -39,7 +39,7 @@ export default function Sidebar({
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -52,37 +52,18 @@ export default function Sidebar({
       >
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex-1 text-center">
+          <div className="flex items-center justify-center mb-4 padding-2">
+            <div className="text-center">
               <h1 className="text-xl font-bold text-gray-900 tracking-wide">
                 ACADEMIX
               </h1>
             </div>
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden text-gray-500 hover:text-gray-700 ml-2"
-              aria-label="Close sidebar"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
           </div>
           <div className="mt-2 flex flex-col items-center text-center">
-            <div className="w-20 h-20 rounded-full bg-gray-900 flex items-center justify-center text-white font-semibold text-xl">
+            <div className="w-40 h-40 rounded-full bg-gray-900 flex items-center justify-center text-white font-semibold text-xl">
               {lecturerName.charAt(0)}
             </div>
-            <p className="mt-2 text-sm font-semibold text-gray-800 truncate max-w-full">
+            <p className="mt-2 text-md font-semibold text-gray-800 truncate max-w-full">
               {lecturerName}
             </p>
             <p className="text-xs text-gray-500">Lecturer</p>
@@ -97,7 +78,10 @@ export default function Sidebar({
               return (
                 <li key={item.id}>
                   <button
-                    onClick={() => onTabChange(item.id)}
+                    onClick={() => {
+                      onTabChange(item.id);
+                      setIsSidebarOpen(false);
+                    }}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                       activeTab === item.id
                         ? "bg-gray-100 text-gray-900 font-medium"

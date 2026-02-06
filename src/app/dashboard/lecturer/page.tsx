@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ShieldX } from "lucide-react";
+import { ShieldX, Menu } from "lucide-react";
 import Sidebar from "@/components/lecturer/Sidebar";
 import BentoStats from "@/components/lecturer/BentoStats";
 import QuickActions from "@/components/lecturer/QuickActions";
@@ -261,6 +261,54 @@ function DateTimeCard() {
   );
 }
 
+// Compact date/time bar for mobile header
+function MobileDateTimeBar() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!now) {
+    return (
+      <div className="flex items-center justify-center text-xs text-gray-400">
+        Loading time...
+      </div>
+    );
+  }
+
+  const dateLabel = now.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  const timeLabel = now.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  return (
+    <div className="flex flex-col items-center justify-center text-center">
+      <span className="text-xl font-semibold text-blue-600 leading-tight">
+        {timeLabel}
+      </span>
+      <span className="text-xs font-medium text-gray-700 mt-1">
+        {dateLabel}
+      </span>
+    </div>
+  );
+}
+
 export default function LecturerDashboard() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<MockUser | null>(mockUser); // Set initial user data
@@ -381,9 +429,12 @@ export default function LecturerDashboard() {
         return (
           <>
             {/* Bento Grid Layout */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 mb-4 items-stretch">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 mb-4 items-stretch">
               <BentoStats stats={stats} />
-              <DateTimeCard />
+              {/* Hide big clock card on extra-small screens */}
+              <div className="hidden sm:block">
+                <DateTimeCard />
+              </div>
             </div>
 
             {/* Main Content Grid */}
@@ -490,7 +541,32 @@ export default function LecturerDashboard() {
 
       {/* Main Content Area (no top header) */}
       <div className="flex-1 lg:ml-64">
-        <main className="p-4 md:p-6">{renderContent()}</main>
+        <main className="p-4 md:p-6">
+          {/* Mobile header with centered title and menu button */}
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
+                ACADEMIX
+              </h1>
+
+              {/* Spacer to keep title centered relative to menu button */}
+              <div className="w-10" aria-hidden="true" />
+            </div>
+            <div className="mt-2">
+              <MobileDateTimeBar />
+            </div>
+          </div>
+
+          {renderContent()}
+        </main>
       </div>
 
       {/* Notification Drawer */}
