@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 
 export interface Subject {
   id: string;
@@ -193,6 +194,7 @@ function SubjectDetailsView({
   intakeCode,
   onBack,
 }: SubjectDetailsViewProps) {
+  const router = useRouter();
   const allMaterials = mockMaterialsPerSubject[subject.id] || [];
   const assignments = mockAssignmentsPerSubject[subject.id] || [];
   const [activeTab, setActiveTab] = useState("assignments");
@@ -385,7 +387,9 @@ function SubjectDetailsView({
                     <button
                       className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition"
                       onClick={() =>
-                        console.log("Mark submissions:", assignment.id)
+                        router.push(
+                          `/dashboard/lecturer/assignments/${assignment.id}`,
+                        )
                       }
                     >
                       Mark Submissions
@@ -872,6 +876,23 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
   const [selectedCourseCode, setSelectedCourseCode] = useState("");
   const [selectedIntakeCode, setSelectedIntakeCode] = useState("");
 
+  const selectionRestoredRef = React.useRef(false);
+
+  const persistSelection = (
+    intakeId: string | null,
+    subjectId: string | null = null,
+  ) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        "lecturerIntakesSelection",
+        JSON.stringify({ intakeId, subjectId }),
+      );
+    } catch {
+      // ignore storage errors
+    }
+  };
+
   const toggleCourse = (courseId: string) => {
     const newExpanded = new Set(expandedCourses);
     if (newExpanded.has(courseId)) {
@@ -886,16 +907,22 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     subject: Subject,
     courseCode: string,
     intakeCode: string,
+    intakeId: string,
   ) => {
+    setSelectedIntake(intakeId);
     setSelectedSubject(subject);
     setSelectedCourseCode(courseCode);
     setSelectedIntakeCode(intakeCode);
+    persistSelection(intakeId, subject.id);
   };
 
   const handleBackToIntake = () => {
     setSelectedSubject(null);
     setSelectedCourseCode("");
     setSelectedIntakeCode("");
+    if (selectedIntake) {
+      persistSelection(selectedIntake, null);
+    }
   };
 
   // Filter to show only assigned items
@@ -907,21 +934,64 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     })),
   }));
 
-  // Auto-select first intake if none selected
-  React.useEffect(() => {
-    if (!selectedIntake && assignedIntakes.length > 0) {
-      setSelectedIntake(assignedIntakes[0].id);
-    }
-  }, [assignedIntakes, selectedIntake]);
-
   const currentIntake = assignedIntakes.find(
     (intake) => intake.id === selectedIntake,
   );
 
+  // Restore last selected intake/subject when the component mounts
+  React.useEffect(() => {
+    if (selectionRestoredRef.current) return;
+    if (typeof window === "undefined") return;
+
+    selectionRestoredRef.current = true;
+
+    try {
+      const raw = window.localStorage.getItem("lecturerIntakesSelection");
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as {
+        intakeId?: string | null;
+        subjectId?: string | null;
+      };
+
+      if (!parsed.intakeId) return;
+
+      const intake = assignedIntakes.find((i) => i.id === parsed.intakeId);
+      if (!intake) return;
+
+      setSelectedIntake(intake.id);
+
+      if (parsed.subjectId) {
+        const courseWithSubject = intake.courses.find((course) =>
+          course.subjects.some((subject) => subject.id === parsed.subjectId),
+        );
+
+        if (courseWithSubject) {
+          const subject = courseWithSubject.subjects.find(
+            (s) => s.id === parsed.subjectId,
+          );
+
+          if (subject) {
+            setSelectedSubject(subject);
+            setSelectedCourseCode(courseWithSubject.code);
+            setSelectedIntakeCode(intake.code);
+            setExpandedCourses(new Set([courseWithSubject.id]));
+          }
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [assignedIntakes]);
+
   return (
-    <div className="flex gap-4 h-[600px]">
+    <div className="flex flex-col lg:flex-row gap-4 lg:h-[600px]">
       {/* Left Panel - Intakes List */}
-      <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200">
+      <div
+        className={`bg-white rounded-lg shadow-sm border border-gray-200 w-full lg:w-80 ${
+          selectedSubject ? "hidden lg:block" : ""
+        }`}
+      >
         <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
           <h2 className="font-semibold text-gray-800">Your Intakes</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -939,7 +1009,13 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
               {assignedIntakes.map((intake) => (
                 <button
                   key={intake.id}
-                  onClick={() => setSelectedIntake(intake.id)}
+                  onClick={() => {
+                    setSelectedIntake(intake.id);
+                    setSelectedSubject(null);
+                    setSelectedCourseCode("");
+                    setSelectedIntakeCode("");
+                    persistSelection(intake.id, null);
+                  }}
                   className={`w-full text-left p-3 rounded-lg border transition-all ${
                     selectedIntake === intake.id
                       ? "bg-blue-50 border-blue-200 shadow-sm"
@@ -976,7 +1052,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
       </div>
 
       {/* Right Panel - Intake Details or Subject Details */}
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 mt-4 lg:mt-0">
         {currentIntake && !selectedSubject ? (
           <div className="h-full overflow-y-auto">
             <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
@@ -1043,6 +1119,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
                                       subject,
                                       course.code,
                                       currentIntake.code,
+                                      currentIntake.id,
                                     )
                                   }
                                   className="w-full flex items-center gap-3 p-3 bg-white rounded-lg border border-purple-200 hover:border-purple-300 hover:bg-purple-50 transition cursor-pointer"

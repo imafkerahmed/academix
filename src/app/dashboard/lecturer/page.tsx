@@ -431,8 +431,8 @@ export default function LecturerDashboard() {
             {/* Bento Grid Layout */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 mb-4 items-stretch">
               <BentoStats stats={stats} />
-              {/* Hide big clock card on extra-small screens */}
-              <div className="hidden sm:block">
+              {/* Show large date/time card only on desktop */}
+              <div className="hidden lg:block">
                 <DateTimeCard />
               </div>
             </div>
@@ -442,7 +442,7 @@ export default function LecturerDashboard() {
               {/* Upcoming Classes - Takes 2 columns */}
               <div className="lg:col-span-2">
                 <UpcomingClasses
-                  classes={mockUpcomingClasses}
+                  classes={mockUpcomingClasses.slice(0, 3)}
                   onViewAll={() => setIsModalOpen(true)}
                 />
               </div>
@@ -496,7 +496,7 @@ export default function LecturerDashboard() {
               {/* Upcoming Classes - Takes 2 columns */}
               <div className="lg:col-span-2">
                 <UpcomingClasses
-                  classes={mockUpcomingClasses}
+                  classes={mockUpcomingClasses.slice(0, 3)}
                   onViewAll={() => setIsModalOpen(true)}
                 />
               </div>

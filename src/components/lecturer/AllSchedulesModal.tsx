@@ -16,6 +16,68 @@ export default function AllSchedulesModal({
   classes,
 }: AllSchedulesModalProps) {
   const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+
+  const monthOptions = React.useMemo(() => {
+    const monthMap = new Map<string, string>();
+
+    classes.forEach((classItem) => {
+      const date = new Date(classItem.startTime);
+      if (Number.isNaN(date.getTime())) return;
+
+      const year = date.getFullYear();
+      const monthIndex = date.getMonth();
+      const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+      const monthLabel = date.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      });
+
+      if (!monthMap.has(monthKey)) {
+        monthMap.set(monthKey, monthLabel);
+      }
+    });
+
+    return Array.from(monthMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => (a.value < b.value ? -1 : 1));
+  }, [classes]);
+
+  const filteredClasses = React.useMemo(() => {
+    if (!selectedMonth) return classes;
+
+    return classes.filter((classItem) => {
+      const date = new Date(classItem.startTime);
+      if (Number.isNaN(date.getTime())) return false;
+
+      const year = date.getFullYear();
+      const monthIndex = date.getMonth();
+      const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+
+      return monthKey === selectedMonth;
+    });
+  }, [classes, selectedMonth]);
+
+  // When the modal opens, default the filter to the current month
+  useEffect(() => {
+    if (!isOpen || classes.length === 0) return;
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const monthIndex = now.getMonth();
+    const currentMonthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+
+    const hasCurrentMonthClasses = classes.some((classItem) => {
+      const date = new Date(classItem.startTime);
+      if (Number.isNaN(date.getTime())) return false;
+      const itemYear = date.getFullYear();
+      const itemMonthIndex = date.getMonth();
+      const itemKey = `${itemYear}-${String(itemMonthIndex + 1).padStart(2, "0")}`;
+      return itemKey === currentMonthKey;
+    });
+
+    setSelectedMonth(hasCurrentMonthClasses ? currentMonthKey : "");
+  }, [isOpen, classes]);
 
   useEffect(() => {
     if (isOpen) {
@@ -44,6 +106,12 @@ export default function AllSchedulesModal({
     }
   };
 
+  const getWeekdayLabel = (startTime: string) => {
+    const date = new Date(startTime);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("en-US", { weekday: "short" });
+  };
+
   const handleQuickJoin = (url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -51,44 +119,69 @@ export default function AllSchedulesModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className={`absolute inset-0 bg-white/10 backdrop-blur-sm transition-all duration-300 ${
-          isAnimating ? "opacity-100" : "opacity-0"
-        }`}
-        onClick={handleClose}
-      />
-
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+        isAnimating ? "opacity-100" : "opacity-0"
+      }`}
+      onClick={handleClose}
+    >
       {/* Modal */}
       <div
-        className={`relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden mx-4 transition-all duration-300 ${
+        className={`relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden mx-4 transition-transform transition-opacity duration-300 ${
           isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
+        onClick={(event) => event.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            All Scheduled Classes
-          </h2>
-          <button
-            onClick={handleClose}
-            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Close modal"
-          >
-            <X size={20} className="text-gray-500" />
-          </button>
+        <div className="flex flex-col gap-3 p-4 border-b border-gray-200 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              All Scheduled Classes
+            </h2>
+            {selectedMonth && (
+              <p className="text-xs text-gray-500 mt-1">
+                Filtering by:{" "}
+                {monthOptions.find((m) => m.value === selectedMonth)?.label ??
+                  selectedMonth}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {monthOptions.length > 0 && (
+              <select
+                value={selectedMonth}
+                onChange={(event) => {
+                  setSelectedMonth(event.target.value);
+                }}
+                className="border border-gray-300 rounded-md text-sm px-2 py-1 bg-white shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All months</option>
+                {monthOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={handleClose}
+              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Close modal"
+            >
+              <X size={20} className="text-gray-500" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
         <div className="p-4 overflow-y-auto max-h-[calc(85vh-80px)]">
-          {classes.length === 0 ? (
+          {filteredClasses.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <p>No scheduled classes found</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {classes.map((classItem) => (
+              {filteredClasses.map((classItem) => (
                 <div
                   key={classItem.id}
                   className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -114,7 +207,10 @@ export default function AllSchedulesModal({
                       <div className="text-sm text-gray-500 flex items-center gap-3">
                         <span className="flex items-center gap-1">
                           <Clock size={14} />
-                          {classItem.startTime}
+                          <span className="font-medium text-gray-800">
+                            {getWeekdayLabel(classItem.startTime)}
+                          </span>
+                          <span>• {classItem.startTime}</span>
                         </span>
                         <span className="flex items-center gap-1">
                           <Timer size={14} />
@@ -124,18 +220,13 @@ export default function AllSchedulesModal({
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleQuickJoin(classItem.zoomJoinUrl)}
+                        onClick={(event) => {
+                          handleQuickJoin(classItem.zoomJoinUrl);
+                        }}
                         className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
                         aria-label={`Join ${classItem.classTitle}`}
                       >
                         Quick Join
-                      </button>
-                      <button
-                        onClick={() => console.log("Details:", classItem.id)}
-                        className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition"
-                        aria-label={`View details for ${classItem.classTitle}`}
-                      >
-                        Details
                       </button>
                     </div>
                   </div>

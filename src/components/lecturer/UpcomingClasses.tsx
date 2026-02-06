@@ -92,9 +92,9 @@ export default function UpcomingClasses({
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm p-3 md:p-4 border border-gray-200">
-        <div className="flex items-center justify-between mb-3 md:mb-4">
-          <h2 className="text-base md:text-lg font-semibold text-gray-900">
+      <div className="bg-white rounded-lg shadow-sm p-3 lg:p-4 border border-gray-200">
+        <div className="flex items-center justify-between mb-3 lg:mb-4">
+          <h2 className="text-base lg:text-lg font-semibold text-gray-900">
             Upcoming Classes
           </h2>
           {onViewAll && (
@@ -107,7 +107,7 @@ export default function UpcomingClasses({
           )}
         </div>
 
-        <div className="space-y-3 md:space-y-4">
+        <div className="space-y-3 lg:space-y-4">
           {classes.map((classItem) => (
             <div
               key={classItem.id}
@@ -120,9 +120,9 @@ export default function UpcomingClasses({
                   openDetails(classItem);
                 }
               }}
-              className="w-full cursor-pointer border border-gray-200 rounded-lg p-3 md:p-4 hover:shadow-md hover:border-blue-200 transition-shadow transition-colors bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full cursor-pointer border border-gray-200 rounded-lg p-3 lg:p-4 hover:shadow-md hover:border-blue-200 transition-shadow transition-colors bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 lg:gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span
@@ -131,7 +131,7 @@ export default function UpcomingClasses({
                       {classItem.status.toUpperCase()}
                     </span>
                   </div>
-                  <h3 className="font-semibold text-base md:text-lg text-gray-800 mb-1">
+                  <h3 className="font-semibold text-base lg:text-lg text-gray-800 mb-1">
                     {classItem.classTitle}
                   </h3>
                   <p className="text-sm text-gray-600 mb-1">
@@ -140,7 +140,7 @@ export default function UpcomingClasses({
                     <span className="font-semibold">Course:</span>{" "}
                     {classItem.courseName}
                   </p>
-                  <div className="text-xs md:text-sm text-gray-500 flex flex-wrap items-center gap-3 md:gap-4">
+                  <div className="text-xs lg:text-sm text-gray-500 flex flex-wrap items-center gap-3 lg:gap-4">
                     <span className="flex items-center gap-1">
                       <Clock size={14} />
                       <span className="font-medium text-gray-800">
