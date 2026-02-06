@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 export default function Home() {
@@ -14,8 +16,25 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="text-sm text-gray-500 dark: text-gray-400 text-center">
-          <p>Welcome — explore the dashboard when available.</p>
+        <div className="flex flex-col gap-4 w-full">
+          <Link
+            href="/dashboard/admin"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium text-center transition-colors"
+          >
+            Admin Dashboard
+          </Link>
+          <Link
+            href="/dashboard/lecturer"
+            className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium text-center transition-colors"
+          >
+            Lecturer Dashboard
+          </Link>
+          <Link
+            href="/dashboard/student"
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium text-center transition-colors"
+          >
+            Student Dashboard
+          </Link>
         </div>
       </main>
     </div>

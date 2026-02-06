@@ -156,16 +156,18 @@ export default function UpcomingClasses({
                 </div>
 
                 <div className="mt-3 md:mt-0 flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleQuickJoin(classItem.zoomJoinUrl);
-                    }}
-                    className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition w-full sm:w-auto"
-                    aria-label={`Join ${classItem.classTitle}`}
-                  >
-                    Quick Join
-                  </button>
+                  {classItem.zoomJoinUrl ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleQuickJoin(classItem.zoomJoinUrl);
+                      }}
+                      className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition w-full sm:w-auto"
+                      aria-label={`Join ${classItem.classTitle}`}
+                    >
+                      Quick Join
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -200,12 +202,14 @@ export default function UpcomingClasses({
                 </p>
               </div>
               <div className="mt-4 flex justify-end">
-                <button
-                  onClick={() => handleQuickJoin(selectedClass.zoomJoinUrl)}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-                >
-                  Join Class
-                </button>
+                {selectedClass.zoomJoinUrl ? (
+                  <button
+                    onClick={() => handleQuickJoin(selectedClass.zoomJoinUrl)}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                  >
+                    Join Class
+                  </button>
+                ) : null}
               </div>
             </>
           )}

@@ -16,68 +16,48 @@ export default function AllSchedulesModal({
   classes,
 }: AllSchedulesModalProps) {
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedDay, setSelectedDay] = useState<string>("");
 
-  const monthOptions = React.useMemo(() => {
-    const monthMap = new Map<string, string>();
-
+  const dayOptions = React.useMemo(() => {
+    const days = new Map<string, string>();
     classes.forEach((classItem) => {
       const date = new Date(classItem.startTime);
       if (Number.isNaN(date.getTime())) return;
-
-      const year = date.getFullYear();
-      const monthIndex = date.getMonth();
-      const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-      const monthLabel = date.toLocaleDateString("en-US", {
-        month: "long",
+      const dayKey = date.toISOString().slice(0, 10); // YYYY-MM-DD
+      const label = date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
         year: "numeric",
       });
-
-      if (!monthMap.has(monthKey)) {
-        monthMap.set(monthKey, monthLabel);
-      }
+      if (!days.has(dayKey)) days.set(dayKey, label);
     });
-
-    return Array.from(monthMap.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => (a.value < b.value ? -1 : 1));
+    return Array.from(days.entries()).map(([value, label]) => ({
+      value,
+      label,
+    }));
   }, [classes]);
 
   const filteredClasses = React.useMemo(() => {
-    if (!selectedMonth) return classes;
-
+    if (!selectedDay) return [];
     return classes.filter((classItem) => {
       const date = new Date(classItem.startTime);
       if (Number.isNaN(date.getTime())) return false;
-
-      const year = date.getFullYear();
-      const monthIndex = date.getMonth();
-      const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-
-      return monthKey === selectedMonth;
+      const dayKey = date.toISOString().slice(0, 10);
+      return dayKey === selectedDay;
     });
-  }, [classes, selectedMonth]);
+  }, [classes, selectedDay]);
 
-  // When the modal opens, default the filter to the current month
+  // When the modal opens, default to today if available, otherwise first available day
   useEffect(() => {
     if (!isOpen || classes.length === 0) return;
-
-    const now = new Date();
-    const year = now.getFullYear();
-    const monthIndex = now.getMonth();
-    const currentMonthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-
-    const hasCurrentMonthClasses = classes.some((classItem) => {
-      const date = new Date(classItem.startTime);
-      if (Number.isNaN(date.getTime())) return false;
-      const itemYear = date.getFullYear();
-      const itemMonthIndex = date.getMonth();
-      const itemKey = `${itemYear}-${String(itemMonthIndex + 1).padStart(2, "0")}`;
-      return itemKey === currentMonthKey;
-    });
-
-    setSelectedMonth(hasCurrentMonthClasses ? currentMonthKey : "");
-  }, [isOpen, classes]);
+    const todayKey = new Date().toISOString().slice(0, 10);
+    if (dayOptions.find((d) => d.value === todayKey)) {
+      setSelectedDay(todayKey);
+      return;
+    }
+    if (dayOptions.length > 0) setSelectedDay(dayOptions[0].value);
+  }, [isOpen, classes, dayOptions]);
 
   useEffect(() => {
     if (isOpen) {
@@ -138,25 +118,22 @@ export default function AllSchedulesModal({
             <h2 className="text-lg font-semibold text-gray-900">
               All Scheduled Classes
             </h2>
-            {selectedMonth && (
+            {selectedDay && (
               <p className="text-xs text-gray-500 mt-1">
-                Filtering by:{" "}
-                {monthOptions.find((m) => m.value === selectedMonth)?.label ??
-                  selectedMonth}
+                Showing:{" "}
+                {dayOptions.find((d) => d.value === selectedDay)?.label ??
+                  selectedDay}
               </p>
             )}
           </div>
           <div className="flex items-center gap-2">
-            {monthOptions.length > 0 && (
+            {dayOptions.length > 0 && (
               <select
-                value={selectedMonth}
-                onChange={(event) => {
-                  setSelectedMonth(event.target.value);
-                }}
+                value={selectedDay}
+                onChange={(event) => setSelectedDay(event.target.value)}
                 className="border border-gray-300 rounded-md text-sm px-2 py-1 bg-white shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">All months</option>
-                {monthOptions.map((option) => (
+                {dayOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -200,7 +177,7 @@ export default function AllSchedulesModal({
                       </h3>
                       <p className="text-sm text-gray-600 mb-1">
                         <span className="font-semibold">Intake:</span>{" "}
-                        {classItem.intakeName} →{" "}
+                        {classItem.intakeName} &nbsp;•&nbsp;
                         <span className="font-semibold">Course:</span>{" "}
                         {classItem.courseName}
                       </p>
@@ -210,7 +187,9 @@ export default function AllSchedulesModal({
                           <span className="font-medium text-gray-800">
                             {getWeekdayLabel(classItem.startTime)}
                           </span>
-                          <span>• {classItem.startTime}</span>
+                          <span className="ml-1">
+                            {new Date(classItem.startTime).toLocaleString()}
+                          </span>
                         </span>
                         <span className="flex items-center gap-1">
                           <Timer size={14} />

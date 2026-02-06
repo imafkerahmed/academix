@@ -21,10 +21,12 @@ export interface User {
   id: string;
   email: string;
   username: string;
+  name: string;
   full_name?: string;
-  role: "host" | "attendee" | "admin" | "student" | "lectuer";
+  role: "host" | "attendee" | "admin" | "student" | "lecturer";
   avatar?: string;
   verified: boolean;
+  accountStatus?: "active" | "disabled";
   created: string;
   updated: string;
 }
