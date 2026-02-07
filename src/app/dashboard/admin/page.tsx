@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import UpcomingClasses from "@/components/admin/UpcomingClasses";
+import UpcomingClasses from "@/components/lecturer/UpcomingClasses";
 import AllSchedulesModal from "@/components/admin/AllSchedulesModal";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import Calendar from "@/components/Calendar";
@@ -119,10 +119,16 @@ export default function AdminDashboard() {
         />
       </div>
       <div className="flex-1 flex flex-col h-screen w-full p-8 relative overflow-x-auto min-h-0 min-w-0">
-        <div className="grid flex-1 w-full h-full gap-4 p-2 grid-cols-4 grid-rows-4 overflow-hidden min-h-0 min-w-0">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Admin Dashboard
+        </h1>
+        <p className="text-gray-600 mt-0">
+          Manage all student accounts and enrollments
+        </p>
+        <div className="grid flex-1 w-full h-full gap-2 p-1 grid-cols-4 grid-rows-4 overflow-hidden min-h-0 min-w-0">
           <div className="col-span-1 row-span-1 min-h-0 min-w-0 overflow-hidden">
             <AdminStatsCard
-              title="Total Students"
+              title="Active Students"
               value={1234}
               icon={Users}
               bgColor="bg-blue-100"
@@ -132,8 +138,8 @@ export default function AdminDashboard() {
           </div>
           <div className="col-span-1 row-span-1 min-h-0 min-w-0 overflow-hidden">
             <AdminStatsCard
-              title="Graduates"
-              value={456}
+              title="Active Intakes"
+              value={4}
               icon={GraduationCap}
               bgColor="bg-green-100"
               iconColor="text-green-600"
@@ -142,30 +148,22 @@ export default function AdminDashboard() {
           </div>
           <div className="col-span-1 row-span-1 min-h-0 min-w-0 overflow-hidden">
             <AdminStatsCard
-              title="Courses"
-              value={32}
-              icon={BookOpen}
+              title="Pending Payments"
+              value={12}
+              icon={DollarSign}
               bgColor="bg-yellow-100"
               iconColor="text-yellow-600"
               trend={{ value: "0.8%", isPositive: false }}
             />
           </div>
           <div className="col-span-1 row-span-1 min-h-0 min-w-0 overflow-hidden">
-            <AdminStatsCard
-              title="Payments"
-              value={"$12,345"}
-              icon={DollarSign}
-              bgColor="bg-purple-100"
-              iconColor="text-purple-600"
-              trend={{ value: "3.1%", isPositive: true }}
-            />
+            <DateTimeStatCard />
           </div>
-
           <div className="col-span-2 row-span-3 bg-gray-200 rounded-lg shadow-md min-h-0 min-w-0 overflow-hidden">
             <Calendar />
           </div>
 
-          <div className="col-span-2 row-span-2 bg-white rounded-lg shadow-md p-4 h-full flex flex-col min-h-0 min-w-0 overflow-hidden">
+          <div className="col-span-2 row-span-2 bg-white rounded-lg shadow-md p-4 h-full flex flex-col min-h-0 min-w-0 overflow-auto">
             <div className="flex items-start justify-between mb-4">
               <div className="text-xl font-semibold">Today's Classes</div>
               <div>
@@ -177,7 +175,7 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 flex flex-col justify-between">
+            <div className="flex-1 flex flex-col gap-2 overflow-auto">
               <AnimatedList
                 items={todaysClasses.slice(0, 3).map((cls) => (
                   <div
@@ -226,7 +224,7 @@ export default function AdminDashboard() {
                 ))}
                 showGradients={false}
                 displayScrollbar={false}
-                className="h-full"
+                className="h-full min-h-0"
                 itemClassName="w-full flex-1 min-h-0"
                 onItemSelect={() => {}}
               />
@@ -256,6 +254,49 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// DateTimeStatCard component outside AdminDashboard
+import { useState, useEffect } from "react";
+
+function DateTimeStatCard() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!now) {
+    return (
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 flex flex-col items-center justify-center w-full animate-pulse">
+        <div className="h-10 w-32 bg-gray-200 rounded mb-2"></div>
+        <div className="h-6 w-24 bg-gray-100 rounded"></div>
+      </div>
+    );
+  }
+
+  const time = now.toLocaleTimeString("en-US", { hour12: false });
+  const date = now.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  return (
+    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 flex flex-col items-center justify-center w-full">
+      <span className="text-4xl md:text-5xl font-extrabold text-blue-600 mb-2 tracking-wider">
+        {time}
+      </span>
+      <span className="text-lg md:text-xl font-semibold text-gray-800">
+        {date}
+      </span>
     </div>
   );
 }
