@@ -271,11 +271,11 @@ function DayCell({
 }) {
   return (
     <button
-      className={`w-full h-24 p-1 rounded-lg border flex flex-col items-start text-left relative transition
-        border-gray-300
+      className={`w-full h-24 p-1 rounded-lg border flex flex-col items-start text-left relative transition border-gray-300
         ${isToday ? "bg-indigo-100 border-indigo-400" : "hover:bg-gray-50"}
         ${isSelected ? "ring-2 ring-indigo-400" : ""}
-      `}
+        min-w-0 max-w-full overflow-hidden`}
+      style={{ minWidth: 0 }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
     >
@@ -425,11 +425,11 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
       );
     }
     return (
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-2 w-full max-w-full overflow-x-hidden">
         {weekDays.map((w) => (
           <div
             key={w}
-            className="text-xs font-bold text-gray-400 text-center mb-1"
+            className="text-xs font-bold text-gray-400 text-center mb-1 min-w-0"
           >
             {w}
           </div>
@@ -484,7 +484,8 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
   return (
     <div
       id="calendar-root"
-      className="w-full h-full bg-white rounded-2xl p-4 flex flex-col"
+      className="w-full h-full bg-white rounded-2xl p-4 flex flex-col max-w-full overflow-x-hidden"
+      style={{ boxSizing: "border-box" }}
     >
       {/* Header: Navigation & View Switch */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
@@ -550,7 +551,7 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
         </div>
       </div>
       {/* Calendar Body */}
-      <div className="flex-1">
+      <div className="flex-1 w-full max-w-full overflow-x-hidden">
         {view === "month" && renderMonth()}
         {view === "week" && renderWeek()}
         {view === "day" && renderDay()}

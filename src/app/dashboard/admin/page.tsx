@@ -197,8 +197,8 @@ export default function AdminDashboard() {
         setIsSidebarOpen={setIsSidebarOpen}
       />
 
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        <main className="p-4 md:p-6 lg:p-8 flex-1 flex flex-col">
+      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
+        <main className="p-4 md:p-6 lg:p-8 flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
           {/* Mobile header with hamburger — phones only */}
           <div className="md:hidden mb-4">
             <div className="flex items-center justify-between">
@@ -260,18 +260,20 @@ export default function AdminDashboard() {
             </p>
           </div>
 
-          {/* Stats Carousel */}
-          <StatsCarousel stats={statsData}>
-            {/* Date/time card on iPad and desktop */}
-            <div>
-              <DateTimeStatCard />
-            </div>
-          </StatsCarousel>
+          {/* Stats Carousel - match student dashboard mobile size */}
+          <div className="w-full p-4">
+            <StatsCarousel stats={statsData}>
+              {/* Date/time card on iPad and desktop */}
+              <div>
+                <DateTimeStatCard />
+              </div>
+            </StatsCarousel>
+          </div>
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0 w-full max-w-full overflow-x-hidden">
             {/* Calendar */}
-            <div className="bg-gray-200 rounded-lg shadow-md min-h-[300px] lg:min-h-0 overflow-hidden lg:row-span-2">
+            <div className="bg-gray-200 rounded-lg shadow-md min-h-[300px] lg:min-h-0 overflow-hidden lg:row-span-2 max-w-full overflow-x-hidden">
               <Calendar />
             </div>
 
