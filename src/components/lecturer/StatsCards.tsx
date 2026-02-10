@@ -66,13 +66,13 @@ export default function StatsCards({ stats }: StatsCardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 w-full max-w-full">
       {cards.map((card, index) => {
         const IconComponent = card.icon;
         return (
           <div
             key={index}
-            className={`${card.bgColor} rounded-xl shadow-md p-6 border-2 ${card.borderColor} hover:shadow-lg transition-shadow flex items-center`}
+            className={`${card.bgColor} rounded-xl shadow-md p-6 border-2 ${card.borderColor} hover:shadow-lg transition-shadow flex items-center w-full max-w-full`}
           >
             <div className="flex items-center justify-center mr-5 flex-shrink-0">
               <IconComponent size={48} className={card.textColor} />

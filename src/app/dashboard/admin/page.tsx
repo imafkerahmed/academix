@@ -329,7 +329,7 @@ export default function AdminDashboard() {
                             rel="noopener noreferrer"
                             className="inline-block bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-1 rounded"
                           >
-                            Join
+                            Specate
                           </a>
                         ) : (
                           <div className="text-xs text-gray-500">
