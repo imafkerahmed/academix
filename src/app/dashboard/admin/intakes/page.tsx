@@ -12,7 +12,12 @@ import {
   Edit,
   Trash2,
   Eye,
+  Menu,
+  Check,
+  Layers,
 } from "lucide-react";
+import StatsCarousel from "@/components/admin/StatsCarousel";
+import AdminActionBar from "@/components/admin/AdminActionBar";
 
 interface Intake {
   id: string;
@@ -44,9 +49,9 @@ interface CourseIntake {
 export default function IntakeCourseManagement() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"intakes" | "courses">("intakes");
   const [intakes, setIntakes] = useState<Intake[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);
 
   useEffect(() => {
@@ -56,24 +61,50 @@ export default function IntakeCourseManagement() {
 
   const fetchData = async () => {
     try {
-      const [intakesData, coursesData, courseIntakesData] = await Promise.all([
-        pb.collection("intakes").getFullList({ sort: "-created" }),
-        pb.collection("courses").getFullList({ sort: "-created" }),
-        pb.collection("course_intakes").getFullList({
+      const intakesPromise = pb
+        .collection("intakes")
+        .getFullList({
+          sort: "-start_date",
+        })
+        .catch(() => []);
+
+      const coursesPromise = pb
+        .collection("courses")
+        .getFullList({
+          sort: "name",
+        })
+        .catch(() => []);
+
+      const courseIntakesPromise = pb
+        .collection("course_intake")
+        .getFullList({
           expand: "course,intake",
-          sort: "-created",
-        }),
+        })
+        .catch(() => []);
+
+      const [intakesData, coursesData, courseIntakesData] = await Promise.all([
+        intakesPromise,
+        coursesPromise,
+        courseIntakesPromise,
       ]);
 
-      setIntakes(intakesData as any);
-      setCourses(coursesData as any);
-      setCourseIntakes(courseIntakesData as any);
+      setIntakes((intakesData as any) || []);
+      setCourses((coursesData as any) || []);
+      setCourseIntakes((courseIntakesData as any) || []);
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      setIntakes([]);
+      setCourses([]);
+      setCourseIntakes([]);
       setLoading(false);
     }
   };
+
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredIntakes = intakes.filter((intake) =>
+    intake.code.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   const handleLogout = () => {
     logout();
@@ -117,9 +148,30 @@ export default function IntakeCourseManagement() {
 
   return (
     <>
-      <AdminSidebar activeTab="intakes" onLogout={handleLogout} />
+      <AdminSidebar
+        activeTab="intakes"
+        onLogout={handleLogout}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
       <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-8">
+        <main className="p-4 md:p-6 lg:p-8">
+          {/* Mobile header with hamburger */}
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
+                ACADEMIX
+              </h1>
+              <div className="w-10" aria-hidden="true" />
+            </div>
+          </div>
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
@@ -131,220 +183,141 @@ export default function IntakeCourseManagement() {
           </div>
 
           {/* Tabs */}
-          <div className="mb-6 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab("intakes")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "intakes"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Calendar size={20} />
-                  Intakes ({intakes.length})
-                </div>
-              </button>
-              <button
-                onClick={() => setActiveTab("courses")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "courses"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <BookOpen size={20} />
-                  Courses ({courses.length})
-                </div>
-              </button>
-            </nav>
-          </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-600">Total Intakes</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {intakes.length}
-              </p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-600">Total Courses</p>
-              <p className="text-2xl font-bold text-green-600">
-                {courses.length}
-              </p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-600">Active Course-Intakes</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {courseIntakes.length}
-              </p>
-            </div>
-          </div>
+          {/* Stats Carousel */}
+          <StatsCarousel
+            stats={[
+              {
+                title: "Total Intakes",
+                value: intakes.length,
+                icon: Calendar,
+                bgColor: "bg-blue-50",
+                iconColor: "text-blue-600",
+              },
+              {
+                title: "Total Courses",
+                value: courses.length,
+                icon: BookOpen,
+                bgColor: "bg-green-50",
+                iconColor: "text-green-600",
+              },
+              {
+                title: "Active Course-Intakes",
+                value: courseIntakes.length,
+                icon: Layers,
+                bgColor: "bg-purple-50",
+                iconColor: "text-purple-600",
+              },
+            ]}
+          />
 
           {/* Intakes Tab Content */}
-          {activeTab === "intakes" && (
-            <div className="space-y-4">
-              {/* Add Button */}
-              <div className="flex justify-end">
-                <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                  <Plus size={20} />
-                  Create New Intake
-                </button>
-              </div>
+          {/* Actions Bar */}
+          <AdminActionBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search intakes by code..."
+            action={
+              <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
+                <Plus size={20} />
+                Create New Intake
+              </button>
+            }
+          />
 
-              {/* Intakes List */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Intake Code
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Start Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          End Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {intakes.map((intake) => {
-                        const today = new Date();
-                        const startDate = new Date(intake.start_date);
-                        const endDate = new Date(intake.end_date);
-                        const status =
-                          today < startDate
-                            ? "upcoming"
-                            : today > endDate
-                              ? "completed"
-                              : "active";
+          {/* Intakes List */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Intake Code
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Start Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        End Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredIntakes.map((intake) => {
+                      const today = new Date();
+                      const startDate = new Date(intake.start_date);
+                      const endDate = new Date(intake.end_date);
+                      const status =
+                        today < startDate
+                          ? "upcoming"
+                          : today > endDate
+                            ? "completed"
+                            : "active";
 
-                        return (
-                          <tr key={intake.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">
-                                {intake.code}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {new Date(intake.start_date).toLocaleDateString()}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {new Date(intake.end_date).toLocaleDateString()}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span
-                                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  status === "active"
-                                    ? "bg-green-100 text-green-800"
-                                    : status === "upcoming"
-                                      ? "bg-blue-100 text-blue-800"
-                                      : "bg-gray-100 text-gray-800"
-                                }`}
+                      return (
+                        <tr key={intake.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {intake.code}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {new Date(intake.start_date).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {new Date(intake.end_date).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                status === "active"
+                                  ? "bg-green-100 text-green-800"
+                                  : status === "upcoming"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex items-center justify-end gap-2">
+                              <button className="text-blue-600 hover:text-blue-900">
+                                <Eye size={18} />
+                              </button>
+                              <button className="text-green-600 hover:text-green-900">
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteIntake(intake.id)}
+                                className="text-red-600 hover:text-red-900"
                               >
-                                {status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <div className="flex items-center justify-end gap-2">
-                                <button className="text-blue-600 hover:text-blue-900">
-                                  <Eye size={18} />
-                                </button>
-                                <button className="text-green-600 hover:text-green-900">
-                                  <Edit size={18} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteIntake(intake.id)}
-                                  className="text-red-600 hover:text-red-900"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {intakes.length === 0 && (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500">No intakes found</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Courses Tab Content */}
-          {activeTab === "courses" && (
-            <div className="space-y-4">
-              {/* Add Button */}
-              <div className="flex justify-end">
-                <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                  <Plus size={20} />
-                  Create New Course
-                </button>
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
-              {/* Courses Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {courses.map((course) => (
-                  <div
-                    key={course.id}
-                    className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                          {course.name}
-                        </h3>
-                        <p className="text-sm text-gray-500">{course.code}</p>
-                      </div>
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <BookOpen className="text-blue-600" size={20} />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <span className="text-xs text-gray-500">
-                        Created: {new Date(course.created).toLocaleDateString()}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <button className="text-blue-600 hover:text-blue-900">
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCourse(course.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {courses.length === 0 && (
-                <div className="bg-white rounded-lg border border-gray-200 text-center py-12">
-                  <p className="text-gray-500">No courses found</p>
+              {intakes.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No intakes found</p>
                 </div>
               )}
             </div>
-          )}
+          </div>
         </main>
       </div>
     </>

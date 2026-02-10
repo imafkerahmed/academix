@@ -13,7 +13,14 @@ import {
   Mail,
   Phone,
   MapPin,
+  Menu,
+  Users,
+  CheckCircle,
+  XCircle,
+  Calendar,
 } from "lucide-react";
+import StatsCarousel from "@/components/admin/StatsCarousel";
+import AdminActionBar from "@/components/admin/AdminActionBar";
 
 interface Student {
   id: string;
@@ -32,6 +39,7 @@ export default function StudentManagement() {
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Authentication disabled for UI development
@@ -40,15 +48,18 @@ export default function StudentManagement() {
 
   const fetchStudents = async () => {
     try {
-      const records = await pb.collection("users").getFullList({
-        filter: 'role = "student"',
-        sort: "-created",
-      });
+      const records = await pb
+        .collection("users")
+        .getFullList({
+          filter: 'role = "student"',
+          sort: "-created",
+        })
+        .catch(() => []);
 
-      setStudents(records as any);
+      setStudents((records as any) || []);
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching students:", error);
+      setStudents([]);
       setLoading(false);
     }
   };
@@ -92,9 +103,30 @@ export default function StudentManagement() {
 
   return (
     <>
-      <AdminSidebar activeTab="students" onLogout={handleLogout} />
+      <AdminSidebar
+        activeTab="students"
+        onLogout={handleLogout}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
       <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-8">
+        <main className="p-4 md:p-6 lg:p-8">
+          {/* Mobile header with hamburger */}
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
+                ACADEMIX
+              </h1>
+              <div className="w-10" aria-hidden="true" />
+            </div>
+          </div>
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
@@ -104,80 +136,71 @@ export default function StudentManagement() {
               Manage all student accounts and enrollments
             </p>
           </div>
+          {/* Stats Carousel */}
+          <StatsCarousel
+            stats={[
+              {
+                title: "Total Students",
+                value: students.length,
+                icon: Users,
+                bgColor: "bg-blue-50",
+                iconColor: "text-blue-600",
+              },
+              {
+                title: "Active",
+                value: students.filter((s) => s.accountStatus === "active")
+                  .length,
+                icon: CheckCircle,
+                bgColor: "bg-green-50",
+                iconColor: "text-green-600",
+              },
+              {
+                title: "Disabled",
+                value: students.filter((s) => s.accountStatus === "disabled")
+                  .length,
+                icon: XCircle,
+                bgColor: "bg-red-50",
+                iconColor: "text-red-600",
+              },
+              {
+                title: "This Month",
+                value: students.filter(
+                  (s) =>
+                    new Date(s.created).getMonth() === new Date().getMonth(),
+                ).length,
+                icon: Calendar,
+                bgColor: "bg-blue-50",
+                iconColor: "text-blue-600",
+              },
+            ]}
+          />
 
           {/* Actions Bar */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              {/* Search */}
-              <div className="relative flex-1 w-full md:max-w-md">
-                <Search
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                  size={20}
-                />
-                <input
-                  type="text"
-                  placeholder="Search students by name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Filter */}
+          <AdminActionBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search students by name or email..."
+            action={
               <div className="flex gap-2 items-center">
-                <Filter size={20} className="text-gray-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="disabled">Disabled</option>
-                </select>
+                <div className="flex gap-2 items-center mr-2">
+                  <Filter size={20} className="text-gray-400" />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                </div>
+                <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
+                  <UserPlus size={20} />
+                  Add Student
+                </button>
               </div>
-
-              {/* Add Button */}
-              <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                <UserPlus size={20} />
-                Add Student
-              </button>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-600">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {students.length}
-              </p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-600">Active</p>
-              <p className="text-2xl font-bold text-green-600">
-                {students.filter((s) => s.accountStatus === "active").length}
-              </p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-600">Disabled</p>
-              <p className="text-2xl font-bold text-red-600">
-                {students.filter((s) => s.accountStatus === "disabled").length}
-              </p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-600">This Month</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {
-                  students.filter(
-                    (s) =>
-                      new Date(s.created).getMonth() === new Date().getMonth(),
-                  ).length
-                }
-              </p>
-            </div>
-          </div>
-
+            }
+          />
           {/* Students Table */}
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">

@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import pb, { getCurrentUser, logout } from "@/lib/pocketbase";
+import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import StatsCarousel from "@/components/admin/StatsCarousel";
+import AdminActionBar from "@/components/admin/AdminActionBar";
 import {
   FileText,
   Calendar,
@@ -12,6 +14,8 @@ import {
   AlertCircle,
   Eye,
   Download,
+  Menu,
+  Plus,
 } from "lucide-react";
 
 interface Assignment {
@@ -46,6 +50,7 @@ export default function AssignmentManagement() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Authentication disabled for UI development
@@ -54,22 +59,34 @@ export default function AssignmentManagement() {
 
   const fetchData = async () => {
     try {
-      const [assignmentsData, submissionsData] = await Promise.all([
-        pb.collection("assignments").getFullList({
+      const assignmentsPromise = pb
+        .collection("assignments")
+        .getFullList({
           expand: "course_subject,marker",
           sort: "-created",
-        }),
-        pb.collection("assignment_submissions").getFullList({
+        })
+        .catch(() => []);
+
+      const submissionsPromise = pb
+        .collection("assignment_submissions")
+        .getFullList({
           expand: "student,assignment",
           sort: "-created",
-        }),
+        })
+        .catch(() => []);
+
+      const [assignmentsData, submissionsData] = await Promise.all([
+        assignmentsPromise,
+        submissionsPromise,
       ]);
 
-      setAssignments(assignmentsData as any);
-      setSubmissions(submissionsData as any);
+      setAssignments((assignmentsData as any) || []);
+      setSubmissions((submissionsData as any) || []);
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      // console.error("Error fetching data:", error); // Suppress error for UI dev
+      setAssignments([]);
+      setSubmissions([]);
       setLoading(false);
     }
   };
@@ -98,7 +115,17 @@ export default function AssignmentManagement() {
 
   const stats = getSubmissionStats();
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const filteredSubmissions = submissions.filter((submission) => {
+    const studentName = submission.expand?.student?.name || "";
+    const assignmentTitle = submission.expand?.assignment?.title || "";
+    const matchesSearch =
+      studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assignmentTitle.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
     if (filter === "all") return true;
     if (filter === "pending") return submission.evaluation_status === "pending";
     if (filter === "marked") return submission.evaluation_status === "marked";
@@ -119,9 +146,30 @@ export default function AssignmentManagement() {
 
   return (
     <>
-      <AdminSidebar activeTab="assignments" onLogout={handleLogout} />
+      <AdminSidebar
+        activeTab="assignments"
+        onLogout={handleLogout}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
       <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-8">
+        <main className="p-4 md:p-6 lg:p-8">
+          {/* Mobile header with hamburger */}
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
+                ACADEMIX
+              </h1>
+              <div className="w-10" aria-hidden="true" />
+            </div>
+          </div>
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
@@ -132,110 +180,93 @@ export default function AssignmentManagement() {
             </p>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Assignments</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {assignments.length}
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <FileText className="text-blue-600" size={24} />
-                </div>
-              </div>
-            </div>
+          {/* Stats Carousel */}
+          <StatsCarousel
+            stats={[
+              {
+                title: "Total Assignments",
+                value: assignments.length,
+                icon: FileText,
+                bgColor: "bg-blue-50",
+                iconColor: "text-blue-600",
+              },
+              {
+                title: "Pending Review",
+                value: stats.pending,
+                icon: Clock,
+                bgColor: "bg-orange-50",
+                iconColor: "text-orange-600",
+              },
+              {
+                title: "Marked",
+                value: stats.marked,
+                icon: CheckCircle,
+                bgColor: "bg-green-50",
+                iconColor: "text-green-600",
+              },
+              {
+                title: "Late Submissions",
+                value: stats.late,
+                icon: AlertCircle,
+                bgColor: "bg-red-50",
+                iconColor: "text-red-600",
+              },
+            ]}
+          />
 
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Pending Review</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {stats.pending}
-                  </p>
-                </div>
-                <div className="p-3 bg-orange-50 rounded-lg">
-                  <Clock className="text-orange-600" size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Marked</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {stats.marked}
-                  </p>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <CheckCircle className="text-green-600" size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Late Submissions</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {stats.late}
-                  </p>
-                </div>
-                <div className="p-3 bg-red-50 rounded-lg">
-                  <AlertCircle className="text-red-600" size={24} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filter Tabs */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilter("all")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "all"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                All ({submissions.length})
+          {/* Actions Bar */}
+          <AdminActionBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search submissions..."
+            action={
+              <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
+                <Plus size={20} />
+                Create New Assignment
               </button>
-              <button
-                onClick={() => setFilter("pending")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "pending"
-                    ? "bg-orange-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Pending ({stats.pending})
-              </button>
-              <button
-                onClick={() => setFilter("marked")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "marked"
-                    ? "bg-green-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Marked ({stats.marked})
-              </button>
-              <button
-                onClick={() => setFilter("late")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "late"
-                    ? "bg-red-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Late ({stats.late})
-              </button>
-            </div>
-          </div>
+            }
+          >
+            <button
+              onClick={() => setFilter("all")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "all"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              All ({submissions.length})
+            </button>
+            <button
+              onClick={() => setFilter("pending")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "pending"
+                  ? "bg-orange-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Pending ({stats.pending})
+            </button>
+            <button
+              onClick={() => setFilter("marked")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "marked"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Marked ({stats.marked})
+            </button>
+            <button
+              onClick={() => setFilter("late")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "late"
+                  ? "bg-red-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Late ({stats.late})
+            </button>
+          </AdminActionBar>
 
           {/* Submissions Table */}
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

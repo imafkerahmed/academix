@@ -4,11 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser, logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
-import { Settings, User, BookOpen, Building2, DollarSign } from "lucide-react";
+import {
+  Settings,
+  User,
+  BookOpen,
+  Building2,
+  DollarSign,
+  Menu,
+} from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Authentication disabled for UI development
@@ -33,9 +41,30 @@ export default function SettingsPage() {
 
   return (
     <>
-      <AdminSidebar activeTab="settings" onLogout={handleLogout} />
+      <AdminSidebar
+        activeTab="settings"
+        onLogout={handleLogout}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
       <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-8">
+        <main className="p-4 md:p-6 lg:p-8">
+          {/* Mobile header with hamburger */}
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
+                ACADEMIX
+              </h1>
+              <div className="w-10" aria-hidden="true" />
+            </div>
+          </div>
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">

@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import pb, { getCurrentUser, logout } from "@/lib/pocketbase";
+import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import StatsCarousel from "@/components/admin/StatsCarousel";
+import AdminActionBar from "@/components/admin/AdminActionBar";
 import {
   Video,
   Calendar,
@@ -13,6 +15,8 @@ import {
   XCircle,
   Play,
   Eye,
+  Menu,
+  Plus,
 } from "lucide-react";
 
 interface ZoomClass {
@@ -48,6 +52,7 @@ export default function ClassManagement() {
   const [classes, setClasses] = useState<ZoomClass[]>([]);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Authentication disabled for UI development
@@ -56,22 +61,31 @@ export default function ClassManagement() {
 
   const fetchData = async () => {
     try {
-      const [classesData, attendeesData] = await Promise.all([
-        pb.collection("classes").getFullList({
-          expand: "host,zoom_account",
+      const classesPromise = pb
+        .collection("classes")
+        .getFullList({
           sort: "-start_time",
-        }),
-        pb.collection("attendees").getFullList({
+        })
+        .catch(() => []);
+
+      const attendeesPromise = pb
+        .collection("class_attendees")
+        .getFullList({
           expand: "class,attendee",
-          sort: "-created",
-        }),
+        })
+        .catch(() => []);
+
+      const [classesData, attendeesData] = await Promise.all([
+        classesPromise,
+        attendeesPromise,
       ]);
 
-      setClasses(classesData as any);
-      setAttendees(attendeesData as any);
+      setClasses((classesData as any) || []);
+      setAttendees((attendeesData as any) || []);
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      setClasses([]);
+      setAttendees([]);
       setLoading(false);
     }
   };
@@ -85,18 +99,24 @@ export default function ClassManagement() {
     const scheduled = classes.filter((c) => c.status === "scheduled").length;
     const inProgress = classes.filter((c) => c.status === "in_progress").length;
     const completed = classes.filter((c) => c.status === "completed").length;
+    const cancelled = classes.filter((c) => c.status === "cancelled").length;
     const totalAttendees = attendees.filter(
       (a) => a.status === "attended",
     ).length;
 
-    return { scheduled, inProgress, completed, totalAttendees };
+    return { scheduled, inProgress, completed, cancelled, totalAttendees };
   };
 
   const stats = getClassStats();
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const filteredClasses = classes.filter((classItem) => {
-    if (filter === "all") return true;
-    return classItem.status === filter;
+    const matchesSearch = classItem.title
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    if (filter === "all") return matchesSearch;
+    return matchesSearch && classItem.status === filter;
   });
 
   const getStatusColor = (status: string) => {
@@ -127,9 +147,30 @@ export default function ClassManagement() {
 
   return (
     <>
-      <AdminSidebar activeTab="classes" onLogout={handleLogout} />
+      <AdminSidebar
+        activeTab="classes"
+        onLogout={handleLogout}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
       <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-8">
+        <main className="p-4 md:p-6 lg:p-8">
+          {/* Mobile header with hamburger */}
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
+                ACADEMIX
+              </h1>
+              <div className="w-10" aria-hidden="true" />
+            </div>
+          </div>
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
@@ -140,110 +181,93 @@ export default function ClassManagement() {
             </p>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Scheduled</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {stats.scheduled}
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <Calendar className="text-blue-600" size={24} />
-                </div>
-              </div>
-            </div>
+          {/* Stats Carousel */}
+          <StatsCarousel
+            stats={[
+              {
+                title: "Scheduled",
+                value: stats.scheduled,
+                icon: Calendar,
+                bgColor: "bg-blue-50",
+                iconColor: "text-blue-600",
+              },
+              {
+                title: "In Progress",
+                value: stats.inProgress,
+                icon: Play,
+                bgColor: "bg-green-50",
+                iconColor: "text-green-600",
+              },
+              {
+                title: "Completed",
+                value: stats.completed,
+                icon: CheckCircle,
+                bgColor: "bg-gray-100",
+                iconColor: "text-gray-600",
+              },
+              {
+                title: "Cancelled",
+                value: stats.cancelled,
+                icon: XCircle,
+                bgColor: "bg-red-50",
+                iconColor: "text-red-600",
+              },
+            ]}
+          />
 
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">In Progress</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {stats.inProgress}
-                  </p>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <Play className="text-green-600" size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Completed</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.completed}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <CheckCircle className="text-gray-600" size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Attendees</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {stats.totalAttendees}
-                  </p>
-                </div>
-                <div className="p-3 bg-purple-50 rounded-lg">
-                  <Users className="text-purple-600" size={24} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filter Tabs */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilter("all")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "all"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                All ({classes.length})
+          {/* Actions Bar */}
+          <AdminActionBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search classes..."
+            action={
+              <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
+                <Plus size={20} />
+                Schedule New Class
               </button>
-              <button
-                onClick={() => setFilter("scheduled")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "scheduled"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Scheduled ({stats.scheduled})
-              </button>
-              <button
-                onClick={() => setFilter("in_progress")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "in_progress"
-                    ? "bg-green-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                In Progress ({stats.inProgress})
-              </button>
-              <button
-                onClick={() => setFilter("completed")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "completed"
-                    ? "bg-gray-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Completed ({stats.completed})
-              </button>
-            </div>
-          </div>
+            }
+          >
+            <button
+              onClick={() => setFilter("all")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "all"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              All ({classes.length})
+            </button>
+            <button
+              onClick={() => setFilter("scheduled")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "scheduled"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Scheduled ({stats.scheduled})
+            </button>
+            <button
+              onClick={() => setFilter("in_progress")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "in_progress"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              In Progress ({stats.inProgress})
+            </button>
+            <button
+              onClick={() => setFilter("completed")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "completed"
+                  ? "bg-gray-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Completed ({stats.completed})
+            </button>
+          </AdminActionBar>
 
           {/* Classes Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

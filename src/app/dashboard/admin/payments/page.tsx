@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import pb, { getCurrentUser, logout } from "@/lib/pocketbase";
+import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import StatsCarousel from "@/components/admin/StatsCarousel";
+import AdminActionBar from "@/components/admin/AdminActionBar";
 import {
   DollarSign,
   CheckCircle,
@@ -12,6 +14,8 @@ import {
   Eye,
   Download,
   TrendingUp,
+  Menu,
+  Plus,
 } from "lucide-react";
 
 interface Payment {
@@ -46,6 +50,7 @@ export default function PaymentManagement() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Authentication disabled for UI development
@@ -54,22 +59,33 @@ export default function PaymentManagement() {
 
   const fetchData = async () => {
     try {
+      const paymentsPromise = pb
+        .collection("payments")
+        .getFullList({
+          expand: "student,intake,course",
+          sort: "-payment_date",
+        })
+        .catch(() => []);
+
+      const installmentsPromise = pb
+        .collection("installments")
+        .getFullList({
+          expand: "student",
+          sort: "due_date",
+        })
+        .catch(() => []);
+
       const [paymentsData, installmentsData] = await Promise.all([
-        pb.collection("payments").getFullList({
-          expand: "student,enrollment",
-          sort: "-created",
-        }),
-        pb.collection("installments").getFullList({
-          expand: "enrollment",
-          sort: "-created",
-        }),
+        paymentsPromise,
+        installmentsPromise,
       ]);
 
-      setPayments(paymentsData as any);
-      setInstallments(installmentsData as any);
+      setPayments((paymentsData as any) || []);
+      setInstallments((installmentsData as any) || []);
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      setPayments([]);
+      setInstallments([]);
       setLoading(false);
     }
   };
@@ -109,7 +125,17 @@ export default function PaymentManagement() {
 
   const stats = getPaymentStats();
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const filteredPayments = payments.filter((payment) => {
+    const studentName = (payment as any).expand?.student?.name || "";
+    const courseName = (payment as any).expand?.course?.name || "";
+    const matchesSearch =
+      studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      courseName.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
     if (filter === "all") return true;
     if (filter === "verified") return payment.verified;
     if (filter === "pending") return !payment.verified;
@@ -132,9 +158,30 @@ export default function PaymentManagement() {
 
   return (
     <>
-      <AdminSidebar activeTab="payments" onLogout={handleLogout} />
+      <AdminSidebar
+        activeTab="payments"
+        onLogout={handleLogout}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
       <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-8">
+        <main className="p-4 md:p-6 lg:p-8">
+          {/* Mobile header with hamburger */}
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
+                ACADEMIX
+              </h1>
+              <div className="w-10" aria-hidden="true" />
+            </div>
+          </div>
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
@@ -146,119 +193,104 @@ export default function PaymentManagement() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    ₹{stats.totalRevenue.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <TrendingUp className="text-green-600" size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Verified Payments</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {stats.verifiedPayments}
-                  </p>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <CheckCircle className="text-green-600" size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Pending Verification</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {stats.pendingPayments}
-                  </p>
-                </div>
-                <div className="p-3 bg-orange-50 rounded-lg">
-                  <Clock className="text-orange-600" size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Pending Installments</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {stats.pendingInstallments}
-                  </p>
-                </div>
-                <div className="p-3 bg-red-50 rounded-lg">
-                  <DollarSign className="text-red-600" size={24} />
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Stats Carousel */}
+          <StatsCarousel
+            stats={[
+              {
+                title: "Total Revenue",
+                value: `₹${stats.totalRevenue.toLocaleString()}`,
+                icon: TrendingUp,
+                bgColor: "bg-green-50",
+                iconColor: "text-green-600",
+              },
+              {
+                title: "Verified Payments",
+                value: stats.verifiedPayments,
+                icon: CheckCircle,
+                bgColor: "bg-green-50",
+                iconColor: "text-green-600",
+              },
+              {
+                title: "Pending Verification",
+                value: stats.pendingPayments,
+                icon: Clock,
+                bgColor: "bg-orange-50",
+                iconColor: "text-orange-600",
+              },
+              {
+                title: "Pending Installments",
+                value: stats.pendingInstallments,
+                icon: DollarSign,
+                bgColor: "bg-red-50",
+                iconColor: "text-red-600",
+              },
+            ]}
+          />
 
           {/* Filter Tabs */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => setFilter("all")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "all"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                All Payments ({payments.length})
+          {/* Actions Bar */}
+          <AdminActionBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search payments..."
+            action={
+              <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
+                <Plus size={20} />
+                Record New Payment
               </button>
-              <button
-                onClick={() => setFilter("pending")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "pending"
-                    ? "bg-orange-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Pending ({stats.pendingPayments})
-              </button>
-              <button
-                onClick={() => setFilter("verified")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "verified"
-                    ? "bg-green-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Verified ({stats.verifiedPayments})
-              </button>
-              <button
-                onClick={() => setFilter("registration")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "registration"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Registration
-              </button>
-              <button
-                onClick={() => setFilter("installment")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === "installment"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Installments
-              </button>
-            </div>
-          </div>
+            }
+          >
+            <button
+              onClick={() => setFilter("all")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "all"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              All ({payments.length})
+            </button>
+            <button
+              onClick={() => setFilter("pending")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "pending"
+                  ? "bg-orange-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Pending ({stats.pendingPayments})
+            </button>
+            <button
+              onClick={() => setFilter("verified")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "verified"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Verified ({stats.verifiedPayments})
+            </button>
+            <button
+              onClick={() => setFilter("registration")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "registration"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Registration
+            </button>
+            <button
+              onClick={() => setFilter("installment")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "installment"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Installments
+            </button>
+          </AdminActionBar>
 
           {/* Payments Table */}
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
