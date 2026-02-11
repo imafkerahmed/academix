@@ -5,6 +5,15 @@ import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import { Plus } from "lucide-react";
+import { useState } from "react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
 
 // --- Types ---
 interface Intake {
@@ -74,13 +83,13 @@ const mockCourseIntakes: CourseIntake[] = [
 ];
 
 // --- Utility Functions ---
-function getStatus(intake: Intake) {
+function calculateStatus(start_date: string, end_date: string) {
   const today = new Date();
-  const start = new Date(intake.start_date);
-  const end = new Date(intake.end_date);
+  const start = new Date(start_date);
+  const end = new Date(end_date);
   if (today < start) return "upcoming";
   if (today > end) return "completed";
-  return "active";
+  return "ongoing";
 }
 function formatDate(date: string) {
   // Always outputs YYYY-MM-DD
@@ -89,7 +98,7 @@ function formatDate(date: string) {
 }
 function StatusBadge({ status }: { status: string }) {
   const color =
-    status === "active"
+    status === "ongoing"
       ? "bg-green-100 text-green-700"
       : status === "upcoming"
         ? "bg-blue-100 text-blue-700"
@@ -126,6 +135,26 @@ export default function IntakeDetailsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = React.useState("");
 
+  // Modal state for modifying intake
+  const [showModifyModal, setShowModifyModal] = useState(false);
+  const [editIntake, setEditIntake] = useState({
+    code: intake?.code || "",
+    start_date: intake?.start_date || "",
+    end_date: intake?.end_date || "",
+  });
+
+  // Modal state for creating a course
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newCourse, setNewCourse] = useState({
+    courseId: "",
+    start_date: "",
+    end_date: "",
+    isSemesterBased: false,
+    course_fee: "",
+    registration_fee: "",
+    duration: "",
+  });
+
   if (!intake) {
     return (
       <div className="p-8 text-center text-gray-500">Intake not found.</div>
@@ -142,6 +171,52 @@ export default function IntakeDetailsPage() {
           .toLowerCase()
           .includes(searchQuery.toLowerCase())),
   );
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 10;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredCourses.length / rowsPerPage),
+  );
+  const paginatedCourses = filteredCourses.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage,
+  );
+
+  function handleOpenModifyModal() {
+    setEditIntake({
+      code: intake?.code || "",
+      start_date: intake?.start_date || "",
+      end_date: intake?.end_date || "",
+    });
+    setShowModifyModal(true);
+  }
+
+  function handleModifyIntake(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    // Here you would update the intake in your data source
+    // For now, just close the modal
+    setShowModifyModal(false);
+  }
+
+  function handleOpenCreateModal() {
+    setNewCourse({
+      courseId: "",
+      start_date: "",
+      end_date: "",
+      isSemesterBased: false,
+      course_fee: "",
+      registration_fee: "",
+      duration: "",
+    });
+    setShowCreateModal(true);
+  }
+
+  function handleCreateCourse(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    // Here you would create the course intake and fees in your backend
+    setShowCreateModal(false);
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans">
@@ -168,13 +243,16 @@ export default function IntakeDetailsPage() {
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v6l4 2" />
               </svg>
-              {getStatus(intake).toUpperCase()}
+              {calculateStatus(
+                intake.start_date,
+                intake.end_date,
+              ).toUpperCase()}
             </span>
 
             {/* Edit Button */}
             <button
               className="ml-2 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm shadow transition-colors"
-              onClick={() => alert("Edit Intake (implement modal or route)")}
+              onClick={handleOpenModifyModal}
             >
               MODIFY
             </button>
@@ -220,9 +298,7 @@ export default function IntakeDetailsPage() {
               <Button
                 type="button"
                 className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-4 rounded-lg transition-colors h-14"
-                onClick={() =>
-                  alert("Create Course (implement modal or route)")
-                }
+                onClick={handleOpenCreateModal}
               >
                 <Plus size={20} />
                 CREATE COURSE
@@ -246,20 +322,23 @@ export default function IntakeDetailsPage() {
                 <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase tracking-wider bg-white">
                   End Date
                 </th>
+                <th className="px-6 py-3 text-left font-bold text-gray-500 uppercase tracking-wider bg-white">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredCourses.length === 0 ? (
+              {paginatedCourses.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center py-12 text-gray-400 bg-gray-50"
                   >
                     No courses found for this intake.
                   </td>
                 </tr>
               ) : (
-                filteredCourses.map((ci, idx) =>
+                paginatedCourses.map((ci, idx) =>
                   ci.courseDetails ? (
                     <tr
                       key={ci.id}
@@ -277,14 +356,376 @@ export default function IntakeDetailsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                         {formatDate(ci.end_date)}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge
+                          status={calculateStatus(ci.start_date, ci.end_date)}
+                        />
+                      </td>
                     </tr>
                   ) : null,
                 )
               )}
             </tbody>
           </table>
+          {/* Pagination Bar: right-aligned */}
+          <div className="w-full flex justify-end px-4 py-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage((p) => Math.max(1, p - 1));
+                    }}
+                    aria-disabled={currentPage === 1}
+                    tabIndex={currentPage === 1 ? -1 : 0}
+                  />
+                </PaginationItem>
+                {[...Array(totalPages)].map((_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      href="#"
+                      isActive={currentPage === i + 1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(i + 1);
+                      }}
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage((p) => Math.min(totalPages, p + 1));
+                    }}
+                    aria-disabled={currentPage === totalPages}
+                    tabIndex={currentPage === totalPages ? -1 : 0}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         </div>
+        {/* Modify Intake Modal */}
+        {showModifyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4">Modify Intake</h2>
+              <form onSubmit={handleModifyIntake} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Intake Code
+                  </label>
+                  <input
+                    type="text"
+                    value={editIntake.code}
+                    onChange={(e) =>
+                      setEditIntake({ ...editIntake, code: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border rounded"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editIntake.start_date}
+                    onChange={(e) =>
+                      setEditIntake({
+                        ...editIntake,
+                        start_date: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editIntake.end_date}
+                    onChange={(e) =>
+                      setEditIntake({ ...editIntake, end_date: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border rounded"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded bg-gray-200"
+                    onClick={() => setShowModifyModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded bg-indigo-600 text-white"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* Create Course Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
+              {/* X Close Button */}
+              <button
+                type="button"
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold"
+                onClick={() => setShowCreateModal(false)}
+                aria-label="Close"
+              >
+                &times;
+              </button>
+              <h2 className="text-xl font-bold mb-4">Create Course Intake</h2>
+              <CreateCourseModalContent
+                newCourse={newCourse}
+                setNewCourse={setNewCourse}
+                setShowCreateModal={setShowCreateModal}
+                handleCreateCourse={handleCreateCourse}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+// Place this component inside the same file, outside your main component:
+function CreateCourseModalContent({
+  newCourse,
+  setNewCourse,
+  setShowCreateModal,
+  handleCreateCourse,
+}: {
+  newCourse: any;
+  setNewCourse: React.Dispatch<React.SetStateAction<any>>;
+  setShowCreateModal: (v: boolean) => void;
+  handleCreateCourse: (e: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  const [step, setStep] = useState(1);
+
+  return (
+    <form
+      onSubmit={(e) => {
+        if (step === 1) {
+          e.preventDefault();
+          setStep(2);
+        } else {
+          handleCreateCourse(e);
+        }
+      }}
+      className="space-y-4"
+    >
+      {step === 1 && (
+        <>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Select Course
+            </label>
+            <select
+              value={newCourse.courseId}
+              onChange={(e) =>
+                setNewCourse((prev: any) => ({
+                  ...prev,
+                  courseId: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded"
+              required
+            >
+              <option value="">-- Select --</option>
+              {mockCourses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.name} ({course.code})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Start Date</label>
+            <input
+              type="date"
+              value={newCourse.start_date}
+              onChange={(e) =>
+                setNewCourse((prev: any) => ({
+                  ...prev,
+                  start_date: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">End Date</label>
+            <input
+              type="date"
+              value={newCourse.end_date}
+              onChange={(e) =>
+                setNewCourse((prev: any) => ({
+                  ...prev,
+                  end_date: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded"
+              required
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                newCourse.isSemesterBased ? "bg-indigo-600" : "bg-gray-300"
+              }`}
+              onClick={() =>
+                setNewCourse((prev: any) => ({
+                  ...prev,
+                  isSemesterBased: !prev.isSemesterBased,
+                  semesterCount: 1,
+                }))
+              }
+              aria-pressed={newCourse.isSemesterBased}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  newCourse.isSemesterBased ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className="text-sm select-none">Semester Based</span>
+          </div>
+          {newCourse.isSemesterBased && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Number of Semesters (max 4)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={4}
+                value={newCourse.semesterCount || 1}
+                onChange={(e) => {
+                  let val = Math.max(1, Math.min(4, Number(e.target.value)));
+                  setNewCourse((prev: any) => ({
+                    ...prev,
+                    semesterCount: val,
+                  }));
+                }}
+                className="w-full px-3 py-2 border rounded"
+                required
+              />
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="px-4 py-2 rounded bg-gray-200"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded bg-indigo-600 text-white"
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
+      {step === 2 && (
+        <>
+          <div>
+            <label className="block text-sm font-medium mb-1">Course Fee</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={newCourse.course_fee}
+              onChange={(e) =>
+                setNewCourse((prev: any) => ({
+                  ...prev,
+                  course_fee: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Registration Fee
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={newCourse.registration_fee}
+              onChange={(e) =>
+                setNewCourse((prev: any) => ({
+                  ...prev,
+                  registration_fee: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Duration (months)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={newCourse.duration}
+              onChange={(e) =>
+                setNewCourse((prev: any) => ({
+                  ...prev,
+                  duration: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded"
+              required
+            />
+          </div>
+          <div className="flex justify-between gap-2">
+            <button
+              type="button"
+              className="px-4 py-2 rounded bg-gray-200"
+              onClick={() => setStep(1)}
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded bg-indigo-600 text-white"
+            >
+              Create
+            </button>
+          </div>
+        </>
+      )}
+    </form>
   );
 }
