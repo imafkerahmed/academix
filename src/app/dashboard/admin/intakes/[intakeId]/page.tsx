@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
+import AdminActionBar from "@/components/admin/AdminActionBar";
+import { Plus } from "lucide-react";
 
 // --- Types ---
 interface Intake {
@@ -121,12 +124,24 @@ export default function IntakeDetailsPage() {
   }));
 
   const router = useRouter();
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   if (!intake) {
     return (
       <div className="p-8 text-center text-gray-500">Intake not found.</div>
     );
   }
+
+  const filteredCourses = courses.filter(
+    (ci) =>
+      ci.courseDetails &&
+      (ci.courseDetails.name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+        ci.courseDetails.code
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())),
+  );
 
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans">
@@ -196,6 +211,25 @@ export default function IntakeDetailsPage() {
 
       {/* Courses Table */}
       <div className="space-y-4">
+        <div className="w-full max-w-3xl">
+          <AdminActionBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search courses..."
+            action={
+              <Button
+                type="button"
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-4 rounded-lg transition-colors h-14"
+                onClick={() =>
+                  alert("Create Course (implement modal or route)")
+                }
+              >
+                <Plus size={20} />
+                CREATE COURSE
+              </Button>
+            }
+          />
+        </div>
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto shadow-sm">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-white border-b border-gray-200">
@@ -215,7 +249,7 @@ export default function IntakeDetailsPage() {
               </tr>
             </thead>
             <tbody>
-              {courses.length === 0 ? (
+              {filteredCourses.length === 0 ? (
                 <tr>
                   <td
                     colSpan={4}
@@ -225,7 +259,7 @@ export default function IntakeDetailsPage() {
                   </td>
                 </tr>
               ) : (
-                courses.map((ci, idx) =>
+                filteredCourses.map((ci, idx) =>
                   ci.courseDetails ? (
                     <tr
                       key={ci.id}

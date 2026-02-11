@@ -8,7 +8,7 @@ interface AdminActionBarProps {
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
   children?: React.ReactNode;
-  action?: React.ReactNode;
+  action?: React.ReactElement<any, any>;
 }
 
 export default function AdminActionBar({
@@ -19,8 +19,8 @@ export default function AdminActionBar({
   action,
 }: AdminActionBarProps) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-4">
+    <div className="w-full max-w-xl">
+      <div className="flex flex-col md:flex-row gap-2 md:gap-3 items-center md:justify-start justify-between mb-4">
         {/* Search */}
         <div className="relative flex-1 w-full md:max-w-md">
           <Search
@@ -37,7 +37,14 @@ export default function AdminActionBar({
         </div>
 
         {/* Action Button (Create) */}
-        {action && <div>{action}</div>}
+        {action && (
+          <div className="w-full md:w-auto flex-shrink-0">
+            {React.cloneElement(action, {
+              className: `${action.props.className ?? ""} h-12 px-6 text-base flex items-center justify-center`,
+              style: { ...(action.props.style || {}), minWidth: 0 },
+            })}
+          </div>
+        )}
       </div>
 
       {/* Categories / Filters */}
