@@ -1,162 +1,141 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import pb, { getCurrentUser, logout } from "@/lib/pocketbase";
+import { useState } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import {
   Plus,
   Calendar,
   BookOpen,
-  Users,
+  Eye,
   Edit,
   Trash2,
-  Eye,
-  Menu,
-  Check,
   Layers,
+  Menu,
 } from "lucide-react";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
+import { useRouter } from "next/navigation";
 
-interface Intake {
-  id: string;
-  code: string;
-  start_date: string;
-  end_date: string;
-  created: string;
-}
+const mockIntakes = [
+  {
+    id: "1",
+    code: "JAN2026",
+    start_date: "2026-01-01",
+    end_date: "2026-06-30",
+    created: "2025-12-01",
+  },
+  {
+    id: "2",
+    code: "JUL2025",
+    start_date: "2025-07-01",
+    end_date: "2025-12-31",
+    created: "2025-06-01",
+  },
+  {
+    id: "3",
+    code: "JAN2025",
+    start_date: "2025-01-01",
+    end_date: "2025-06-30",
+    created: "2024-12-01",
+  },
+  {
+    id: "4",
+    code: "JUL2026",
+    start_date: "2026-07-01",
+    end_date: "2026-12-31",
+    created: "2026-06-01",
+  },
+];
 
-interface Course {
-  id: string;
-  name: string;
-  code: string;
-  created: string;
-}
+const mockCourses = [
+  { id: "c1", name: "Mathematics", code: "MATH101", created: "2025-01-01" },
+  { id: "c2", name: "Physics", code: "PHYS101", created: "2025-01-01" },
+];
 
-interface CourseIntake {
-  id: string;
-  course: string;
-  intake: string;
-  start_date: string;
-  end_date: string;
-  expand?: {
-    course?: Course;
-    intake?: Intake;
-  };
-}
+const mockCourseIntakes = [
+  {
+    id: "ci1",
+    course: "c1",
+    intake: "1",
+    start_date: "2026-01-01",
+    end_date: "2026-06-30",
+  },
+  {
+    id: "ci2",
+    course: "c2",
+    intake: "2",
+    start_date: "2025-07-01",
+    end_date: "2025-12-31",
+  },
+];
 
 export default function IntakeCourseManagement() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [intakes, setIntakes] = useState<Intake[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);
-
-  useEffect(() => {
-    // Authentication disabled for UI development
-    fetchData();
-  }, [router]);
-
-  const fetchData = async () => {
-    try {
-      const intakesPromise = pb
-        .collection("intakes")
-        .getFullList({
-          sort: "-start_date",
-        })
-        .catch(() => []);
-
-      const coursesPromise = pb
-        .collection("courses")
-        .getFullList({
-          sort: "name",
-        })
-        .catch(() => []);
-
-      const courseIntakesPromise = pb
-        .collection("course_intake")
-        .getFullList({
-          expand: "course,intake",
-        })
-        .catch(() => []);
-
-      const [intakesData, coursesData, courseIntakesData] = await Promise.all([
-        intakesPromise,
-        coursesPromise,
-        courseIntakesPromise,
-      ]);
-
-      setIntakes((intakesData as any) || []);
-      setCourses((coursesData as any) || []);
-      setCourseIntakes((courseIntakesData as any) || []);
-      setLoading(false);
-    } catch (error) {
-      setIntakes([]);
-      setCourses([]);
-      setCourseIntakes([]);
-      setLoading(false);
-    }
-  };
-
+  const [tab, setTab] = useState<"active" | "completed">("active");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const filteredIntakes = intakes.filter((intake) =>
-    intake.code.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [newIntake, setNewIntake] = useState({
+    code: "",
+    start_date: "",
+    end_date: "",
+  });
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
+  // Use mock data directly
+  const intakes = mockIntakes;
+  const courses = mockCourses;
+  const courseIntakes = mockCourseIntakes;
+
+  // Helper to determine status
+  const getStatus = (intake: {
+    id?: string;
+    code?: string;
+    start_date: any;
+    end_date: any;
+    created?: string;
+  }) => {
+    const today = new Date();
+    const startDate = new Date(intake.start_date);
+    const endDate = new Date(intake.end_date);
+    if (today < startDate) return "upcoming";
+    if (today > endDate) return "completed";
+    return "active";
   };
 
-  const handleDeleteIntake = async (id: string) => {
-    if (confirm("Are you sure you want to delete this intake?")) {
-      try {
-        await pb.collection("intakes").delete(id);
-        setIntakes(intakes.filter((i) => i.id !== id));
-      } catch (error) {
-        console.error("Error deleting intake:", error);
-        alert("Failed to delete intake");
-      }
-    }
-  };
+  // Filter intakes by tab and search
+  const filteredIntakes = intakes
+    .filter((intake) =>
+      intake.code.toLowerCase().includes(searchQuery.toLowerCase()),
+    )
+    .filter((intake) => getStatus(intake) === tab);
 
-  const handleDeleteCourse = async (id: string) => {
-    if (confirm("Are you sure you want to delete this course?")) {
-      try {
-        await pb.collection("courses").delete(id);
-        setCourses(courses.filter((c) => c.id !== id));
-      } catch (error) {
-        console.error("Error deleting course:", error);
-        alert("Failed to delete course");
-      }
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
+  function handleCreateIntake(event: React.FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    // Add new intake to mockIntakes (for demo, just update state)
+    mockIntakes.push({
+      id: (mockIntakes.length + 1).toString(),
+      code: newIntake.code,
+      start_date: newIntake.start_date,
+      end_date: newIntake.end_date,
+      created: new Date().toISOString().split("T")[0],
+    });
+    setShowModal(false);
+    setNewIntake({ code: "", start_date: "", end_date: "" });
   }
+  const router = useRouter();
 
   return (
     <>
       <AdminSidebar
         activeTab="intakes"
-        onLogout={handleLogout}
+        onLogout={() => {}}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
       <div className="bg-gray-50 min-h-screen lg:ml-64">
         <main className="p-4 md:p-6 lg:p-8">
-          {/* Mobile header with hamburger */}
+          {/* Header */}
           <div className="lg:hidden mb-4">
             <div className="flex items-center justify-between">
               <button
@@ -172,7 +151,6 @@ export default function IntakeCourseManagement() {
               <div className="w-10" aria-hidden="true" />
             </div>
           </div>
-          {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
               Intake & Course Management
@@ -181,11 +159,6 @@ export default function IntakeCourseManagement() {
               Manage academic intakes and course offerings
             </p>
           </div>
-
-          {/* Tabs */}
-
-          {/* Stats */}
-          {/* Stats Carousel */}
           <StatsCarousel
             stats={[
               {
@@ -211,22 +184,34 @@ export default function IntakeCourseManagement() {
               },
             ]}
           />
-
-          {/* Intakes Tab Content */}
-          {/* Actions Bar */}
           <AdminActionBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             searchPlaceholder="Search intakes by code..."
             action={
-              <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
+              <button
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors"
+                onClick={() => setShowModal(true)}
+              >
                 <Plus size={20} />
                 Create New Intake
               </button>
             }
           />
-
-          {/* Intakes List */}
+          <div className="mb-6 flex gap-2">
+            <button
+              className={`px-4 py-2 rounded ${tab === "active" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+              onClick={() => setTab("active")}
+            >
+              Active
+            </button>
+            <button
+              className={`px-4 py-2 rounded ${tab === "completed" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+              onClick={() => setTab("completed")}
+            >
+              Completed
+            </button>
+          </div>
           <div className="space-y-4">
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
@@ -245,35 +230,33 @@ export default function IntakeCourseManagement() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredIntakes.map((intake) => {
-                      const today = new Date();
-                      const startDate = new Date(intake.start_date);
-                      const endDate = new Date(intake.end_date);
-                      const status =
-                        today < startDate
-                          ? "upcoming"
-                          : today > endDate
-                            ? "completed"
-                            : "active";
-
+                      const status = getStatus(intake);
                       return (
-                        <tr key={intake.id} className="hover:bg-gray-50">
+                        <tr
+                          key={intake.id}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() =>
+                            router.push(`/dashboard/admin/intakes/${intake.id}`)
+                          }
+                        >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {intake.code}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(intake.start_date).toLocaleDateString()}
+                            {new Date(intake.start_date)
+                              .toISOString()
+                              .slice(0, 10)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(intake.end_date).toLocaleDateString()}
+                            {new Date(intake.end_date)
+                              .toISOString()
+                              .slice(0, 10)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
@@ -288,30 +271,13 @@ export default function IntakeCourseManagement() {
                               {status}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex items-center justify-end gap-2">
-                              <button className="text-blue-600 hover:text-blue-900">
-                                <Eye size={18} />
-                              </button>
-                              <button className="text-green-600 hover:text-green-900">
-                                <Edit size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteIntake(intake.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-
-              {intakes.length === 0 && (
+              {filteredIntakes.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-gray-500">No intakes found</p>
                 </div>
@@ -320,6 +286,73 @@ export default function IntakeCourseManagement() {
           </div>
         </main>
       </div>
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Create New Intake</h2>
+            <form onSubmit={handleCreateIntake} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Intake Code
+                </label>
+                <input
+                  type="text"
+                  value={newIntake.code}
+                  onChange={(e) =>
+                    setNewIntake({ ...newIntake, code: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={newIntake.start_date}
+                  onChange={(e) =>
+                    setNewIntake({ ...newIntake, start_date: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={newIntake.end_date}
+                  onChange={(e) =>
+                    setNewIntake({ ...newIntake, end_date: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded bg-gray-200"
+                  onClick={() => setShowModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded bg-indigo-600 text-white"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }
