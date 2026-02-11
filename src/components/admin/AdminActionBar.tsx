@@ -19,7 +19,7 @@ export default function AdminActionBar({
   action,
 }: AdminActionBarProps) {
   return (
-    <div className="w-full max-w-xl">
+    <div className="w-full">
       <div className="flex flex-col md:flex-row gap-2 md:gap-3 items-center md:justify-start justify-between mb-4">
         {/* Search */}
         <div className="relative flex-1 w-full md:max-w-md">

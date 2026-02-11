@@ -4,7 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import AdminActionBar from "@/components/admin/AdminActionBar";
-import { Plus } from "lucide-react";
+import { Plus, Filter } from "lucide-react";
 import { useState } from "react";
 import {
   Pagination,
@@ -134,6 +134,7 @@ export default function IntakeDetailsPage() {
 
   const router = useRouter();
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Modal state for modifying intake
   const [showModifyModal, setShowModifyModal] = useState(false);
@@ -161,16 +162,19 @@ export default function IntakeDetailsPage() {
     );
   }
 
-  const filteredCourses = courses.filter(
-    (ci) =>
+  const filteredCourses = courses.filter((ci) => {
+    const courseStatus = calculateStatus(ci.start_date, ci.end_date);
+    const matchesStatus =
+      statusFilter === "all" || courseStatus === statusFilter;
+    return (
       ci.courseDetails &&
+      matchesStatus &&
       (ci.courseDetails.name
         .toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
-        ci.courseDetails.code
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())),
-  );
+        ci.courseDetails.code.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  });
 
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
@@ -295,16 +299,33 @@ export default function IntakeDetailsPage() {
             onSearchChange={setSearchQuery}
             searchPlaceholder="Search courses..."
             action={
-              <Button
-                type="button"
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-4 rounded-lg transition-colors h-14"
-                onClick={handleOpenCreateModal}
-              >
-                <Plus size={20} />
-                CREATE COURSE
-              </Button>
+              <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center mr-2">
+                  <Filter size={20} className="text-gray-400" />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+                <Button
+                  type="button"
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-4 rounded-lg transition-colors h-14"
+                  onClick={handleOpenCreateModal}
+                >
+                  <Plus size={20} />
+                  CREATE COURSE
+                </Button>
+              </div>
             }
-          />
+          >
+            {/* Status filter buttons here */}
+          </AdminActionBar>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto shadow-sm">
           <table className="w-full text-sm">
