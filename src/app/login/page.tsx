@@ -8,20 +8,20 @@ import { motion } from "framer-motion";
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <main className="flex flex-col md:flex-row items-center gap-8 p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-3xl w-full">
-        <div className="flex flex-col items-center md:items-start md:w-1/2 gap-4 w-full">
-          <div className="flex flex-col items-center w-full">
-            <GradientText className="text-4xl font-extrabold mb-2">ACADEMIX</GradientText>
-            <motion.div
-              animate={{ y: [0, -20, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="w-full flex justify-center"
-            >
-              <LoginIllustration />
-            </motion.div>
-          </div>
+      <main className="flex flex-col items-center gap-8 p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full md:flex-row md:max-w-3xl">
+        <div className="flex flex-col items-center w-full md:w-1/2 gap-4">
+          <GradientText className="text-4xl font-extrabold mb-2">
+            ACADEMIX
+          </GradientText>
+          <motion.div
+            animate={{ y: [0, -20, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="w-full flex justify-center"
+          >
+            <LoginIllustration />
+          </motion.div>
         </div>
-        <div className="flex flex-col md:w-1/2 items-center md:items-start w-full">
+        <div className="flex flex-col items-center w-full md:w-1/2">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Welcome Back
           </h1>
@@ -49,10 +49,8 @@ export default function LoginPage() {
             </button>
           </form>
           <div className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-blue-600 hover:underline">
-              Sign up
-            </Link>
+            Contact your system administrator if you're having trouble accessing
+            your account.
           </div>
         </div>
       </main>

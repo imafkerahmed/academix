@@ -15,7 +15,7 @@ import IntakesTree, {
   type Course,
   type Subject,
 } from "@/components/lecturer/IntakesTree";
-import Loader from "@/components/ui/loader";
+
 import NotificationButton from "@/components/ui/notification-button";
 
 // Mock user type
@@ -298,9 +298,7 @@ export default function LecturerDashboard() {
   // Role gating
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader />
-      </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center"></div>
     );
   }
 

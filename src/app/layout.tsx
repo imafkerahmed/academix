@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { RouteLoaderProvider } from "@/components/ui/route-loader-provider";
 import StyledComponentsRegistry from "@/lib/registry";
 
 const geistSans = Geist({
@@ -29,9 +28,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <StyledComponentsRegistry>
-          <RouteLoaderProvider>{children}</RouteLoaderProvider>
-        </StyledComponentsRegistry>
+        <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
       </body>
     </html>
   );

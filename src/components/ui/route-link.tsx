@@ -3,7 +3,6 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRouteLoader } from "./route-loader-provider";
 
 interface RouteLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
   href: string;
@@ -20,33 +19,18 @@ export const RouteLink: React.FC<RouteLinkProps> = ({
   ...props
 }) => {
   const router = useRouter();
-  const { setIsLoading } = useRouteLoader();
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Don't interfere with ctrl/cmd+click or middle click
-    if (e.ctrlKey || e.metaKey || e.button === 1) {
-      return;
-    }
+    if (e.ctrlKey || e.metaKey || e.button === 1) return;
+    if (href.startsWith("#")) return;
 
-    // Don't show loader for same-page links (anchors)
-    if (href.startsWith("#")) {
-      return;
-    }
-
-    if (showLoader) {
-      e.preventDefault();
-      setIsLoading(true);
-
-      // Small delay to ensure loader shows
-      setTimeout(() => {
-        router.push(href);
-      }, 500);
-    }
+    e.preventDefault();
+    router.push(href);
   };
 
   return (
-    <Link href={href} className={className} onClick={handleClick} {...props}>
+    <a href={href} className={className} onClick={handleClick} {...props}>
       {children}
-    </Link>
+    </a>
   );
 };
