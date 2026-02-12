@@ -165,9 +165,24 @@ export default function CourseDetailsPage() {
 
   // Mock content for each tab
   const students = [
-    { name: "Alice Johnson" },
-    { name: "Bob Smith" },
-    { name: "Charlie Lee" },
+    {
+      name: "Alice Johnson",
+      regNumber: "REG-2026-001",
+      enrolledDate: "2026-01-05",
+      status: "Active",
+    },
+    {
+      name: "Bob Smith",
+      regNumber: "REG-2026-002",
+      enrolledDate: "2026-01-06",
+      status: "Active",
+    },
+    {
+      name: "Charlie Lee",
+      regNumber: "REG-2026-003",
+      enrolledDate: "2026-01-10",
+      status: "Pending",
+    },
   ];
   const subjects = [
     { name: "Algebra" },
@@ -296,18 +311,66 @@ export default function CourseDetailsPage() {
         <div className="mt-6">
           {/* Students Tab */}
           {activeTab === 0 && (
-            <div>
-              <div className="text-lg font-semibold mb-4">Classmates</div>
-              <ul className="divide-y divide-gray-100">
-                {students.map((s, i) => (
-                  <li key={i} className="py-3 flex items-center gap-3">
-                    <span className="inline-block w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-                      {s.name.charAt(0)}
-                    </span>
-                    <span className="text-gray-900 font-medium">{s.name}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="overflow-x-auto">
+              <div className="text-lg font-semibold mb-6">
+                Enrolled Students
+              </div>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="pb-3 pl-2 w-12">#</th>
+                    <th className="pb-3">Registration Number</th>
+                    <th className="pb-3">Student Name</th>
+                    <th className="pb-3">Enrolled Date</th>
+                    <th className="pb-3 pr-2 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {students.map((s, i) => (
+                    <tr
+                      key={i}
+                      className="hover:bg-gray-50 transition-colors group"
+                    >
+                      <td className="py-4 pl-2 text-sm text-gray-500 font-medium">
+                        {String(i + 1).padStart(2, "0")}
+                      </td>
+                      <td className="py-4">
+                        <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                          {s.regNumber}
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-block w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                            {s.name.charAt(0)}
+                          </span>
+                          <span className="text-gray-900 font-medium">
+                            {s.name}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 text-sm text-gray-600">
+                        {new Date(s.enrolledDate).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "2-digit",
+                        })}
+                      </td>
+                      <td className="py-4 pr-2 text-right">
+                        <Badge
+                          className={
+                            s.status === "Active"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }
+                        >
+                          {s.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
