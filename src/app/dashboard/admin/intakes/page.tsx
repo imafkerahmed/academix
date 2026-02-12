@@ -15,6 +15,7 @@ import {
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import { useRouter } from "next/navigation";
+import { ModernModal } from "@/components/ui/modern-modal";
 
 const mockIntakes = [
   {
@@ -286,28 +287,35 @@ export default function IntakeCourseManagement() {
           </div>
         </main>
       </div>
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Create New Intake</h2>
-            <form onSubmit={handleCreateIntake} className="space-y-4">
+
+      <ModernModal
+        open={showModal}
+        onOpenChange={setShowModal}
+        title="Create New Intake"
+        subtitle="Define the schedule for a new academic intake."
+        avatarChar="+"
+        avatarColor="bg-indigo-600"
+      >
+        <form onSubmit={handleCreateIntake} className="space-y-4">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                Intake Code
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. JAN2026"
+                value={newIntake.code}
+                onChange={(e) =>
+                  setNewIntake({ ...newIntake, code: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Intake Code
-                </label>
-                <input
-                  type="text"
-                  value={newIntake.code}
-                  onChange={(e) =>
-                    setNewIntake({ ...newIntake, code: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
                   Start Date
                 </label>
                 <input
@@ -316,12 +324,12 @@ export default function IntakeCourseManagement() {
                   onChange={(e) =>
                     setNewIntake({ ...newIntake, start_date: e.target.value })
                   }
-                  className="w-full px-3 py-2 border rounded"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
                   End Date
                 </label>
                 <input
@@ -330,29 +338,30 @@ export default function IntakeCourseManagement() {
                   onChange={(e) =>
                     setNewIntake({ ...newIntake, end_date: e.target.value })
                   }
-                  className="w-full px-3 py-2 border rounded"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all"
                   required
                 />
               </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded bg-gray-200"
-                  onClick={() => setShowModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded bg-indigo-600 text-white"
-                >
-                  Create
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+
+          <div className="flex flex-col gap-3 pt-6 border-t border-gray-50">
+            <button
+              type="submit"
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-widest"
+            >
+              CREATE INTAKE
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="w-full py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider"
+            >
+              CANCEL
+            </button>
+          </div>
+        </form>
+      </ModernModal>
     </>
   );
 }

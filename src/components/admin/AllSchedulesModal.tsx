@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Clock, Timer } from "lucide-react";
+import { Clock, Timer, Calendar as CalendarIcon } from "lucide-react";
 import { UpcomingClass } from "./UpcomingClasses";
+import { ModernModal } from "@/components/ui/modern-modal";
 
 interface AllSchedulesModalProps {
   isOpen: boolean;
@@ -15,7 +16,6 @@ export default function AllSchedulesModal({
   onClose,
   classes,
 }: AllSchedulesModalProps) {
-  const [isAnimating, setIsAnimating] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string>("");
 
   const dayOptions = React.useMemo(() => {
@@ -59,20 +59,6 @@ export default function AllSchedulesModal({
     if (dayOptions.length > 0) setSelectedDay(dayOptions[0].value);
   }, [isOpen, classes, dayOptions]);
 
-  useEffect(() => {
-    if (isOpen) {
-      // Trigger animation after mount
-      setTimeout(() => setIsAnimating(true), 10);
-    } else {
-      setIsAnimating(false);
-    }
-  }, [isOpen]);
-
-  const handleClose = () => {
-    setIsAnimating(false);
-    setTimeout(onClose, 300); // Wait for animation to complete
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "scheduled":
@@ -96,115 +82,94 @@ export default function AllSchedulesModal({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
-        isAnimating ? "opacity-100" : "opacity-0"
-      }`}
-      onClick={handleClose}
+    <ModernModal
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      title="All Scheduled Classes"
+      subtitle={
+        selectedDay
+          ? `Showing: ${dayOptions.find((d) => d.value === selectedDay)?.label ?? selectedDay}`
+          : "View upcoming schedules"
+      }
     >
-      {/* Modal */}
-      <div
-        className={`relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden mx-4 transition-transform transition-opacity duration-300 ${
-          isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
-        }`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex flex-col gap-3 p-4 border-b border-gray-200 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              All Scheduled Classes
-            </h2>
-            {selectedDay && (
-              <p className="text-xs text-gray-500 mt-1">
-                Showing:{" "}
-                {dayOptions.find((d) => d.value === selectedDay)?.label ??
-                  selectedDay}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {dayOptions.length > 0 && (
-              <select
-                value={selectedDay}
-                onChange={(event) => setSelectedDay(event.target.value)}
-                className="border border-gray-300 rounded-md text-sm px-2 py-1 bg-white shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {dayOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            <button
-              onClick={handleClose}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Close modal"
+      <div className="space-y-4">
+        {/* Day Selector */}
+        {dayOptions.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarIcon size={16} className="text-gray-400" />
+            <select
+              value={selectedDay}
+              onChange={(event) => setSelectedDay(event.target.value)}
+              className="border border-gray-200 rounded-lg text-sm px-3 py-1.5 bg-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
             >
-              <X size={20} className="text-gray-500" />
-            </button>
+              {dayOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
+        )}
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-[calc(85vh-80px)]">
+        <div className="overflow-y-auto max-h-[60vh] -mx-1 px-1">
           {filteredClasses.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p>No scheduled classes found</p>
+            <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">
+              <p className="font-medium">No scheduled classes found</p>
             </div>
           ) : (
             <div className="space-y-3">
               {filteredClasses.map((classItem) => (
                 <div
                   key={classItem.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-blue-100 transition-all group"
                 >
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span
-                          className={`text-xs px-2 py-1 rounded border font-semibold ${getStatusColor(classItem.status)}`}
+                          className={`text-[10px] px-2 py-0.5 rounded-full border font-bold tracking-wider ${getStatusColor(classItem.status)}`}
                         >
                           {classItem.status.toUpperCase()}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-base text-gray-800 mb-1">
+                      <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
                         {classItem.classTitle}
                       </h3>
-                      <p className="text-sm text-gray-600 mb-1">
-                        <span className="font-semibold">Intake:</span>{" "}
+                      <p className="text-sm text-gray-600 mt-1">
+                        <span className="font-semibold text-gray-400 uppercase text-[10px] tracking-widest text-indigo-100">
+                          Intake
+                        </span>{" "}
                         {classItem.intakeName} &nbsp;•&nbsp;
-                        <span className="font-semibold">Course:</span>{" "}
+                        <span className="font-semibold text-gray-400 uppercase text-[10px] tracking-widest text-indigo-100">
+                          Course
+                        </span>{" "}
                         {classItem.courseName}
                       </p>
-                      <div className="text-sm text-gray-500 flex items-center gap-3">
-                        <span className="flex items-center gap-1">
-                          <Clock size={14} />
-                          <span className="font-medium text-gray-800">
+                      <div className="text-sm text-gray-500 mt-3 flex flex-wrap items-center gap-4">
+                        <span className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+                          <Clock size={14} className="text-blue-500" />
+                          <span className="font-bold text-gray-700">
                             {getWeekdayLabel(classItem.startTime)}
                           </span>
-                          <span className="ml-1">
+                          <span className="text-gray-400">
                             {new Date(classItem.startTime).toLocaleString()}
                           </span>
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Timer size={14} />
-                          {classItem.duration} min
+                        <span className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+                          <Timer size={14} className="text-amber-500" />
+                          <span className="font-bold text-gray-700">
+                            {classItem.duration} min
+                          </span>
                         </span>
                       </div>
                     </div>
                     <div className="flex gap-2">
                       {classItem.zoomJoinUrl ? (
                         <button
-                          onClick={(event) => {
-                            handleQuickJoin(classItem.zoomJoinUrl);
-                          }}
-                          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-                          aria-label={`Join ${classItem.classTitle}`}
+                          onClick={() => handleQuickJoin(classItem.zoomJoinUrl)}
+                          className="w-full md:w-auto px-6 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100 active:scale-95"
                         >
                           Quick Join
                         </button>
@@ -217,6 +182,6 @@ export default function AllSchedulesModal({
           )}
         </div>
       </div>
-    </div>
+    </ModernModal>
   );
 }
