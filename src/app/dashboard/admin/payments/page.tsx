@@ -156,13 +156,6 @@ export default function PaymentManagement() {
 
   return (
     <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
-      <AdminSidebar
-        activeTab="payments"
-        onLogout={handleLogout}
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-      />
-
       <main className="p-4 md:p-6 lg:p-8 space-y-8">
         {/* Mobile Header */}
         <div className="lg:hidden flex items-center justify-between mb-4">
