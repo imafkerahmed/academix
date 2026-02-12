@@ -363,6 +363,7 @@ export default function IntakeDetailsPage() {
                   ci.courseDetails ? (
                     <tr
                       key={ci.id}
+<<<<<<< HEAD
                       className={
                         (idx % 2 === 0 ? "bg-white" : "bg-gray-50") +
                         " cursor-pointer hover:bg-indigo-50 transition-colors"
@@ -385,6 +386,14 @@ export default function IntakeDetailsPage() {
                         }
                       }}
                       aria-label={`View details for ${ci.courseDetails.name}`}
+=======
+                      className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} cursor-pointer hover:bg-indigo-50 transition`}
+                      onClick={() =>
+                        router.push(
+                          `/dashboard/admin/intakes/${intakeId}/${ci.courseDetails?.id}`,
+                        )
+                      }
+>>>>>>> 772ebb685372371e452be2544d8b3689a2dad0c7
                     >
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                         {ci.courseDetails.name}
