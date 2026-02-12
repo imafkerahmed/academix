@@ -137,7 +137,6 @@ export default function IntakeCourseManagement() {
   return (
     <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
       <AdminSidebar
-        activeTab="intakes"
         onLogout={() => {}}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}

@@ -18,19 +18,9 @@ export const RouteLink: React.FC<RouteLinkProps> = ({
   showLoader = true,
   ...props
 }) => {
-  const router = useRouter();
-
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (e.ctrlKey || e.metaKey || e.button === 1) return;
-    if (href.startsWith("#")) return;
-
-    e.preventDefault();
-    router.push(href);
-  };
-
   return (
-    <a href={href} className={className} onClick={handleClick} {...props}>
+    <Link href={href} className={className} {...props}>
       {children}
-    </a>
+    </Link>
   );
 };

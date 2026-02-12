@@ -49,16 +49,14 @@ function ProfileDropdown({ adminName, onLogout }: ProfileDropdownProps) {
       </button>
       {open && (
         <div className="absolute bottom-full left-0 right-0 mb-4 bg-white border border-gray-100 rounded-[2rem] shadow-2xl p-2 z-[60] animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <button
-            onClick={() => {
-              setOpen(false);
-              window.location.href = "/dashboard/admin/profile";
-            }}
+          <RouteLink
+            href="/dashboard/admin/profile"
+            onClick={() => setOpen(false)}
             className="flex items-center gap-3 w-full text-left px-5 py-3 text-xs font-black text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl transition-all uppercase tracking-widest"
           >
             <Users size={14} />
             PROFILE
-          </button>
+          </RouteLink>
           <button
             onClick={onLogout}
             className="flex items-center gap-3 w-full text-left px-5 py-3 text-xs font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all uppercase tracking-widest mt-1"
@@ -74,7 +72,6 @@ function ProfileDropdown({ adminName, onLogout }: ProfileDropdownProps) {
 
 interface AdminSidebarProps {
   adminName?: string;
-  activeTab: string;
   onLogout: () => void;
   isSidebarOpen?: boolean;
   setIsSidebarOpen?: (open: boolean) => void;
@@ -82,11 +79,22 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({
   adminName = "Admin User",
-  activeTab,
   onLogout,
   isSidebarOpen = false,
   setIsSidebarOpen,
 }: AdminSidebarProps) {
+  const { usePathname } = require("next/navigation");
+  const pathname = usePathname();
+  function getActiveTab(path: string) {
+    if (path.startsWith("/dashboard/admin/students")) return "students";
+    if (path.startsWith("/dashboard/admin/intakes")) return "intakes";
+    if (path.startsWith("/dashboard/admin/assignments")) return "assignments";
+    if (path.startsWith("/dashboard/admin/payments")) return "payments";
+    if (path.startsWith("/dashboard/admin/classes")) return "classes";
+    if (path.startsWith("/dashboard/admin/settings")) return "settings";
+    return "overview";
+  }
+  const activeTab = getActiveTab(pathname);
   const menuItems = [
     {
       id: "overview",
