@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -306,7 +307,7 @@ export default function IntakeDetailsPage() {
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               searchPlaceholder="Search courses by name or code..."
-              action={null}
+              action={undefined}
             />
           </div>
           <div className="flex items-center gap-3">
