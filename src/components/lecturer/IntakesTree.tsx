@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ModernModal } from "@/components/ui/modern-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -407,168 +408,158 @@ function SubjectDetailsView({
               <h3 className="text-base font-semibold text-gray-800">
                 Materials overview
               </h3>
-              <Dialog
+              <Button
+                size="sm"
+                className="shadow-sm"
+                onClick={() => setIsAddMaterialOpen(true)}
+              >
+                + Add material
+              </Button>
+              <ModernModal
                 open={isAddMaterialOpen}
                 onOpenChange={setIsAddMaterialOpen}
+                title="Add material"
+                subtitle="Create a new study or video material for this subject."
+                avatarChar="+"
               >
-                <DialogTrigger asChild>
-                  <Button size="sm" className="shadow-sm">
-                    + Add material
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-xl">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-lg">
-                      <span className="inline-flex size-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-xs font-semibold">
-                        NEW
-                      </span>
-                      Add material
-                    </DialogTitle>
-                    <DialogDescription className="text-sm text-gray-500">
-                      Create a new study or video material for this subject.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleAddMaterial} className="mt-4 space-y-5">
-                    <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4 space-y-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Basic details
-                      </p>
-                      <div className="space-y-2">
-                        <Label htmlFor="material-title">Title</Label>
-                        <Input
-                          id="material-title"
-                          value={newMaterialTitle}
-                          onChange={(event) =>
-                            setNewMaterialTitle(event.target.value)
-                          }
-                          required
-                          placeholder="e.g. Week 1 Lecture Notes"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="material-description">
-                          Description
-                        </Label>
-                        <textarea
-                          id="material-description"
-                          className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input min-h-[80px] w-full min-w-0 rounded-md border bg-white px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                          value={newMaterialDescription}
-                          onChange={(event) =>
-                            setNewMaterialDescription(event.target.value)
-                          }
-                          placeholder="Optional short summary for students"
-                        />
-                      </div>
+                <form onSubmit={handleAddMaterial} className="space-y-5">
+                  <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Basic details
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="material-title">Title</Label>
+                      <Input
+                        id="material-title"
+                        value={newMaterialTitle}
+                        onChange={(event) =>
+                          setNewMaterialTitle(event.target.value)
+                        }
+                        required
+                        placeholder="e.g. Week 1 Lecture Notes"
+                      />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="material-description">Description</Label>
+                      <textarea
+                        id="material-description"
+                        className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input min-h-[80px] w-full min-w-0 rounded-md border bg-white px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                        value={newMaterialDescription}
+                        onChange={(event) =>
+                          setNewMaterialDescription(event.target.value)
+                        }
+                        placeholder="Optional short summary for students"
+                      />
+                    </div>
+                  </div>
 
-                    <div className="rounded-lg border border-gray-100 bg-white p-4 space-y-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Type & attachment
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-gray-100 bg-white p-4 space-y-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Type & attachment
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="material-type">Type</Label>
+                        <select
+                          id="material-type"
+                          className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                          value={newMaterialType}
+                          onChange={(event) =>
+                            setNewMaterialType(
+                              event.target.value as SubjectMaterial["type"],
+                            )
+                          }
+                        >
+                          <option value="document">Document</option>
+                          <option value="youtube-link">YouTube link</option>
+                          <option value="video-link">Video link</option>
+                          <option value="video-upload">Video upload</option>
+                        </select>
+                        <p className="text-[11px] text-gray-500">
+                          Choose how students will access this material.
+                        </p>
+                      </div>
+
+                      {(newMaterialType === "youtube-link" ||
+                        newMaterialType === "video-link") && (
                         <div className="space-y-2">
-                          <Label htmlFor="material-type">Type</Label>
-                          <select
-                            id="material-type"
-                            className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                            value={newMaterialType}
+                          <Label htmlFor="material-url">Video URL</Label>
+                          <Input
+                            id="material-url"
+                            value={newMaterialUrl}
                             onChange={(event) =>
-                              setNewMaterialType(
-                                event.target.value as SubjectMaterial["type"],
-                              )
+                              setNewMaterialUrl(event.target.value)
                             }
-                          >
-                            <option value="document">Document</option>
-                            <option value="youtube-link">YouTube link</option>
-                            <option value="video-link">Video link</option>
-                            <option value="video-upload">Video upload</option>
-                          </select>
+                            placeholder="https://youtu.be/..."
+                          />
                           <p className="text-[11px] text-gray-500">
-                            Choose how students will access this material.
+                            Paste a public YouTube or video link.
                           </p>
                         </div>
+                      )}
 
-                        {(newMaterialType === "youtube-link" ||
-                          newMaterialType === "video-link") && (
-                          <div className="space-y-2">
-                            <Label htmlFor="material-url">Video URL</Label>
-                            <Input
-                              id="material-url"
-                              value={newMaterialUrl}
-                              onChange={(event) =>
-                                setNewMaterialUrl(event.target.value)
-                              }
-                              placeholder="https://youtu.be/..."
-                            />
+                      {(newMaterialType === "document" ||
+                        newMaterialType === "video-upload") && (
+                        <div className="space-y-2 sm:col-span-1">
+                          <Label htmlFor="material-file">Attach file</Label>
+                          <input
+                            id="material-file"
+                            type="file"
+                            accept={
+                              newMaterialType === "document"
+                                ? ".pdf,.doc,.docx,.ppt,.pptx,.txt"
+                                : "video/*"
+                            }
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              setNewMaterialFileName(file ? file.name : "");
+                            }}
+                            className="block w-full text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                          />
+                          {newMaterialFileName && (
                             <p className="text-[11px] text-gray-500">
-                              Paste a public YouTube or video link.
+                              Selected: {newMaterialFileName}
                             </p>
-                          </div>
-                        )}
-
-                        {(newMaterialType === "document" ||
-                          newMaterialType === "video-upload") && (
-                          <div className="space-y-2 sm:col-span-1">
-                            <Label htmlFor="material-file">Attach file</Label>
-                            <input
-                              id="material-file"
-                              type="file"
-                              accept={
-                                newMaterialType === "document"
-                                  ? ".pdf,.doc,.docx,.ppt,.pptx,.txt"
-                                  : "video/*"
-                              }
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                setNewMaterialFileName(file ? file.name : "");
-                              }}
-                              className="block w-full text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                            />
-                            {newMaterialFileName && (
-                              <p className="text-[11px] text-gray-500">
-                                Selected: {newMaterialFileName}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </div>
+                  </div>
 
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          id="material-can-download"
-                          type="checkbox"
-                          checked={newMaterialCanDownload}
-                          onChange={(event) =>
-                            setNewMaterialCanDownload(event.target.checked)
-                          }
-                          className="h-4 w-4 rounded border-input text-primary focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                        />
-                        <Label
-                          htmlFor="material-can-download"
-                          className="m-0 text-sm"
-                        >
-                          Allow download
-                        </Label>
-                      </div>
-                      <DialogFooter className="gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setIsAddMaterialOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button type="submit">Save material</Button>
-                      </DialogFooter>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="material-can-download"
+                        type="checkbox"
+                        checked={newMaterialCanDownload}
+                        onChange={(event) =>
+                          setNewMaterialCanDownload(event.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-input text-primary focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                      />
+                      <Label
+                        htmlFor="material-can-download"
+                        className="m-0 text-sm"
+                      >
+                        Allow download
+                      </Label>
                     </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsAddMaterialOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit">Save material</Button>
+                    </div>
+                  </div>
+                </form>
+              </ModernModal>
             </div>
             {previewMaterial && (
-              <Dialog
+              <ModernModal
                 open={isPreviewOpen}
                 onOpenChange={(open) => {
                   setIsPreviewOpen(open);
@@ -576,15 +567,14 @@ function SubjectDetailsView({
                     setPreviewMaterial(null);
                   }
                 }}
+                title={previewMaterial.title}
+                subtitle={
+                  previewMaterial.description ||
+                  "Preview of the selected material."
+                }
+                avatarChar={previewMaterial.title.charAt(0)}
               >
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{previewMaterial.title}</DialogTitle>
-                    <DialogDescription>
-                      {previewMaterial.description ||
-                        "Preview of the selected material."}
-                    </DialogDescription>
-                  </DialogHeader>
+                <>
                   <div className="space-y-4 mt-2">
                     <div className="text-xs text-gray-500">
                       <p>
@@ -676,8 +666,8 @@ function SubjectDetailsView({
                       Close
                     </Button>
                   </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                </>
+              </ModernModal>
             )}
             {/* Study Materials Section */}
             <div>

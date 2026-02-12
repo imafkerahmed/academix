@@ -225,6 +225,90 @@ export default function CourseDetailsPage() {
     { name: "Genetics", code: "BIOL302" },
   ];
 
+  const initialAssignments = [
+    {
+      id: "asgn-1",
+      title: "Algebra Quiz 1",
+      subjectCode: "MATH101",
+      semester: "Semester 1",
+      dueDate: "2026-03-15",
+      status: "Upcoming",
+      totalMarks: 100,
+      assignmentSheet: "algebra-quiz-1.pdf",
+      rules: "• Answer all questions\n• Show working",
+      markingLecturer: "Dianne Russell",
+    },
+    {
+      id: "asgn-2",
+      title: "Calculus Assignment 1",
+      subjectCode: "MATH102",
+      semester: "Semester 1",
+      dueDate: "2026-03-20",
+      status: "Upcoming",
+      totalMarks: 50,
+      assignmentSheet: "calculus-asgn-1.pdf",
+      rules: "• Late submissions penalized\n• PDF only",
+      markingLecturer: "Albert Flores",
+    },
+    {
+      id: "asgn-3",
+      title: "Geometry Homework",
+      subjectCode: "MATH201",
+      semester: "Semester 2",
+      dueDate: "2026-04-10",
+      status: "Upcoming",
+      totalMarks: 20,
+      assignmentSheet: "geometry-hw.pdf",
+      rules: "• Manual drawings accepted",
+      markingLecturer: "Theresa Webb",
+    },
+  ];
+
+  const availableAssignments = [
+    {
+      id: "lib-1",
+      title: "Linear Algebra Project",
+      subjectCode: "MATH301",
+      totalMarks: 100,
+      rules: "Group project. Max 4 members.",
+    },
+    {
+      id: "lib-2",
+      title: "Discrete Mathematics Quiz",
+      subjectCode: "CS101",
+      totalMarks: 20,
+      rules: "MCQ based quiz.",
+    },
+    {
+      id: "lib-3",
+      title: "Physics Lab Report",
+      subjectCode: "PHYS101",
+      totalMarks: 30,
+      rules: "Submit lab notes along with report.",
+    },
+    {
+      id: "lib-4",
+      title: "Organic Chemistry Quiz",
+      subjectCode: "CHEM201",
+      totalMarks: 15,
+      rules: "Basic naming quiz.",
+    },
+    {
+      id: "lib-5",
+      title: "Microeconomics Essay",
+      subjectCode: "ECON101",
+      totalMarks: 100,
+      rules: "Minimum 2000 words.",
+    },
+    {
+      id: "lib-6",
+      title: "Genetics Research Paper",
+      subjectCode: "BIOL302",
+      totalMarks: 100,
+      rules: "Case study required.",
+    },
+  ];
+
   const [courseSubjects, setCourseSubjects] = useState(initialSubjects);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSemester, setSelectedSemester] = useState("Semester 1");
@@ -248,6 +332,32 @@ export default function CourseDetailsPage() {
   const [showLecturerModal, setShowLecturerModal] = useState(false);
   const [subjectToAssign, setSubjectToAssign] = useState<any>(null);
 
+  // Assignment Management State
+  const [courseAssignments, setCourseAssignments] =
+    useState(initialAssignments);
+  const [showAddAssignmentModal, setShowAddAssignmentModal] = useState(false);
+  const [showAdminAssignmentDetailModal, setShowAdminAssignmentDetailModal] =
+    useState(false);
+  const [selectedAdminAssignment, setSelectedAdminAssignment] =
+    useState<any>(null);
+  const [selectedAssignmentModalSemester, setSelectedAssignmentModalSemester] =
+    useState("Semester 1");
+  const [selectedAssignmentModalSubject, setSelectedAssignmentModalSubject] =
+    useState<string | null>(null);
+  const [disabledAssignments, setDisabledAssignments] = useState<string[]>([]);
+
+  // Stage: 1 (Select Sem/Sub), 2 (Create Form)
+  const [assignmentModalStage, setAssignmentModalStage] = useState(1);
+  const [assignmentForm, setAssignmentForm] = useState<any>({
+    title: "",
+    totalMarks: 100,
+    rules: "",
+    unlockDate: "2026-05-01",
+    dueDate: "2026-06-01",
+    markingLecturer: mockLecturers[0],
+    assignmentSheet: null,
+  });
+
   const [expandedSemesters, setExpandedSemesters] = useState<string[]>([
     "Semester 1",
   ]);
@@ -265,6 +375,12 @@ export default function CourseDetailsPage() {
     const savedSubjects = localStorage.getItem(`disabled_subjects_${courseId}`);
     if (savedSubjects) {
       setDisabledSubjects(JSON.parse(savedSubjects));
+    }
+    const savedAssignments = localStorage.getItem(
+      `disabled_assignments_${courseId}`,
+    );
+    if (savedAssignments) {
+      setDisabledAssignments(JSON.parse(savedAssignments));
     }
   }, [courseId]);
 
@@ -305,6 +421,23 @@ export default function CourseDetailsPage() {
         ? prev.filter((s) => s !== semester)
         : [...prev, semester],
     );
+  };
+
+  const toggleAssignmentEnablement = (
+    assignmentId: string,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+    setDisabledAssignments((prev) => {
+      const next = prev.includes(assignmentId)
+        ? prev.filter((id) => id !== assignmentId)
+        : [...prev, assignmentId];
+      localStorage.setItem(
+        `disabled_assignments_${courseId}`,
+        JSON.stringify(next),
+      );
+      return next;
+    });
   };
 
   const updateSubjectLecturer = (subjectCode: string, lecturerName: string) => {
@@ -353,10 +486,54 @@ export default function CourseDetailsPage() {
     );
   };
 
+  const handleGoToConfig = () => {
+    if (selectedAssignmentModalSemester && selectedAssignmentModalSubject) {
+      setAssignmentModalStage(2);
+    }
+  };
+
+  const handleAddAssignments = () => {
+    if (!assignmentForm.title || !selectedAssignmentModalSubject) return;
+
+    const newAsgn = {
+      id: "asgn-" + Date.now(),
+      ...assignmentForm,
+      subjectCode: selectedAssignmentModalSubject,
+      semester: selectedAssignmentModalSemester,
+      status: "Upcoming",
+      assignmentSheet: assignmentForm.assignmentSheet
+        ? assignmentForm.assignmentSheet.name
+        : assignmentForm.title.toLowerCase().replace(/\s+/g, "-") + ".pdf",
+    };
+
+    setCourseAssignments((prev) => [...prev, newAsgn]);
+
+    toast.success(`Successfully created assignment: ${assignmentForm.title}`);
+
+    setShowAddAssignmentModal(false);
+    setSelectedAssignmentModalSubject(null);
+    setAssignmentModalStage(1);
+    setAssignmentForm({
+      title: "",
+      totalMarks: 100,
+      rules: "",
+      unlockDate: "2026-05-01",
+      dueDate: "2026-06-01",
+      markingLecturer: mockLecturers[0],
+      assignmentSheet: null,
+    });
+  };
+
   // Grouping subjects by semester
   const groupedSubjects = courseSubjects.reduce((acc: any, subj) => {
     if (!acc[subj.semester]) acc[subj.semester] = [];
     acc[subj.semester].push(subj);
+    return acc;
+  }, {});
+
+  const groupedAssignments = courseAssignments.reduce((acc: any, asgn) => {
+    if (!acc[asgn.semester]) acc[asgn.semester] = [];
+    acc[asgn.semester].push(asgn);
     return acc;
   }, {});
 
@@ -761,59 +938,324 @@ export default function CourseDetailsPage() {
           {/* Assignments Tab */}
           {activeTab === 2 && (
             <div className="space-y-4">
-              {assignments.map((assignment) => (
-                <div
-                  key={assignment.id}
-                  onClick={() => {
-                    setSelectedAssignment(assignment);
-                    setShowAssignmentModal(true);
-                  }}
-                  className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              <div className="flex items-center justify-between mb-6">
+                <div className="text-lg font-semibold">Assignments</div>
+                <button
+                  onClick={() => setShowAddAssignmentModal(true)}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2"
                 >
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">
-                      {assignment.title}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Due:{" "}
-                      {new Date(assignment.dueDate).toLocaleDateString(
-                        "en-US",
-                        {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                        },
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-0">
-                    <Badge
-                      className={
-                        assignment.status === "Submitted"
-                          ? "bg-blue-100 text-blue-700"
-                          : assignment.status === "Graded"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-700"
-                      }
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  ADD ASSIGNMENT
+                </button>
+              </div>
+
+              {Object.keys(groupedAssignments).length === 0 ? (
+                <div className="bg-white rounded-2xl border-2 border-dashed border-gray-100 p-12 text-center">
+                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg
+                      className="w-8 h-8 text-gray-300"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      {assignment.status}
-                    </Badge>
-                    {assignment.grade !== "-" &&
-                      assignment.grade !== "Pending" && (
-                        <>
-                          <Badge
-                            className={`${getGradeBadgeColor(getLetterGrade(assignment.grade))} text-base md:text-lg font-bold px-3 py-1`}
-                          >
-                            {getLetterGrade(assignment.grade)}
-                          </Badge>
-                          <span className="text-sm md:text-base font-semibold text-gray-600">
-                            {assignment.grade}
-                          </span>
-                        </>
-                      )}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
                   </div>
+                  <h3 className="text-gray-900 font-bold">
+                    No assignments yet
+                  </h3>
+                  <p className="text-gray-500 text-sm mt-1">
+                    Start by adding assignments to your semesters.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-6">
+                  {Object.keys(groupedAssignments)
+                    .sort()
+                    .map((semester) => (
+                      <div
+                        key={semester}
+                        className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm"
+                      >
+                        <div
+                          className="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 transition-colors"
+                          onClick={() => toggleSemester(semester)}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${
+                                expandedSemesters.includes(semester)
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-indigo-50 text-indigo-600"
+                              }`}
+                            >
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.168.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-3">
+                                <h3 className="font-bold text-gray-900">
+                                  {semester}
+                                </h3>
+                                <button
+                                  onClick={(e) =>
+                                    toggleSemesterEnablement(semester, e)
+                                  }
+                                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                                    !disabledSemesters.includes(semester)
+                                      ? "bg-indigo-600"
+                                      : "bg-gray-300"
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                      !disabledSemesters.includes(semester)
+                                        ? "translate-x-5"
+                                        : "translate-x-1"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                              <Badge className="bg-indigo-100 text-indigo-700">
+                                {groupedAssignments[semester].length}{" "}
+                                Assignments
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+
+                        {expandedSemesters.includes(semester) && (
+                          <div className="p-4 pt-0 border-t border-gray-100 bg-gray-50/30">
+                            <div className="space-y-2 mt-4">
+                              {groupedAssignments[semester].map(
+                                (asgn: any, i: number) => (
+                                  <div
+                                    key={i}
+                                    className={`flex items-center justify-between p-4 bg-white rounded-xl border transition-all ${
+                                      disabledAssignments.includes(asgn.id)
+                                        ? "border-gray-100 opacity-60 bg-gray-50/50"
+                                        : "border-gray-100 shadow-sm hover:border-indigo-100"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <Badge className="bg-gray-100 text-gray-500 font-bold text-[10px] px-2 py-0.5">
+                                        {asgn.subjectCode}
+                                      </Badge>
+                                      <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                                            {asgn.title}
+                                          </span>
+                                          {asgn.assignmentSheet && (
+                                            <span className="px-1.5 py-0.5 bg-green-50 text-[8px] font-black text-green-600 rounded-md flex items-center gap-1 border border-green-100">
+                                              <svg
+                                                className="w-2 h-2"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                              >
+                                                <path
+                                                  strokeLinecap="round"
+                                                  strokeLinejoin="round"
+                                                  strokeWidth={3}
+                                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                                />
+                                              </svg>
+                                              SHEET
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-4 mt-1">
+                                          <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                                            <svg
+                                              className="w-3 h-3 text-indigo-400"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                              />
+                                            </svg>
+                                            Due: {asgn.dueDate}
+                                          </span>
+                                          <span className="text-[10px] text-gray-500 flex items-center gap-1 font-bold">
+                                            <svg
+                                              className="w-3 h-3 text-amber-500"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                              />
+                                            </svg>
+                                            {asgn.totalMarks} Marks
+                                          </span>
+                                          <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                                            <svg
+                                              className="w-3 h-3 text-purple-400"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                              />
+                                            </svg>
+                                            {asgn.markingLecturer ||
+                                              "Unassigned"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-4">
+                                      <button
+                                        onClick={() =>
+                                          router.push(
+                                            `/dashboard/admin/assignments/${asgn.id}`,
+                                          )
+                                        }
+                                        className="p-2 hover:bg-indigo-50 rounded-lg text-gray-400 hover:text-indigo-600 transition-all group/btn flex items-center gap-2"
+                                      >
+                                        <span className="text-[10px] font-bold whitespace-nowrap">
+                                          Submissions
+                                        </span>
+                                        <svg
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                          />
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                          />
+                                        </svg>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setSelectedAdminAssignment(asgn);
+                                          setShowAdminAssignmentDetailModal(
+                                            true,
+                                          );
+                                        }}
+                                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600 transition-all group/btn flex items-center gap-2"
+                                      >
+                                        <span className="text-[10px] font-bold">
+                                          Details
+                                        </span>
+                                        <svg
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                          />
+                                        </svg>
+                                      </button>
+                                      <div className="flex items-center gap-4">
+                                        <span
+                                          className={`text-[10px] font-bold uppercase ${
+                                            disabledAssignments.includes(
+                                              asgn.id,
+                                            )
+                                              ? "text-red-400"
+                                              : "text-green-500"
+                                          }`}
+                                        >
+                                          {disabledAssignments.includes(asgn.id)
+                                            ? "Disabled"
+                                            : "Active"}
+                                        </span>
+                                        <button
+                                          onClick={(e) =>
+                                            toggleAssignmentEnablement(
+                                              asgn.id,
+                                              e,
+                                            )
+                                          }
+                                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                                            !disabledAssignments.includes(
+                                              asgn.id,
+                                            )
+                                              ? "bg-indigo-600"
+                                              : "bg-gray-300"
+                                          }`}
+                                        >
+                                          <span
+                                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                              !disabledAssignments.includes(
+                                                asgn.id,
+                                              )
+                                                ? "translate-x-5"
+                                                : "translate-x-1"
+                                            }`}
+                                          />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1028,6 +1470,160 @@ export default function CourseDetailsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Assignment Detail Modal */}
+      {showAdminAssignmentDetailModal && selectedAdminAssignment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+            onClick={() => setShowAdminAssignmentDetailModal(false)}
+          />
+          <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-indigo-50/30">
+              <div>
+                <h2 className="text-xl font-black text-gray-900 leading-tight">
+                  Assignment Details
+                </h2>
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mt-1">
+                  {selectedAdminAssignment.subjectCode}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAdminAssignmentDetailModal(false)}
+                className="w-10 h-10 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:border-gray-200 transition-all shadow-sm"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              <div>
+                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">
+                  Title
+                </label>
+                <p className="text-lg font-bold text-gray-900">
+                  {selectedAdminAssignment.title}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">
+                    Total Marks
+                  </label>
+                  <p className="text-sm font-bold border-2 border-indigo-100 rounded-2xl px-4 py-2 text-indigo-600 bg-indigo-50 inline-block">
+                    {selectedAdminAssignment.totalMarks}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">
+                    Unlock Date
+                  </label>
+                  <p className="text-sm font-bold text-gray-900 bg-gray-50 rounded-2xl px-4 py-2 inline-block">
+                    {selectedAdminAssignment.unlockDate}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">
+                    Due Date
+                  </label>
+                  <p className="text-sm font-bold text-gray-900 bg-gray-50 rounded-2xl px-4 py-2 inline-block">
+                    {selectedAdminAssignment.dueDate}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">
+                  Marking Lecturer
+                </label>
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-3xl border border-gray-100">
+                  <div className="w-10 h-10 rounded-2xl bg-white border border-gray-200 flex items-center justify-center shadow-sm">
+                    <svg
+                      className="w-5 h-5 text-indigo-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    </svg>
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    {selectedAdminAssignment.markingLecturer || "Not Assigned"}
+                  </span>
+                </div>
+              </div>
+
+              {selectedAdminAssignment.rules && (
+                <div>
+                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">
+                    Rules & Regulations
+                  </label>
+                  <div className="p-5 bg-amber-50/50 rounded-3xl border border-amber-100/50 text-sm text-amber-900 font-medium whitespace-pre-line leading-relaxed shadow-sm">
+                    {selectedAdminAssignment.rules}
+                  </div>
+                </div>
+              )}
+
+              {selectedAdminAssignment.assignmentSheet && (
+                <div>
+                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">
+                    Assignment Sheet
+                  </label>
+                  <div className="flex items-center justify-between p-4 bg-green-50/50 rounded-3xl border border-green-100/50 group hover:bg-green-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-white border border-green-100 flex items-center justify-center shadow-sm">
+                        <svg
+                          className="w-5 h-5 text-green-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-bold text-green-900 truncate max-w-[200px]">
+                        {selectedAdminAssignment.assignmentSheet}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100">
+              <button
+                onClick={() => setShowAdminAssignmentDetailModal(false)}
+                className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-sm shadow-xl shadow-gray-200 hover:bg-gray-800 transition-all active:scale-95 uppercase tracking-widest"
+              >
+                CLOSE VIEW
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1366,6 +1962,385 @@ export default function CourseDetailsPage() {
                   setLecturerSearchQuery("");
                 }}
                 className="w-full py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Add Assignment Modal */}
+      {showAddAssignmentModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in slide-in-from-bottom-8 duration-500">
+            <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 p-8 text-white relative">
+              <h2 className="text-3xl font-bold">
+                {assignmentModalStage === 2
+                  ? "Create Assignment"
+                  : "Add Assignment"}
+              </h2>
+              <p className="text-indigo-100 text-sm mt-1">
+                {assignmentModalStage === 1
+                  ? "Select a semester and subject."
+                  : "Fill in the assignment details."}
+              </p>
+              <button
+                onClick={() => {
+                  setShowAddAssignmentModal(false);
+                  setSelectedAssignmentModalSubject(null);
+                  setAssignmentModalStage(1);
+                }}
+                className="absolute top-8 right-8 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                aria-label="Close modal"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
+              {assignmentModalStage === 1 && (
+                <div className="grid grid-cols-2 gap-8 animate-in slide-in-from-right-4 duration-300">
+                  {/* Semester Selection */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                      1. Select Semester
+                    </label>
+                    <div className="grid grid-cols-1 gap-2">
+                      {Object.keys(groupedSubjects).map((sem) => (
+                        <button
+                          key={sem}
+                          onClick={() => {
+                            setSelectedAssignmentModalSemester(sem);
+                            setSelectedAssignmentModalSubject(null);
+                          }}
+                          className={`px-4 py-3 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-between ${
+                            selectedAssignmentModalSemester === sem
+                              ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm"
+                              : "border-gray-50 bg-gray-50/50 text-gray-500 hover:border-gray-200"
+                          }`}
+                        >
+                          {sem}
+                          {selectedAssignmentModalSemester === sem && (
+                            <svg
+                              className="w-4 h-4"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Subject Selection */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                      2. Select Subject
+                    </label>
+                    <div className="grid grid-cols-1 gap-2 max-h-[140px] overflow-y-auto pr-2 custom-scrollbar">
+                      {groupedSubjects[selectedAssignmentModalSemester]?.map(
+                        (subj: any) => (
+                          <button
+                            key={subj.code}
+                            onClick={() =>
+                              setSelectedAssignmentModalSubject(subj.code)
+                            }
+                            className={`px-4 py-3 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-between ${
+                              selectedAssignmentModalSubject === subj.code
+                                ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm"
+                                : "border-gray-50 bg-gray-50/50 text-gray-500 hover:border-gray-200"
+                            }`}
+                          >
+                            <div className="flex flex-col items-start text-left">
+                              <span>{subj.name}</span>
+                              <span className="text-[10px] opacity-60">
+                                {subj.code}
+                              </span>
+                            </div>
+                            {selectedAssignmentModalSubject === subj.code && (
+                              <svg
+                                className="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {assignmentModalStage === 2 && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                  <div className="p-6 bg-gray-50/50 rounded-3xl border border-gray-100 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                      <h4 className="font-black text-indigo-600 uppercase text-xs tracking-widest">
+                        Assignment General Info
+                      </h4>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">
+                        Assignment Title
+                      </label>
+                      <input
+                        type="text"
+                        value={assignmentForm.title}
+                        onChange={(e) =>
+                          setAssignmentForm((prev: any) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }))
+                        }
+                        placeholder="e.g., Midterm Project"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">
+                          Total Marks
+                        </label>
+                        <input
+                          type="number"
+                          value={assignmentForm.totalMarks}
+                          onChange={(e) =>
+                            setAssignmentForm((prev: any) => ({
+                              ...prev,
+                              totalMarks: parseInt(e.target.value),
+                            }))
+                          }
+                          className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">
+                          Marking Lecturer
+                        </label>
+                        <select
+                          value={assignmentForm.markingLecturer}
+                          onChange={(e) =>
+                            setAssignmentForm((prev: any) => ({
+                              ...prev,
+                              markingLecturer: e.target.value,
+                            }))
+                          }
+                          className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
+                        >
+                          {mockLecturers.map((lec) => (
+                            <option key={lec} value={lec}>
+                              {lec}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">
+                          Unlock Date
+                        </label>
+                        <input
+                          type="date"
+                          value={assignmentForm.unlockDate}
+                          onChange={(e) =>
+                            setAssignmentForm((prev: any) => ({
+                              ...prev,
+                              unlockDate: e.target.value,
+                            }))
+                          }
+                          className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">
+                          Due Date
+                        </label>
+                        <input
+                          type="date"
+                          value={assignmentForm.dueDate}
+                          onChange={(e) =>
+                            setAssignmentForm((prev: any) => ({
+                              ...prev,
+                              dueDate: e.target.value,
+                            }))
+                          }
+                          className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">
+                        Assignment Sheet
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id="asgn-sheet-new"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setAssignmentForm((prev: any) => ({
+                                ...prev,
+                                assignmentSheet: file,
+                              }));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor="asgn-sheet-new"
+                          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors text-sm font-bold text-gray-600"
+                        >
+                          <svg
+                            className="w-4 h-4 text-indigo-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                            />
+                          </svg>
+                          {assignmentForm.assignmentSheet
+                            ? assignmentForm.assignmentSheet.name
+                            : "Upload PDF"}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">
+                      Rules & Regulations
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={assignmentForm.rules}
+                      onChange={(e) =>
+                        setAssignmentForm((prev: any) => ({
+                          ...prev,
+                          rules: e.target.value,
+                        }))
+                      }
+                      placeholder="Add rules for this assignment..."
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex flex-col gap-3">
+              {assignmentModalStage === 1 && (
+                <button
+                  onClick={() => setAssignmentModalStage(2)}
+                  disabled={!selectedAssignmentModalSubject}
+                  className={`w-full py-4 rounded-2xl font-bold text-sm shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
+                    selectedAssignmentModalSubject
+                      ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100"
+                      : "bg-gray-300 text-white cursor-not-allowed grayscale"
+                  }`}
+                >
+                  NEXT
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              )}
+
+              {assignmentModalStage === 2 && (
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setAssignmentModalStage(1)}
+                    className="flex-1 py-4 rounded-2xl font-bold text-sm bg-white border-2 border-gray-100 text-gray-500 hover:bg-gray-50 transition-all"
+                  >
+                    BACK
+                  </button>
+                  <button
+                    onClick={handleAddAssignments}
+                    disabled={!assignmentForm.title}
+                    className={`flex-[2] py-4 rounded-2xl font-bold text-sm shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
+                      assignmentForm.title
+                        ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100"
+                        : "bg-gray-300 text-white cursor-not-allowed grayscale"
+                    }`}
+                  >
+                    CREATE ASSIGNMENT
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  setShowAddAssignmentModal(false);
+                  setSelectedAssignmentModalSubject(null);
+                  setAssignmentModalStage(1);
+                  setAssignmentForm({
+                    title: "",
+                    totalMarks: 100,
+                    rules: "",
+                    dueDate: "2026-06-01",
+                    markingLecturer: mockLecturers[0],
+                    assignmentSheet: null,
+                  });
+                }}
+                className="w-full py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest"
               >
                 CANCEL
               </button>

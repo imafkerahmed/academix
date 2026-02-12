@@ -53,6 +53,8 @@ const subjectsData = {
         totalMarks: 100,
         submittedDate: "2024-02-14T18:30:00",
         assignmentFile: "matrix-operations-assignment.pdf",
+        assignmentSheet: "matrix-operations-assignment.pdf",
+        markingLecturer: "Prof. Sarah Johnson",
         submittedFile: "john-doe-matrix-solutions.pdf",
         feedback:
           "Excellent work! Your solutions are clear and well-explained. Minor arithmetic error in question 3.",
@@ -79,6 +81,8 @@ const subjectsData = {
         totalMarks: 100,
         submittedDate: "2024-02-27T20:15:00",
         assignmentFile: "vector-spaces-assignment.pdf",
+        assignmentSheet: "vector-spaces-assignment.pdf",
+        markingLecturer: "Prof. Sarah Johnson",
         submittedFile: "john-doe-vector-solutions.pdf",
         feedback:
           "Incomplete work. Missing several proofs and diagrams. Please review the requirements and resubmit.",
@@ -105,11 +109,14 @@ const subjectsData = {
         rules:
           "• Show step-by-step calculations\n• Include real-world applications\n• Maximum file size: 10MB\n• Allowed formats: PDF, DOCX",
         dueDate: "2024-03-15",
+        unlockDate: "2024-03-01",
         status: "Not Submitted",
         grade: "-",
         totalMarks: 100,
         submittedDate: null,
         assignmentFile: "eigenvalues-assignment.pdf",
+        assignmentSheet: "eigenvalues-assignment.pdf",
+        markingLecturer: "Prof. Sarah Johnson",
         submittedFile: null,
         feedback: null,
         isLate: false,
@@ -210,7 +217,8 @@ const subjectsData = {
         grade: "Pending",
         totalMarks: 100,
         submittedDate: "2024-04-09T15:20:00",
-        assignmentFile: "first-order-de-assignment.pdf",
+        assignmentSheet: "first-order-de-assignment.pdf",
+        markingLecturer: "Prof. Emily Davis",
         submittedFile: "john-doe-de-solutions.pdf",
         feedback: null,
         isLate: false,
@@ -227,7 +235,8 @@ const subjectsData = {
         grade: "-",
         totalMarks: 100,
         submittedDate: null,
-        assignmentFile: "second-order-assignment.pdf",
+        assignmentSheet: "second-order-assignment.pdf",
+        markingLecturer: "Prof. Emily Davis",
         submittedFile: null,
         feedback: null,
         isLate: false,
@@ -284,11 +293,22 @@ export default function SubjectPage() {
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [disabledAssignments, setDisabledAssignments] = useState<string[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation durations (ms)
   const OPEN_DURATION = 900;
   const CLOSE_DURATION = 1500;
+
+  // Load disabled assignments from localStorage
+  React.useEffect(() => {
+    const savedAssignments = localStorage.getItem(
+      `disabled_assignments_${courseId}`,
+    );
+    if (savedAssignments) {
+      setDisabledAssignments(JSON.parse(savedAssignments));
+    }
+  }, [courseId]);
 
   // Auto-close success modal after 3 seconds
   React.useEffect(() => {
@@ -685,59 +705,106 @@ export default function SubjectPage() {
             {/* Assignments Tab */}
             {activeTab === 0 && (
               <div className="space-y-4">
-                {subject.assignments.map((assignment) => (
-                  <div
-                    key={assignment.id}
-                    onClick={() => {
-                      setSelectedAssignment(assignment);
-                      setShowAssignmentModal(true);
-                    }}
-                    className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                  >
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">
-                        {assignment.title}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Due:{" "}
-                        {new Date(assignment.dueDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            year: "numeric",
-                            month: "2-digit",
-                            day: "2-digit",
-                          },
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-0">
-                      <Badge
-                        className={
-                          assignment.status === "Submitted"
-                            ? "bg-blue-100 text-blue-700"
-                            : assignment.status === "Graded"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-700"
-                        }
-                      >
-                        {assignment.status}
-                      </Badge>
-                      {assignment.grade !== "-" &&
-                        assignment.grade !== "Pending" && (
-                          <>
-                            <Badge
-                              className={`${getGradeBadgeColor(getLetterGrade(assignment.grade))} text-base md:text-lg font-bold px-3 py-1`}
-                            >
-                              {getLetterGrade(assignment.grade)}
-                            </Badge>
-                            <span className="text-sm md:text-base font-semibold text-gray-600">
-                              {assignment.grade}
+                {subject.assignments
+                  ?.filter((a) => !disabledAssignments.includes(a.id))
+                  .map((assignment) => (
+                    <div
+                      key={assignment.id}
+                      onClick={() => {
+                        setSelectedAssignment(assignment);
+                        setShowAssignmentModal(true);
+                      }}
+                      className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900">
+                            {assignment.title}
+                          </h3>
+                          {assignment.assignmentSheet && (
+                            <span className="px-1.5 py-0.5 bg-green-50 text-[8px] font-black text-green-600 rounded-md flex items-center gap-1 border border-green-100">
+                              SHEET
                             </span>
-                          </>
-                        )}
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                            Due:{" "}
+                            {new Date(assignment.dueDate).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                              },
+                            )}
+                          </p>
+                          <p className="text-sm text-gray-500 font-bold flex items-center gap-1">
+                            <svg
+                              className="w-3 h-3 text-amber-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            {assignment.totalMarks} Marks
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-0">
+                        <Badge
+                          className={
+                            assignment.status === "Submitted"
+                              ? "bg-blue-100 text-blue-700"
+                              : assignment.status === "Graded"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-700"
+                          }
+                        >
+                          {assignment.status}
+                        </Badge>
+                        {assignment.grade !== "-" &&
+                          assignment.grade !== "Pending" && (
+                            <>
+                              <Badge
+                                className={`${getGradeBadgeColor(getLetterGrade(assignment.grade))} text-base md:text-lg font-bold px-3 py-1`}
+                              >
+                                {getLetterGrade(assignment.grade)}
+                              </Badge>
+                              <span className="text-sm md:text-base font-semibold text-gray-600">
+                                {assignment.grade}
+                              </span>
+                            </>
+                          )}
+                      </div>
                     </div>
+                  ))}
+                {subject.assignments?.filter(
+                  (a) => !disabledAssignments.includes(a.id),
+                ).length === 0 && (
+                  <div className="py-12 text-center text-gray-500 bg-white rounded-xl border border-dashed border-gray-200">
+                    No active assignments for this subject.
                   </div>
-                ))}
+                )}
               </div>
             )}
 
@@ -924,7 +991,22 @@ export default function SubjectPage() {
             {/* Modal Content */}
             <div className="px-4 py-4 md:px-6 md:py-6 space-y-4 md:space-y-6">
               {/* Due Date and Marks */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                  <p className="text-xs md:text-sm text-gray-500 mb-1">
+                    Unlock Date
+                  </p>
+                  <p className="text-sm md:text-base font-semibold text-gray-900">
+                    {new Date(selectedAssignment.unlockDate).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      },
+                    )}
+                  </p>
+                </div>
                 <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
                   <p className="text-xs md:text-sm text-gray-500 mb-1">
                     Due Date
@@ -946,6 +1028,14 @@ export default function SubjectPage() {
                   </p>
                   <p className="text-sm md:text-base font-semibold text-gray-900">
                     {selectedAssignment.totalMarks}
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                  <p className="text-xs md:text-sm text-gray-500 mb-1">
+                    Marking Lecturer
+                  </p>
+                  <p className="text-sm md:text-base font-semibold text-gray-900">
+                    {selectedAssignment.markingLecturer || "Unassigned"}
                   </p>
                 </div>
                 {selectedAssignment.grade !== "-" &&
@@ -1011,7 +1101,8 @@ export default function SubjectPage() {
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <p className="text-sm md:text-base font-semibold text-gray-900 truncate">
-                      {selectedAssignment.assignmentFile}
+                      {selectedAssignment.assignmentSheet ||
+                        selectedAssignment.assignmentFile}
                     </p>
                     <p className="text-xs md:text-sm text-gray-500">
                       Click to download

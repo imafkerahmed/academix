@@ -12,6 +12,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ModernModal } from "@/components/ui/modern-modal";
 import {
   Dialog,
   DialogContent,
@@ -175,7 +176,7 @@ export default function AssignmentMarkingPage() {
   );
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<
     string | null
-  >(searchParams.get("submissionId") ?? null);
+  >(searchParams?.get("submissionId") ?? null);
   const [filter, setFilter] = useState<
     "submitted" | "not_submitted" | "marked" | "resubmission"
   >("submitted");
@@ -188,10 +189,10 @@ export default function AssignmentMarkingPage() {
     const params = new URLSearchParams(window.location.search);
     if (selectedSubmissionId) {
       params.set("submissionId", selectedSubmissionId);
-      router.push(`?${params.toString()}`, { scroll: false });
+      router.replace(`?${params.toString()}`, { scroll: false });
     } else {
       params.delete("submissionId");
-      router.push(
+      router.replace(
         selectedSubmissionId === null
           ? window.location.pathname
           : `?${params.toString()}`,
@@ -901,164 +902,157 @@ export default function AssignmentMarkingPage() {
       </div>
 
       {/* Mobile Marking Modal */}
-      <Dialog
+      <ModernModal
         open={isMobileMarkingModalOpen}
         onOpenChange={setIsMobileMarkingModalOpen}
+        title={
+          selectedSubmission
+            ? `Marking: ${selectedSubmission.studentName}`
+            : "Mark Submission"
+        }
+        subtitle={
+          selectedSubmission
+            ? `ID: ${selectedSubmission.studentId} • Status: ${selectedSubmission.status.replace("_", " ")}`
+            : ""
+        }
+        avatarChar={selectedSubmission?.studentName.charAt(0)}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto md:hidden">
-          <DialogHeader className="sticky top-0 bg-white z-10 pb-2">
-            <DialogTitle className="text-base">
-              {selectedSubmission
-                ? `Marking: ${selectedSubmission.studentName}`
-                : "Mark Submission"}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              {selectedSubmission && (
-                <>
-                  ID: {selectedSubmission.studentId} • Status:{" "}
-                  {selectedSubmission.status.replace("_", " ")}
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedSubmission &&
-            filter !== "not_submitted" &&
-            selectedSubmission.fileUrl && (
-              <div className="mb-4 -mx-6 px-6">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden h-[280px] flex flex-col">
-                  <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between text-xs text-gray-600 bg-gray-50">
-                    <span className="font-semibold">Preview</span>
-                    {selectedSubmission.fileUrl && (
-                      <a
-                        href={selectedSubmission.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] font-medium text-blue-600 hover:text-blue-700"
-                      >
-                        Open
-                      </a>
-                    )}
-                  </div>
-                  <div className="flex-1 bg-white">
-                    <iframe
-                      src={selectedSubmission.fileUrl}
-                      className="w-full h-full border-0"
-                      title={`${selectedSubmission.studentName} submission preview`}
-                    />
-                  </div>
+        {selectedSubmission &&
+          filter !== "not_submitted" &&
+          selectedSubmission.fileUrl && (
+            <div className="mb-4 -mx-6 px-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden h-[280px] flex flex-col">
+                <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between text-xs text-gray-600 bg-gray-50">
+                  <span className="font-semibold">Preview</span>
+                  {selectedSubmission.fileUrl && (
+                    <a
+                      href={selectedSubmission.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Open
+                    </a>
+                  )}
                 </div>
-              </div>
-            )}
-
-          <div className="space-y-3">
-            {/* Grading Section */}
-            <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-              <h3 className="text-sm font-semibold text-gray-900">Grade</h3>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Marks (out of {assignment?.maxMarks})
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={assignment?.maxMarks}
-                  value={marksInput}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    if (raw === "") {
-                      setMarksInput("");
-                      setGradeInput("");
-                      return;
-                    }
-
-                    let numeric = Number(raw);
-                    if (!Number.isFinite(numeric)) {
-                      return;
-                    }
-
-                    if (numeric < 0) numeric = 0;
-                    if (numeric > (assignment?.maxMarks ?? 0))
-                      numeric = assignment?.maxMarks ?? 0;
-
-                    setMarksInput(String(numeric));
-                    if (selectedSubmission && assignment) {
-                      const auto = getEffectiveGrade(
-                        numeric,
-                        assignment,
-                        selectedSubmission,
-                      );
-                      setGradeInput(auto);
-                    }
-                  }}
-                  placeholder={`e.g. 0 - ${assignment?.maxMarks}`}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="mt-2 flex items-center justify-between text-xs text-gray-700">
-                <div>
-                  <span className="font-semibold">Grade %:</span>
-                  <span className="ml-1 text-sm font-semibold text-gray-900">
-                    {gradePercentageLabel}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-semibold">Letter:</span>
-                  <span className="ml-1 text-sm font-semibold text-gray-900">
-                    {gradeInput || "—"}
-                  </span>
+                <div className="flex-1 bg-white">
+                  <iframe
+                    src={selectedSubmission.fileUrl}
+                    className="w-full h-full border-0"
+                    title={`${selectedSubmission.studentName} submission preview`}
+                  />
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Feedback Section */}
-            <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-              <label className="block text-xs font-semibold text-gray-700">
-                Feedback
+        <div className="space-y-3">
+          {/* Grading Section */}
+          <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+            <h3 className="text-sm font-semibold text-gray-900">Grade</h3>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Marks (out of {assignment?.maxMarks})
               </label>
-              <textarea
-                value={feedbackInput}
-                onChange={(event) => setFeedbackInput(event.target.value)}
-                rows={4}
-                placeholder="Provide feedback to the student..."
+              <input
+                type="number"
+                min={0}
+                max={assignment?.maxMarks}
+                value={marksInput}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  if (raw === "") {
+                    setMarksInput("");
+                    setGradeInput("");
+                    return;
+                  }
+
+                  let numeric = Number(raw);
+                  if (!Number.isFinite(numeric)) {
+                    return;
+                  }
+
+                  if (numeric < 0) numeric = 0;
+                  if (numeric > (assignment?.maxMarks ?? 0))
+                    numeric = assignment?.maxMarks ?? 0;
+
+                  setMarksInput(String(numeric));
+                  if (selectedSubmission && assignment) {
+                    const auto = getEffectiveGrade(
+                      numeric,
+                      assignment,
+                      selectedSubmission,
+                    );
+                    setGradeInput(auto);
+                  }
+                }}
+                placeholder={`e.g. 0 - ${assignment?.maxMarks}`}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setMarksInput(
-                    selectedSubmission?.marks != null
-                      ? String(selectedSubmission.marks)
-                      : "",
-                  );
-                  setGradeInput(selectedSubmission?.grade ?? "");
-                  setFeedbackInput(selectedSubmission?.feedback ?? "");
-                }}
-                className="flex-1"
-              >
-                Reset
-              </Button>
-              <Button
-                size="sm"
-                disabled={!hasValidMarks}
-                onClick={() => {
-                  handleSave(gradeInput, feedbackInput);
-                  setIsMobileMarkingModalOpen(false);
-                }}
-                className="flex-1"
-              >
-                Save & Close
-              </Button>
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-700">
+              <div>
+                <span className="font-semibold">Grade %:</span>
+                <span className="ml-1 text-sm font-semibold text-gray-900">
+                  {gradePercentageLabel}
+                </span>
+              </div>
+              <div>
+                <span className="font-semibold">Letter:</span>
+                <span className="ml-1 text-sm font-semibold text-gray-900">
+                  {gradeInput || "—"}
+                </span>
+              </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* Feedback Section */}
+          <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+            <label className="block text-xs font-semibold text-gray-700">
+              Feedback
+            </label>
+            <textarea
+              value={feedbackInput}
+              onChange={(event) => setFeedbackInput(event.target.value)}
+              rows={4}
+              placeholder="Provide feedback to the student..."
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setMarksInput(
+                  selectedSubmission?.marks != null
+                    ? String(selectedSubmission.marks)
+                    : "",
+                );
+                setGradeInput(selectedSubmission?.grade ?? "");
+                setFeedbackInput(selectedSubmission?.feedback ?? "");
+              }}
+              className="flex-1"
+            >
+              Reset
+            </Button>
+            <Button
+              size="sm"
+              disabled={!hasValidMarks}
+              onClick={() => {
+                handleSave(gradeInput, feedbackInput);
+                setIsMobileMarkingModalOpen(false);
+              }}
+              className="flex-1"
+            >
+              Save & Close
+            </Button>
+          </div>
+        </div>
+      </ModernModal>
     </div>
   );
 }

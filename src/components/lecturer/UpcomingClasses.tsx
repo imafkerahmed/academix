@@ -5,10 +5,10 @@ import { Clock, Timer } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { ModernModal } from "@/components/ui/modern-modal";
 
 export interface UpcomingClass {
   id: string;
@@ -175,46 +175,48 @@ export default function UpcomingClasses({
         </div>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
-        <DialogContent>
-          {selectedClass && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{selectedClass.classTitle}</DialogTitle>
-                <DialogDescription>
-                  {selectedClass.intakeName} • {selectedClass.courseName}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="mt-3 space-y-2 text-sm text-gray-700">
-                <p>
-                  <span className="font-semibold">Status:</span>{" "}
-                  {selectedClass.status.toUpperCase()}
-                </p>
-                <p className="flex items-center gap-1">
-                  <Clock size={14} />
-                  <span className="font-medium text-gray-800">
-                    {getWeekdayLabel(selectedClass.startTime)}
-                  </span>
-                  <span>• {selectedClass.startTime}</span>
-                </p>
-                <p className="flex items-center gap-1">
-                  <Timer size={14} /> {selectedClass.duration} min
-                </p>
-              </div>
-              <div className="mt-4 flex justify-end">
-                {selectedClass.zoomJoinUrl ? (
-                  <button
-                    onClick={() => handleQuickJoin(selectedClass.zoomJoinUrl)}
-                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-                  >
-                    Join Class
-                  </button>
-                ) : null}
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ModernModal
+        open={isDialogOpen}
+        onOpenChange={handleDialogChange}
+        title={selectedClass?.classTitle ?? ""}
+        subtitle={
+          selectedClass
+            ? `${selectedClass.intakeName} • ${selectedClass.courseName}`
+            : ""
+        }
+        avatarChar={selectedClass?.classTitle.charAt(0)}
+      >
+        {selectedClass && (
+          <>
+            <div className="mt-3 space-y-2 text-sm text-gray-700">
+              <p>
+                <span className="font-semibold">Status:</span>{" "}
+                {selectedClass.status.toUpperCase()}
+              </p>
+              <p className="flex items-center gap-1">
+                <Clock size={14} />
+                <span className="font-medium text-gray-800">
+                  {getWeekdayLabel(selectedClass.startTime)}
+                </span>
+                <span>• {selectedClass.startTime}</span>
+              </p>
+              <p className="flex items-center gap-1">
+                <Timer size={14} /> {selectedClass.duration} min
+              </p>
+            </div>
+            <div className="mt-4 flex justify-end">
+              {selectedClass.zoomJoinUrl ? (
+                <button
+                  onClick={() => handleQuickJoin(selectedClass.zoomJoinUrl)}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                >
+                  Join Class
+                </button>
+              ) : null}
+            </div>
+          </>
+        )}
+      </ModernModal>
     </>
   );
 }
