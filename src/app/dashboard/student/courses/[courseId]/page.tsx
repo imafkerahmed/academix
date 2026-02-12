@@ -117,12 +117,29 @@ const coursesData = {
 export default function CoursePage() {
   const params = useParams();
   const router = useRouter();
-  const courseId = params.courseId as string;
+  const courseId = (params?.courseId as string) || "";
   const [showNotifications, setShowNotifications] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [activeSemester, setActiveSemester] = useState(0);
+  const [disabledSemesters, setDisabledSemesters] = useState<string[]>([]);
+  const [disabledSubjects, setDisabledSubjects] = useState<string[]>([]);
+
+  // Load disabled states from localStorage
+  React.useEffect(() => {
+    const savedSemesters = localStorage.getItem(
+      `disabled_semesters_${courseId}`,
+    );
+    if (savedSemesters) {
+      setDisabledSemesters(JSON.parse(savedSemesters));
+    }
+    const savedSubjects = localStorage.getItem(`disabled_subjects_${courseId}`);
+    if (savedSubjects) {
+      setDisabledSubjects(JSON.parse(savedSubjects));
+    }
+  }, [courseId]);
+
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation durations (ms)
@@ -435,101 +452,119 @@ export default function CoursePage() {
           </h2>
 
           {/* Semester Tabs */}
-          {course.semesters && course.semesters.length > 1 && (
+          {course.semesters && course.semesters.length > 0 && (
             <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
-              {course.semesters.map((semester, index) => (
-                <button
-                  key={semester.id}
-                  onClick={() => setActiveSemester(index)}
-                  className={`px-6 py-3 rounded-lg font-bold text-sm whitespace-nowrap transition-all duration-200 ${
-                    activeSemester === index
-                      ? "bg-white border-3 border-indigo-600 text-indigo-700 shadow-md"
-                      : "bg-white border-2 border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50 shadow-sm"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{semester.name}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        activeSemester === index
-                          ? semester.status === "Ongoing"
-                            ? "bg-orange-500 text-white"
-                            : semester.status === "Completed"
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-500 text-white"
-                          : semester.status === "Ongoing"
-                            ? "bg-orange-100 text-orange-700"
-                            : semester.status === "Completed"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-700"
+              {course.semesters
+                .filter((s) => !disabledSemesters.includes(s.name))
+                .map((semester, index) => {
+                  // Find the original index to maintain activeSemester logic or adjust it
+                  const displayIndex = course.semesters
+                    .filter((s) => !disabledSemesters.includes(s.name))
+                    .indexOf(semester);
+
+                  return (
+                    <button
+                      key={semester.id}
+                      onClick={() => setActiveSemester(displayIndex)}
+                      className={`px-6 py-3 rounded-lg font-bold text-sm whitespace-nowrap transition-all duration-200 ${
+                        activeSemester === displayIndex
+                          ? "bg-white border-3 border-indigo-600 text-indigo-700 shadow-md"
+                          : "bg-white border-2 border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50 shadow-sm"
                       }`}
                     >
-                      {semester.status}
-                    </span>
-                  </div>
-                </button>
-              ))}
+                      <div className="flex items-center gap-2">
+                        <span>{semester.name}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            activeSemester === displayIndex
+                              ? semester.status === "Ongoing"
+                                ? "bg-orange-500 text-white"
+                                : semester.status === "Completed"
+                                  ? "bg-green-500 text-white"
+                                  : "bg-gray-500 text-white"
+                              : semester.status === "Ongoing"
+                                ? "bg-orange-100 text-orange-700"
+                                : semester.status === "Completed"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {semester.status}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
             </div>
           )}
 
           {/* Subjects Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {course.semesters?.[activeSemester]?.subjects?.map((subject) => (
-              <RouteLink
-                key={subject.id}
-                href={`/dashboard/student/courses/${courseId}/subjects/${subject.id}`}
-                className="block"
-              >
-                <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-start justify-between mb-2">
-                    <CardTitle className="text-lg">{subject.name}</CardTitle>
-                    <Badge variant="outline" className="ml-2">
-                      {subject.code}
-                    </Badge>
-                  </div>
-                  <CardDescription className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <svg
-                        className="w-4 h-4 text-gray-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
-                      <span>{subject.instructor}</span>
-                    </div>
-                  </CardDescription>
+            {course.semesters
+              .filter((s) => !disabledSemesters.includes(s.name))
+              [activeSemester]?.subjects?.filter(
+                (subject) => !disabledSubjects.includes(subject.code),
+              )
+              ?.map((subject) => (
+                <RouteLink
+                  key={subject.id}
+                  href={`/dashboard/student/courses/${courseId}/subjects/${subject.id}`}
+                  className="block"
+                >
+                  <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer h-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between mb-2">
+                        <CardTitle className="text-lg">
+                          {subject.name}
+                        </CardTitle>
+                        <Badge variant="outline" className="ml-2">
+                          {subject.code}
+                        </Badge>
+                      </div>
+                      <CardDescription className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <svg
+                            className="w-4 h-4 text-gray-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                          <span>{subject.instructor}</span>
+                        </div>
+                      </CardDescription>
 
-                  {/* Progress Bar */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                      <span>Progress</span>
-                      <span className="font-semibold">{subject.progress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          subject.progress === 100
-                            ? "bg-green-500"
-                            : subject.progress >= 50
-                              ? "bg-blue-500"
-                              : "bg-orange-500"
-                        }`}
-                        style={{ width: `${subject.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-              </RouteLink>
-            ))}
+                      {/* Progress Bar */}
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                          <span>Progress</span>
+                          <span className="font-semibold">
+                            {subject.progress}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              subject.progress === 100
+                                ? "bg-green-500"
+                                : subject.progress >= 50
+                                  ? "bg-blue-500"
+                                  : "bg-orange-500"
+                            }`}
+                            style={{ width: `${subject.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </RouteLink>
+              ))}
           </div>
         </div>
       </main>

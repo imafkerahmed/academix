@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { Edit } from "lucide-react";
+import { toast } from "sonner";
 
 // --- Mock Data (reuse or extend as needed) ---
 const mockIntakes = [
@@ -155,16 +156,8 @@ export default function CourseDetailsPage() {
   ];
   const [activeTab, setActiveTab] = useState(0);
 
-  // New state for tab content modals
-  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
-  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
-  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
-  const [showMaterialModal, setShowMaterialModal] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
-  const [showVideoModal, setShowVideoModal] = useState(false);
-
   // Mock content for each tab
-  const students = [
+  const [students, setStudents] = useState([
     {
       name: "Alice Johnson",
       regNumber: "REG-2026-001",
@@ -183,13 +176,197 @@ export default function CourseDetailsPage() {
       enrolledDate: "2026-01-10",
       status: "Pending",
     },
+  ]);
+
+  const initialSubjects = [
+    {
+      name: "Algebra",
+      code: "MATH101",
+      semester: "Semester 1",
+      assignedLecturer: "Dianne Russell",
+    },
+    {
+      name: "Calculus",
+      code: "MATH102",
+      semester: "Semester 1",
+      assignedLecturer: "Albert Flores",
+    },
+    {
+      name: "Geometry",
+      code: "MATH201",
+      semester: "Semester 2",
+      assignedLecturer: "Theresa Webb",
+    },
+    {
+      name: "Statistics",
+      code: "MATH202",
+      semester: "Semester 2",
+      assignedLecturer: "Savannah Nguyen",
+    },
+    {
+      name: "Trigonometry",
+      code: "MATH203",
+      semester: "Semester 2",
+      assignedLecturer: "Jenny Wilson",
+    },
   ];
-  const subjects = [
-    { name: "Algebra" },
-    { name: "Calculus" },
-    { name: "Geometry" },
-    { name: "Statistics" },
+
+  const availableSubjects = [
+    { name: "Linear Algebra", code: "MATH301" },
+    { name: "Discrete Mathematics", code: "CS101" },
+    { name: "Differential Equations", code: "MATH302" },
+    { name: "Physics I", code: "PHYS101" },
+    { name: "Physics II", code: "PHYS102" },
+    { name: "Organic Chemistry", code: "CHEM201" },
+    { name: "Biochemistry", code: "BIOL201" },
+    { name: "Microeconomics", code: "ECON101" },
+    { name: "Macroeconomics", code: "ECON102" },
+    { name: "Microbiology", code: "BIOL301" },
+    { name: "Genetics", code: "BIOL302" },
   ];
+
+  const [courseSubjects, setCourseSubjects] = useState(initialSubjects);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedSemester, setSelectedSemester] = useState("Semester 1");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSubjectsInModal, setSelectedSubjectsInModal] = useState<
+    string[]
+  >([]);
+
+  const mockLecturers = [
+    "Dianne Russell",
+    "Albert Flores",
+    "Theresa Webb",
+    "Savannah Nguyen",
+    "Jenny Wilson",
+    "Leslie Alexander",
+    "Robert Fox",
+    "Esther Howard",
+  ];
+
+  const [lecturerSearchQuery, setLecturerSearchQuery] = useState("");
+  const [showLecturerModal, setShowLecturerModal] = useState(false);
+  const [subjectToAssign, setSubjectToAssign] = useState<any>(null);
+
+  const [expandedSemesters, setExpandedSemesters] = useState<string[]>([
+    "Semester 1",
+  ]);
+  const [disabledSemesters, setDisabledSemesters] = useState<string[]>([]);
+  const [disabledSubjects, setDisabledSubjects] = useState<string[]>([]);
+
+  // Load disabled states from localStorage
+  React.useEffect(() => {
+    const savedSemesters = localStorage.getItem(
+      `disabled_semesters_${courseId}`,
+    );
+    if (savedSemesters) {
+      setDisabledSemesters(JSON.parse(savedSemesters));
+    }
+    const savedSubjects = localStorage.getItem(`disabled_subjects_${courseId}`);
+    if (savedSubjects) {
+      setDisabledSubjects(JSON.parse(savedSubjects));
+    }
+  }, [courseId]);
+
+  const toggleSemesterEnablement = (semester: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't expand/collapse when clicking the toggle
+    setDisabledSemesters((prev) => {
+      const next = prev.includes(semester)
+        ? prev.filter((s) => s !== semester)
+        : [...prev, semester];
+      localStorage.setItem(
+        `disabled_semesters_${courseId}`,
+        JSON.stringify(next),
+      );
+      return next;
+    });
+  };
+
+  const toggleSubjectEnablement = (
+    subjectCode: string,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+    setDisabledSubjects((prev) => {
+      const next = prev.includes(subjectCode)
+        ? prev.filter((s) => s !== subjectCode)
+        : [...prev, subjectCode];
+      localStorage.setItem(
+        `disabled_subjects_${courseId}`,
+        JSON.stringify(next),
+      );
+      return next;
+    });
+  };
+
+  const toggleSemester = (semester: string) => {
+    setExpandedSemesters((prev) =>
+      prev.includes(semester)
+        ? prev.filter((s) => s !== semester)
+        : [...prev, semester],
+    );
+  };
+
+  const updateSubjectLecturer = (subjectCode: string, lecturerName: string) => {
+    setCourseSubjects((prev) =>
+      prev.map((s) =>
+        s.code === subjectCode ? { ...s, assignedLecturer: lecturerName } : s,
+      ),
+    );
+    setShowLecturerModal(false);
+    setSubjectToAssign(null);
+    setLecturerSearchQuery("");
+    toast.success(`Lecturer updated to ${lecturerName}`);
+  };
+
+  const handleAddSubjects = () => {
+    if (selectedSubjectsInModal.length === 0) return;
+
+    const subjectsToAdd = availableSubjects.filter((s) =>
+      selectedSubjectsInModal.includes(s.name),
+    );
+
+    setCourseSubjects((prev) => [
+      ...prev,
+      ...subjectsToAdd.map((s) => ({
+        ...s,
+        semester: selectedSemester,
+        assignedLecturer: "Not Assigned",
+      })),
+    ]);
+
+    const count = selectedSubjectsInModal.length;
+    toast.success(
+      `Successfully added ${count} subject${count > 1 ? "s" : ""} to ${selectedSemester}`,
+    );
+
+    setShowAddModal(false);
+    setSelectedSubjectsInModal([]);
+    setSearchQuery("");
+  };
+
+  const toggleSubjectSelection = (subjectName: string) => {
+    setSelectedSubjectsInModal((prev) =>
+      prev.includes(subjectName)
+        ? prev.filter((s) => s !== subjectName)
+        : [...prev, subjectName],
+    );
+  };
+
+  // Grouping subjects by semester
+  const groupedSubjects = courseSubjects.reduce((acc: any, subj) => {
+    if (!acc[subj.semester]) acc[subj.semester] = [];
+    acc[subj.semester].push(subj);
+    return acc;
+  }, {});
+
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
+  const [showMaterialModal, setShowMaterialModal] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+
   const assignments = [
     {
       id: "assign-1",
@@ -213,11 +390,13 @@ export default function CourseDetailsPage() {
       dueDate: "2026-03-10",
     },
   ];
+
   const materials = [
     { id: "mat-1", title: "Lecture Notes.pdf", uploadDate: "2026-01-15" },
     { id: "mat-2", title: "Syllabus.docx", uploadDate: "2026-01-20" },
     { id: "mat-3", title: "Reference Book.epub", uploadDate: "2026-02-01" },
   ];
+
   const videos = [
     {
       id: "vid-1",
@@ -376,20 +555,206 @@ export default function CourseDetailsPage() {
 
           {/* Subject Tab */}
           {activeTab === 1 && (
-            <div>
-              <div className="text-lg font-semibold mb-4">Subjects</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {subjects.map((subj, i) => (
-                  <div
-                    key={i}
-                    className="bg-gray-50 rounded-lg p-4 shadow-sm border border-gray-100 flex items-center"
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-6">
+                <div className="text-lg font-semibold">Subject Structure</div>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 flex items-center gap-2"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <span className="text-blue-600 font-semibold text-base">
-                      {subj.name}
-                    </span>
-                  </div>
-                ))}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  ADD SUBJECT
+                </button>
               </div>
+
+              {Object.keys(groupedSubjects).map((semester) => (
+                <div
+                  key={semester}
+                  className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm"
+                >
+                  <div
+                    onClick={() => toggleSemester(semester)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleSemester(semester);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
+                        <svg
+                          className={`w-5 h-5 text-indigo-600 transition-transform duration-200 ${
+                            expandedSemesters.includes(semester)
+                              ? "rotate-180"
+                              : ""
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <span className="font-bold text-gray-900">
+                          {semester}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold uppercase ${
+                            disabledSemesters.includes(semester)
+                              ? "text-red-500"
+                              : "text-green-500"
+                          }`}
+                        >
+                          {disabledSemesters.includes(semester)
+                            ? "Disabled"
+                            : "Enabled"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 pr-4 border-r border-gray-200">
+                        <button
+                          onClick={(e) => toggleSemesterEnablement(semester, e)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                            !disabledSemesters.includes(semester)
+                              ? "bg-indigo-600"
+                              : "bg-gray-300"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                              !disabledSemesters.includes(semester)
+                                ? "translate-x-5"
+                                : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <Badge className="bg-indigo-100 text-indigo-700">
+                        {groupedSubjects[semester].length} Subjects
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {expandedSemesters.includes(semester) && (
+                    <div className="p-4 pt-0 border-t border-gray-100 bg-gray-50/30">
+                      <div className="space-y-2 mt-4">
+                        {groupedSubjects[semester].map(
+                          (subj: any, i: number) => (
+                            <div
+                              key={i}
+                              className={`flex items-center justify-between p-4 bg-white rounded-xl border transition-all ${
+                                disabledSubjects.includes(subj.code)
+                                  ? "border-gray-100 opacity-60 bg-gray-50/50"
+                                  : "border-gray-100 shadow-sm hover:border-indigo-100"
+                              }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <Badge className="bg-gray-100 text-gray-500 font-bold text-[10px] px-2 py-0.5">
+                                  {subj.code}
+                                </Badge>
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-gray-900">
+                                    {subj.name}
+                                  </span>
+                                  <div className="relative">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSubjectToAssign(subj);
+                                        setShowLecturerModal(true);
+                                      }}
+                                      className="text-xs text-gray-500 flex items-center gap-1 hover:text-indigo-600 transition-colors group/lecturer"
+                                    >
+                                      <svg
+                                        className="w-3 h-3"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                        />
+                                      </svg>
+                                      <span
+                                        className={
+                                          subj.assignedLecturer ===
+                                          "Not Assigned"
+                                            ? "text-orange-500 font-medium"
+                                            : ""
+                                        }
+                                      >
+                                        {subj.assignedLecturer}
+                                      </span>
+                                      <Edit className="w-2.5 h-2.5 opacity-0 group-hover/lecturer:opacity-100 transition-opacity" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className={`text-[10px] font-bold uppercase ${
+                                    disabledSubjects.includes(subj.code)
+                                      ? "text-red-400"
+                                      : "text-green-500"
+                                  }`}
+                                >
+                                  {disabledSubjects.includes(subj.code)
+                                    ? "Disabled"
+                                    : "Active"}
+                                </span>
+                                <button
+                                  onClick={(e) =>
+                                    toggleSubjectEnablement(subj.code, e)
+                                  }
+                                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                                    !disabledSubjects.includes(subj.code)
+                                      ? "bg-indigo-600"
+                                      : "bg-gray-300"
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                      !disabledSubjects.includes(subj.code)
+                                        ? "translate-x-5"
+                                        : "translate-x-1"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
@@ -663,6 +1028,348 @@ export default function CourseDetailsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Subject Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h2 className="text-xl font-bold text-gray-900">
+                Add New Subject
+              </h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Semester Selection */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                  Select Semester
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.keys(groupedSubjects).map((sem) => (
+                    <button
+                      key={sem}
+                      onClick={() => setSelectedSemester(sem)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${
+                        selectedSemester === sem
+                          ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm"
+                          : "border-gray-100 bg-white text-gray-600 hover:border-gray-400"
+                      }`}
+                    >
+                      {sem}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subject Search */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                  Search Subject
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg
+                      className="h-4 w-4 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name..."
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border-gray-100 border-2 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors text-sm"
+                  />
+                </div>
+
+                <div className="mt-4 max-h-48 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                  {availableSubjects
+                    .filter(
+                      (s) =>
+                        !courseSubjects.some((cs) => cs.code === s.code) &&
+                        (s.name
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase()) ||
+                          s.code
+                            .toLowerCase()
+                            .includes(searchQuery.toLowerCase())),
+                    )
+                    .map((subj) => (
+                      <button
+                        key={subj.code}
+                        onClick={() => toggleSubjectSelection(subj.name)}
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left ${
+                          selectedSubjectsInModal.includes(subj.name)
+                            ? "border-indigo-600 bg-indigo-50/50 shadow-sm"
+                            : "border-gray-100 hover:border-indigo-200 hover:bg-gray-50 bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                              selectedSubjectsInModal.includes(subj.name)
+                                ? "bg-indigo-600 border-indigo-600"
+                                : "border-gray-300 bg-white"
+                            }`}
+                          >
+                            {selectedSubjectsInModal.includes(subj.name) && (
+                              <svg
+                                className="w-3.5 h-3.5 text-white"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={3}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <span
+                              className={`font-semibold ${
+                                selectedSubjectsInModal.includes(subj.name)
+                                  ? "text-indigo-900"
+                                  : "text-gray-800"
+                              }`}
+                            >
+                              {subj.name}
+                            </span>
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                              {subj.code}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  {availableSubjects.filter(
+                    (s) =>
+                      !courseSubjects.some((cs) => cs.code === s.code) &&
+                      (s.name
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()) ||
+                        s.code
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase())),
+                  ).length > 0 && (
+                    <div className="pt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                      Click to toggle selection
+                    </div>
+                  )}
+                  {availableSubjects.filter(
+                    (s) =>
+                      !courseSubjects.some((cs) => cs.code === s.code) &&
+                      (s.name
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()) ||
+                        s.code
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase())),
+                  ).length === 0 && (
+                    <div className="py-8 text-center text-gray-400 text-sm">
+                      No new subjects found matching your search.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex flex-col gap-3">
+              <button
+                onClick={handleAddSubjects}
+                disabled={selectedSubjectsInModal.length === 0}
+                className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                  selectedSubjectsInModal.length > 0
+                    ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                    : "bg-gray-300 text-white cursor-not-allowed grayscale"
+                }`}
+              >
+                ADD{" "}
+                {selectedSubjectsInModal.length > 0
+                  ? selectedSubjectsInModal.length
+                  : ""}{" "}
+                SUBJECT{selectedSubjectsInModal.length !== 1 ? "S" : ""}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setSelectedSubjectsInModal([]);
+                }}
+                className="w-full py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Lecturer Selection Modal */}
+      {showLecturerModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-8 duration-500">
+            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-8 text-white">
+              <h2 className="text-2xl font-bold">Assign Lecturer</h2>
+              <p className="text-indigo-100 text-sm mt-1">
+                Assign a lecturer to{" "}
+                <span className="font-bold text-white uppercase tracking-wider">
+                  {subjectToAssign?.name}
+                </span>{" "}
+                ({subjectToAssign?.code})
+              </p>
+              <button
+                onClick={() => {
+                  setShowLecturerModal(false);
+                  setLecturerSearchQuery("");
+                }}
+                className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                aria-label="Close modal"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Lecturer Search */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                  Search Lecturer
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg
+                      className="h-4 w-4 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={lecturerSearchQuery}
+                    onChange={(e) => setLecturerSearchQuery(e.target.value)}
+                    placeholder="Search by name..."
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border-gray-100 border-2 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors text-sm"
+                  />
+                </div>
+
+                <div className="mt-4 max-h-60 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                  {mockLecturers
+                    .filter((l) =>
+                      l
+                        .toLowerCase()
+                        .includes(lecturerSearchQuery.toLowerCase()),
+                    )
+                    .map((lecturer) => (
+                      <button
+                        key={lecturer}
+                        onClick={() =>
+                          updateSubjectLecturer(subjectToAssign?.code, lecturer)
+                        }
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left ${
+                          subjectToAssign?.assignedLecturer === lecturer
+                            ? "border-indigo-600 bg-indigo-50/50 shadow-sm"
+                            : "border-gray-100 hover:border-indigo-200 hover:bg-gray-50 bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              subjectToAssign?.assignedLecturer === lecturer
+                                ? "bg-indigo-600 border-indigo-600"
+                                : "border-gray-300 bg-white"
+                            }`}
+                          >
+                            {subjectToAssign?.assignedLecturer === lecturer && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                            )}
+                          </div>
+                          <span
+                            className={`font-semibold ${
+                              subjectToAssign?.assignedLecturer === lecturer
+                                ? "text-indigo-900"
+                                : "text-gray-800"
+                            }`}
+                          >
+                            {lecturer}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  {mockLecturers.filter((l) =>
+                    l.toLowerCase().includes(lecturerSearchQuery.toLowerCase()),
+                  ).length === 0 && (
+                    <div className="py-8 text-center text-gray-400 text-sm">
+                      No lecturers found matching your search.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setShowLecturerModal(false);
+                  setLecturerSearchQuery("");
+                }}
+                className="w-full py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider"
+              >
+                CANCEL
+              </button>
+            </div>
           </div>
         </div>
       )}
