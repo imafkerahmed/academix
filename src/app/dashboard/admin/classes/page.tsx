@@ -17,7 +17,13 @@ import {
   Eye,
   Menu,
   Plus,
+  ArrowRight,
+  Monitor,
+  Activity,
+  User,
+  Hash,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface ZoomClass {
   id: string;
@@ -35,57 +41,31 @@ interface ZoomClass {
   };
 }
 
-interface Attendee {
-  id: string;
-  joined_at?: string;
-  left_at?: string;
-  status: string;
-  expand?: {
-    class?: ZoomClass;
-    attendee?: any;
-  };
-}
-
 export default function ClassManagement() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<ZoomClass[]>([]);
-  const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    // Authentication disabled for UI development
     fetchData();
   }, [router]);
 
   const fetchData = async () => {
     try {
-      const classesPromise = pb
+      const records = await pb
         .collection("classes")
         .getFullList({
           sort: "-start_time",
         })
         .catch(() => []);
 
-      const attendeesPromise = pb
-        .collection("class_attendees")
-        .getFullList({
-          expand: "class,attendee",
-        })
-        .catch(() => []);
-
-      const [classesData, attendeesData] = await Promise.all([
-        classesPromise,
-        attendeesPromise,
-      ]);
-
-      setClasses((classesData as any) || []);
-      setAttendees((attendeesData as any) || []);
+      setClasses((records as any) || []);
       setLoading(false);
     } catch (error) {
       setClasses([]);
-      setAttendees([]);
       setLoading(false);
     }
   };
@@ -95,21 +75,12 @@ export default function ClassManagement() {
     router.push("/");
   };
 
-  const getClassStats = () => {
-    const scheduled = classes.filter((c) => c.status === "scheduled").length;
-    const inProgress = classes.filter((c) => c.status === "in_progress").length;
-    const completed = classes.filter((c) => c.status === "completed").length;
-    const cancelled = classes.filter((c) => c.status === "cancelled").length;
-    const totalAttendees = attendees.filter(
-      (a) => a.status === "attended",
-    ).length;
-
-    return { scheduled, inProgress, completed, cancelled, totalAttendees };
+  const stats = {
+    scheduled: classes.filter((c) => c.status === "scheduled").length,
+    inProgress: classes.filter((c) => c.status === "in_progress").length,
+    completed: classes.filter((c) => c.status === "completed").length,
+    cancelled: classes.filter((c) => c.status === "cancelled").length,
   };
-
-  const stats = getClassStats();
-
-  const [searchQuery, setSearchQuery] = useState("");
 
   const filteredClasses = classes.filter((classItem) => {
     const matchesSearch = classItem.title
@@ -119,69 +90,69 @@ export default function ClassManagement() {
     return matchesSearch && classItem.status === filter;
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "scheduled":
-        return "bg-blue-100 text-blue-800";
-      case "in_progress":
-        return "bg-green-100 text-green-800";
-      case "completed":
-        return "bg-gray-100 text-gray-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading classes...</p>
+          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
+            Syncing Class Schedules...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
       <AdminSidebar
         activeTab="classes"
         onLogout={handleLogout}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
-      <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-4 md:p-6 lg:p-8">
-          {/* Mobile header with hamburger */}
-          <div className="lg:hidden mb-4">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
-                ACADEMIX
+
+      <main className="p-4 md:p-6 lg:p-8 space-y-8">
+        {/* Mobile Header */}
+        <div className="lg:hidden flex items-center justify-between mb-4">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
+          >
+            <Menu size={24} />
+          </button>
+          <h1 className="text-xl font-black text-gray-900 tracking-tighter uppercase">
+            Academix
+          </h1>
+          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+            <Video size={20} />
+          </div>
+        </div>
+
+        {/* Page Header Card */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+              <Monitor size={40} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                Class <span className="text-indigo-600">Scheduler</span>
               </h1>
-              <div className="w-10" aria-hidden="true" />
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                <Activity size={14} className="text-indigo-400" />
+                Real-time Session Monitoring
+              </p>
             </div>
           </div>
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">
-              Online Class Management
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Monitor all Zoom classes and attendance
-            </p>
-          </div>
+          <button className="px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-xs tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2 uppercase">
+            <Plus size={18} />
+            SCHEDULE CLASS
+          </button>
+        </div>
 
-          {/* Stats Carousel */}
+        {/* Stats Carousel */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <StatsCarousel
             stats={[
               {
@@ -214,165 +185,150 @@ export default function ClassManagement() {
               },
             ]}
           />
+        </div>
 
-          {/* Actions Bar */}
+        {/* Filter Bar */}
+        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <AdminActionBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            searchPlaceholder="Search classes..."
+            searchPlaceholder="Search sessions by title..."
             action={
-              <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
-                <Plus size={20} />
-                Schedule New Class
-              </button>
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                {[
+                  { id: "all", label: "ALL", color: "blue" },
+                  { id: "scheduled", label: "SCHEDULED", color: "blue" },
+                  { id: "in_progress", label: "LIVE", color: "green" },
+                  { id: "completed", label: "HISTORY", color: "gray" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setFilter(t.id)}
+                    className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap ${
+                      filter === t.id
+                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                        : "text-gray-400 bg-gray-50 hover:bg-gray-100"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             }
-          >
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === "all"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              All ({classes.length})
-            </button>
-            <button
-              onClick={() => setFilter("scheduled")}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === "scheduled"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              Scheduled ({stats.scheduled})
-            </button>
-            <button
-              onClick={() => setFilter("in_progress")}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === "in_progress"
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              In Progress ({stats.inProgress})
-            </button>
-            <button
-              onClick={() => setFilter("completed")}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === "completed"
-                  ? "bg-gray-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              Completed ({stats.completed})
-            </button>
-          </AdminActionBar>
+          />
+        </div>
 
-          {/* Classes Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredClasses.map((classItem) => (
-              <div
-                key={classItem.id}
-                className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+        {/* Classes Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+          {filteredClasses.map((classItem) => (
+            <div
+              key={classItem.id}
+              className="group bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 flex flex-col gap-6 ring-1 ring-gray-950/[0.02]"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all duration-500 overflow-hidden ${
+                      classItem.status === "in_progress"
+                        ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50"
+                        : "bg-indigo-50 text-indigo-600"
+                    }`}
+                  >
+                    <Video size={24} />
+                  </div>
+                  <div className="flex flex-col">
+                    <h3 className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
                       {classItem.title}
                     </h3>
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {classItem.description || "No description"}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-blue-50 rounded-lg ml-3">
-                    <Video className="text-blue-600" size={20} />
-                  </div>
-                </div>
-
-                {/* Details */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <Calendar size={16} className="text-gray-400" />
-                    <span>
-                      {new Date(classItem.start_time).toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        },
-                      )}
-                    </span>
-                    <span className="mx-1">•</span>
-                    <Clock size={16} className="text-gray-400" />
-                    <span>
-                      {new Date(classItem.start_time).toLocaleTimeString(
-                        "en-US",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}
-                    </span>
-                  </div>
-
-                  {classItem.duration && (
-                    <div className="flex items-center gap-2 text-sm text-gray-700">
-                      <Clock size={16} className="text-gray-400" />
-                      <span>Duration: {classItem.duration} minutes</span>
-                    </div>
-                  )}
-
-                  {classItem.expand?.host && (
-                    <div className="flex items-center gap-2 text-sm text-gray-700">
-                      <Users size={16} className="text-gray-400" />
-                      <span>Host: {classItem.expand.host.name}</span>
-                    </div>
-                  )}
-
-                  {classItem.is_recurring && (
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                        Recurring - {classItem.recurrence_day}
-                      </span>
+                      <Badge
+                        className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                          classItem.status === "scheduled"
+                            ? "bg-blue-600"
+                            : classItem.status === "in_progress"
+                              ? "bg-green-600"
+                              : classItem.status === "cancelled"
+                                ? "bg-red-600"
+                                : "bg-gray-400"
+                        } text-white`}
+                      >
+                        {classItem.status.replace("_", " ")}
+                      </Badge>
                     </div>
-                  )}
-                </div>
-
-                {/* Status and Actions */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                      classItem.status,
-                    )}`}
-                  >
-                    {classItem.status.replace("_", " ")}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <button className="text-blue-600 hover:text-blue-900 text-sm font-medium">
-                      View Details
-                    </button>
-                    {classItem.zoom_meeting_id && (
-                      <span className="text-gray-400">
-                        • ID: {classItem.zoom_meeting_id}
-                      </span>
-                    )}
                   </div>
+                </div>
+                <button className="p-3 bg-gray-50 rounded-xl text-gray-300 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                  <Eye size={18} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-2xl flex flex-col gap-1 border border-transparent group-hover:border-indigo-100/50 transition-all duration-500">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <Calendar size={12} className="text-indigo-400" /> Date &
+                    Time
+                  </span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {new Date(classItem.start_time).toLocaleDateString(
+                      "en-US",
+                      { month: "short", day: "numeric" },
+                    )}
+                    <span className="text-indigo-500 mx-2">•</span>
+                    {new Date(classItem.start_time).toLocaleTimeString(
+                      "en-US",
+                      { hour: "2-digit", minute: "2-digit" },
+                    )}
+                  </span>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-2xl flex flex-col gap-1 border border-transparent group-hover:border-indigo-100/50 transition-all duration-500">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <User size={12} className="text-indigo-400" /> Host
+                  </span>
+                  <span className="text-sm font-bold text-gray-900 truncate">
+                    {classItem.expand?.host?.name || "Administrator"}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {filteredClasses.length === 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 text-center py-12">
-              <p className="text-gray-500">No classes found</p>
+              <div className="flex items-center justify-between pt-6 border-t border-gray-50 mt-auto">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl">
+                    <Clock size={12} />
+                    <span className="text-[10px] font-black tracking-widest">
+                      {classItem.duration} MIN
+                    </span>
+                  </div>
+                  {classItem.zoom_meeting_id && (
+                    <div className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-xl">
+                      <Hash size={12} />
+                      <span className="text-[10px] font-black tracking-widest">
+                        ID: {classItem.zoom_meeting_id.slice(-4)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <button className="flex items-center gap-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:translate-x-1 transition-transform">
+                  View details <ArrowRight size={14} />
+                </button>
+              </div>
             </div>
-          )}
-        </main>
-      </div>
-    </>
+          ))}
+        </div>
+
+        {filteredClasses.length === 0 && (
+          <div className="text-center py-24 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm">
+            <div className="w-20 h-20 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-200 mx-auto mb-6">
+              <Video size={40} />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+              No sessions found
+            </h3>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
+              Try clearing your filters or search terms
+            </p>
+          </div>
+        )}
+      </main>
+    </div>
   );
 }

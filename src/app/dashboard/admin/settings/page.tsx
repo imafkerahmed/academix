@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentUser, logout } from "@/lib/pocketbase";
+import { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import {
   Settings,
@@ -11,6 +11,13 @@ import {
   Building2,
   DollarSign,
   Menu,
+  Shield,
+  Layers,
+  ArrowRight,
+  ChevronRight,
+  Layout,
+  Bell,
+  Cpu,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -19,7 +26,6 @@ export default function SettingsPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Authentication disabled for UI development
     setLoading(false);
   }, [router]);
 
@@ -32,162 +38,206 @@ export default function SettingsPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading settings...</p>
+          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
+            Accessing Kernel...
+          </p>
         </div>
       </div>
     );
   }
 
+  const settingSections = [
+    {
+      title: "User Management",
+      desc: "Architect accounts for students, lecturers, and system architects",
+      icon: User,
+      color: "blue",
+      link: "Manage Accounts",
+      iconBg: "bg-blue-50",
+      iconColor: "text-blue-600",
+    },
+    {
+      title: "Academic Structure",
+      desc: "Configure subject hierarchies and course delivery parameters",
+      icon: BookOpen,
+      color: "green",
+      link: "Configure Subjects",
+      iconBg: "bg-green-50",
+      iconColor: "text-green-600",
+    },
+    {
+      title: "Operational Units",
+      desc: "Manage regional branch locations and physical infrastructure",
+      icon: Building2,
+      color: "purple",
+      link: "Manage Branches",
+      iconBg: "bg-purple-50",
+      iconColor: "text-purple-600",
+    },
+    {
+      title: "Financial Protocol",
+      desc: "Define fee structures, registration costs, and payment gateways",
+      icon: DollarSign,
+      color: "orange",
+      link: "Finances & Gateways",
+      iconBg: "bg-orange-50",
+      iconColor: "text-orange-600",
+    },
+    {
+      title: "Visual & System UI",
+      desc: "Personalize the dashboad theme, logos, and global aesthetics",
+      icon: Layout,
+      color: "indigo",
+      link: "Customize UI",
+      iconBg: "bg-indigo-50",
+      iconColor: "text-indigo-600",
+    },
+    {
+      title: "Communications Hub",
+      desc: "Sync notification triggers and system-wide broadcast rules",
+      icon: Bell,
+      color: "amber",
+      link: "System Alerts",
+      iconBg: "bg-amber-50",
+      iconColor: "text-amber-600",
+    },
+  ];
+
   return (
-    <>
+    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
       <AdminSidebar
         activeTab="settings"
         onLogout={handleLogout}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
-      <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-4 md:p-6 lg:p-8">
-          {/* Mobile header with hamburger */}
-          <div className="lg:hidden mb-4">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
-                ACADEMIX
+
+      <main className="p-4 md:p-6 lg:p-8 space-y-8">
+        {/* Mobile Header */}
+        <div className="lg:hidden flex items-center justify-between mb-4">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
+          >
+            <Menu size={24} />
+          </button>
+          <h1 className="text-xl font-black text-gray-900 tracking-tighter uppercase">
+            Academix
+          </h1>
+          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+            <Settings size={20} />
+          </div>
+        </div>
+
+        {/* Page Header Card */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+              <Shield size={40} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                Access <span className="text-indigo-600">Control</span>
               </h1>
-              <div className="w-10" aria-hidden="true" />
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                <Layers size={14} className="text-indigo-400" />
+                Global System Configuration
+              </p>
             </div>
           </div>
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">
-              System Settings
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Configure platform settings and manage resources
-            </p>
+          <div className="flex items-center gap-3 bg-gray-50 px-6 py-3 rounded-2xl border border-gray-100">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                Kernel Mode: Active
+              </span>
+            </div>
           </div>
+        </div>
 
-          {/* Settings Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* User Management */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <User className="text-blue-600" size={24} />
+        {/* Settings Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+          {settingSections.map((s, idx) => (
+            <div
+              key={idx}
+              className="group bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 flex flex-col gap-6 ring-1 ring-gray-950/[0.02]"
+            >
+              <div className="flex items-center justify-between">
+                <div
+                  className={`w-14 h-14 ${s.iconBg} ${s.iconColor} rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:bg-indigo-600 group-hover:text-white shadow-sm`}
+                >
+                  <s.icon size={24} />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    User Management
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Add and manage students, lecturers, and admin accounts
-                  </p>
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    Manage Users →
-                  </button>
+                <div className="p-2 bg-gray-50 rounded-lg group-hover:bg-indigo-50 transition-colors">
+                  <ChevronRight
+                    size={16}
+                    className="text-gray-300 group-hover:text-indigo-600"
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Subject Management */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <BookOpen className="text-green-600" size={24} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    Subject Management
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Create and manage subjects for courses
-                  </p>
-                  <button className="text-green-600 hover:text-green-800 text-sm font-medium">
-                    Manage Subjects →
-                  </button>
-                </div>
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight leading-none">
+                  {s.title}
+                </h3>
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest leading-relaxed">
+                  {s.desc}
+                </p>
+              </div>
+
+              <div className="mt-4 pt-6 border-t border-gray-50 flex items-center justify-between">
+                <button className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] group-hover:translate-x-1 transition-transform flex items-center gap-2">
+                  {s.link} <ArrowRight size={14} />
+                </button>
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-100 group-hover:bg-indigo-400 transition-colors" />
               </div>
             </div>
+          ))}
+        </div>
 
-            {/* Branch Settings */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-purple-50 rounded-lg">
-                  <Building2 className="text-purple-600" size={24} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    Branch Settings
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Configure branch locations and settings
-                  </p>
-                  <button className="text-purple-600 hover:text-purple-800 text-sm font-medium">
-                    Manage Branches →
-                  </button>
-                </div>
+        {/* System Summary Footer */}
+        <div className="bg-indigo-900 rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden group shadow-2xl shadow-indigo-900/20">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:scale-125 transition-transform duration-1000" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24 blur-2xl group-hover:scale-150 transition-transform duration-1000" />
+
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex items-center gap-8">
+              <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-[2rem] flex items-center justify-center text-white border border-white/20 shadow-inner">
+                <Cpu size={36} className="animate-pulse" />
+              </div>
+              <div className="flex flex-col">
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+                  System Infrastructure
+                </h2>
+                <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1 opacity-80">
+                  v2.4.0 High-Performance Engine
+                </p>
               </div>
             </div>
-
-            {/* Payment Settings */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-orange-50 rounded-lg">
-                  <DollarSign className="text-orange-600" size={24} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    Payment Settings
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Configure payment options and fee structures
-                  </p>
-                  <button className="text-orange-600 hover:text-orange-800 text-sm font-medium">
-                    Manage Payments →
-                  </button>
-                </div>
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col items-end">
+                <span className="text-indigo-300 text-[10px] font-black uppercase tracking-widest">
+                  Environment
+                </span>
+                <span className="text-white font-black text-lg">
+                  PRODUCTION
+                </span>
               </div>
-            </div>
-
-            {/* System Configuration */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-indigo-50 rounded-lg">
-                  <Settings className="text-indigo-600" size={24} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    System Configuration
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    General system settings and preferences
-                  </p>
-                  <button className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                    Configure System →
-                  </button>
-                </div>
+              <div className="w-px h-10 bg-white/10" />
+              <div className="flex flex-col">
+                <span className="text-indigo-300 text-[10px] font-black uppercase tracking-widest">
+                  Status
+                </span>
+                <span className="text-green-400 font-black text-lg flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />{" "}
+                  OPTIMIZED
+                </span>
               </div>
             </div>
           </div>
-
-          {/* Coming Soon Notice */}
-          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <strong>Note:</strong> Settings pages for user, subject, and other
-              management features are coming soon. For now, manage these
-              directly through the respective section pages.
-            </p>
-          </div>
-        </main>
-      </div>
-    </>
+        </div>
+      </main>
+    </div>
   );
 }

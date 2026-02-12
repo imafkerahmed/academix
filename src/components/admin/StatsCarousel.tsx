@@ -18,7 +18,7 @@ interface StatItem {
 
 interface StatsCarouselProps {
   stats: StatItem[];
-  children?: React.ReactNode; // For extra grid items like DateTimeStatCard
+  children?: React.ReactNode;
 }
 
 export default function StatsCarousel({ stats, children }: StatsCarouselProps) {
@@ -27,36 +27,38 @@ export default function StatsCarousel({ stats, children }: StatsCarouselProps) {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % stats.length);
-    }, 3000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [stats.length]);
 
   return (
     <div className="mb-4">
-      {/* Mobile Carousel (< md) */}
-      <div className="md:hidden px-4">
-        <div className="relative overflow-hidden rounded-xl">
+      {/* Mobile/Tablet Carousel (< lg) */}
+      <div className="lg:hidden">
+        <div className="relative overflow-hidden rounded-[2rem] shadow-sm bg-white/50 border border-indigo-50/50">
           <div
-            className="flex transition-transform duration-500 ease-in-out"
+            className="flex transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]"
             style={{
               transform: `translateX(-${currentIndex * 100}%)`,
             }}
           >
             {stats.map((stat, index) => (
-              <div key={index} className="w-full flex-shrink-0">
+              <div key={index} className="w-full flex-shrink-0 p-1">
                 <AdminStatsCard {...stat} />
               </div>
             ))}
           </div>
         </div>
-        {/* Carousel Indicators */}
-        <div className="flex justify-center gap-2 mt-2">
+        {/* Carousel Indicators - Refined Premium Dots */}
+        <div className="flex justify-center gap-3 mt-6">
           {stats.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentIndex(index)}
-              className={`h-2 w-2 rounded-full transition-all ${
-                currentIndex === index ? "bg-blue-600 w-4" : "bg-gray-300"
+              className={`h-1.5 rounded-full transition-all duration-500 ${
+                currentIndex === index
+                  ? "bg-indigo-600 w-8"
+                  : "bg-indigo-100 w-3 hover:bg-indigo-200"
               }`}
               aria-label={`Go to slide ${index + 1}`}
             />
@@ -64,10 +66,16 @@ export default function StatsCarousel({ stats, children }: StatsCarouselProps) {
         </div>
       </div>
 
-      {/* iPad/Desktop Grid (>= md) */}
-      <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Large Desktop Grid (>= lg) */}
+      <div className="hidden lg:grid grid-cols-4 gap-6">
         {stats.map((stat, index) => (
-          <AdminStatsCard key={index} {...stat} />
+          <div
+            key={index}
+            className="animate-in fade-in slide-in-from-bottom-4 duration-700"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            <AdminStatsCard {...stat} />
+          </div>
         ))}
         {children}
       </div>

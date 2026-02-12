@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import pb, { getCurrentUser, logout } from "@/lib/pocketbase";
+import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import {
   Search,
@@ -18,9 +18,13 @@ import {
   CheckCircle,
   XCircle,
   Calendar,
+  Layers,
+  ChevronRight,
+  MoreHorizontal,
 } from "lucide-react";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
+import { Badge } from "@/components/ui/badge";
 
 interface Student {
   id: string;
@@ -42,7 +46,6 @@ export default function StudentManagement() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Authentication disabled for UI development
     fetchStudents();
   }, [router]);
 
@@ -76,7 +79,6 @@ export default function StudentManagement() {
         setStudents(students.filter((s) => s.id !== id));
       } catch (error) {
         console.error("Error deleting student:", error);
-        alert("Failed to delete student");
       }
     }
   };
@@ -94,49 +96,68 @@ export default function StudentManagement() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading students...</p>
+          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
+            Initialising Directory...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
       <AdminSidebar
         activeTab="students"
         onLogout={handleLogout}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
-      <div className="bg-gray-50 min-h-screen lg:ml-64">
-        <main className="p-4 md:p-6 lg:p-8">
-          {/* Mobile header with hamburger */}
-          <div className="lg:hidden mb-4">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
-                ACADEMIX
+
+      <main className="p-4 md:p-6 lg:p-8 space-y-8">
+        {/* Mobile Header */}
+        <div className="lg:hidden flex items-center justify-between mb-4">
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500 hover:bg-gray-50 transition-all"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <h1 className="text-xl font-black text-gray-900 tracking-tighter uppercase">
+            Academix
+          </h1>
+          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+            <Users size={20} />
+          </div>
+        </div>
+
+        {/* Page Header Card */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+              <Users size={40} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                Student <span className="text-indigo-600">Database</span>
               </h1>
-              <div className="w-10" aria-hidden="true" />
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                <Layers size={14} className="text-indigo-400" />
+                Centralized Enrollment Management
+              </p>
             </div>
           </div>
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">
-              Student Management
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Manage all student accounts and enrollments
-            </p>
+          <div className="flex items-center gap-3">
+            <button className="px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-xs tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2 uppercase">
+              <UserPlus size={18} />
+              ADD NEW STUDENT
+            </button>
           </div>
-          {/* Stats Carousel */}
+        </div>
+
+        {/* Stats Section */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <StatsCarousel
             stats={[
               {
@@ -169,139 +190,160 @@ export default function StudentManagement() {
                     new Date(s.created).getMonth() === new Date().getMonth(),
                 ).length,
                 icon: Calendar,
-                bgColor: "bg-blue-50",
-                iconColor: "text-blue-600",
+                bgColor: "bg-indigo-50",
+                iconColor: "text-indigo-600",
               },
             ]}
           />
+        </div>
 
-          {/* Actions Bar */}
+        {/* Filter & Search Bar */}
+        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <AdminActionBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            searchPlaceholder="Search students by name or email..."
+            searchPlaceholder="Search by name, email or reg ID..."
             action={
-              <div className="flex gap-2 items-center">
-                <div className="flex gap-2 items-center mr-2">
-                  <Filter size={20} className="text-gray-400" />
+              <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 gap-3 transition-all focus-within:ring-2 focus-within:ring-indigo-500/10">
+                  <Filter size={14} className="text-gray-400" />
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-400 focus:outline-none focus:ring-0 cursor-pointer"
                   >
-                    <option value="all">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="disabled">Disabled</option>
+                    <option value="all">ALL STUDENTS</option>
+                    <option value="active">ACTIVE ONLY</option>
+                    <option value="disabled">DISABLED</option>
                   </select>
                 </div>
-                <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
-                  <UserPlus size={20} />
-                  Add Student
-                </button>
               </div>
             }
           />
-          {/* Students Table */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Student
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contact
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Location
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Joined
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 flex-shrink-0">
-                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                              <span className="text-blue-600 font-medium">
-                                {student.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {student.name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {student.email}
-                            </div>
-                          </div>
+        </div>
+
+        {/* Students Table */}
+        <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-6 duration-1000 group">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-50">
+                  <th className="px-10 py-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Identity
+                  </th>
+                  <th className="px-10 py-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Contact & Reach
+                  </th>
+                  <th className="px-10 py-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Location
+                  </th>
+                  <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Account status
+                  </th>
+                  <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Enrolled
+                  </th>
+                  <th className="px-10 py-6 text-right text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50/50">
+                {filteredStudents.map((student) => (
+                  <tr
+                    key={student.id}
+                    className="group/row hover:bg-indigo-50/30 transition-all duration-300"
+                  >
+                    <td className="px-10 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all duration-300 scale-100 group-hover/row:scale-110">
+                          {student.name.charAt(0).toUpperCase()}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <Phone size={14} className="mr-2 text-gray-400" />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-gray-900 group-hover/row:text-indigo-600 transition-colors uppercase tracking-tight">
+                            {student.name}
+                          </span>
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                            REG-{student.id.slice(0, 6).toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-10 py-6">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center text-xs font-bold text-gray-600">
+                          <Mail size={12} className="mr-2 text-indigo-400" />
+                          {student.email}
+                        </div>
+                        <div className="flex items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          <Phone size={10} className="mr-2 text-gray-300" />
                           {student.mobile}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <MapPin size={14} className="mr-2 text-gray-400" />
-                          {student.city}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            student.accountStatus === "active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
+                      </div>
+                    </td>
+                    <td className="px-10 py-6">
+                      <div className="flex items-center text-xs font-black text-gray-400 uppercase tracking-widest">
+                        <MapPin size={14} className="mr-2 text-indigo-300" />
+                        {student.city}
+                      </div>
+                    </td>
+                    <td className="px-10 py-6 text-center">
+                      <Badge
+                        className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-none shadow-sm ${
+                          student.accountStatus === "active"
+                            ? "bg-green-500 text-white"
+                            : "bg-red-500 text-white"
+                        }`}
+                      >
+                        {student.accountStatus}
+                      </Badge>
+                    </td>
+                    <td className="px-10 py-6 text-center">
+                      <span className="text-sm font-black text-gray-400 italic">
+                        {new Date(student.created).toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </td>
+                    <td className="px-10 py-6">
+                      <div className="flex items-center justify-end gap-2 pr-4 opacity-40 group-hover/row:opacity-100 transition-opacity duration-300">
+                        <button className="p-3 bg-white border border-gray-100 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStudent(student.id)}
+                          className="p-3 bg-white border border-gray-100 rounded-xl text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm"
                         >
-                          {student.accountStatus}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(student.created).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
-                          <button className="text-blue-600 hover:text-blue-900">
-                            <Edit size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteStudent(student.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredStudents.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-500">No students found</p>
-              </div>
-            )}
+                          <Trash2 size={16} />
+                        </button>
+                        <button className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:bg-gray-900 hover:text-white transition-all shadow-sm">
+                          <MoreHorizontal size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </main>
-      </div>
-    </>
+
+          {filteredStudents.length === 0 && (
+            <div className="text-center py-24 bg-gray-50/30">
+              <div className="w-20 h-20 bg-gray-100 rounded-[2rem] flex items-center justify-center text-gray-300 mx-auto mb-6">
+                <Search size={40} />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                No results found
+              </h3>
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
+                Adjust your filters or try a different search term
+              </p>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }

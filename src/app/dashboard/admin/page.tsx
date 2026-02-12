@@ -15,10 +15,17 @@ import {
   Bell,
   TrendingUp,
   Menu,
+  Clock,
+  Layout,
+  Zap,
+  Activity,
+  Video,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import StatsCarousel from "@/components/admin/StatsCarousel";
 
-// Mock data for today's classes (replace with real data as needed)
+// Mock data for today's classes
 const todaysClasses = [
   {
     id: 21,
@@ -65,90 +72,14 @@ const todaysClasses = [
     duration: 60,
     status: "ongoing",
   },
-  {
-    id: 24,
-    title: "Campus Seminar",
-    topic: "Career Development",
-    type: "Physical Class",
-    date: "2026-02-07",
-    startTime: "09:00",
-    endTime: "10:00",
-    platform: "Hall A",
-    joinUrl: "",
-    intakeName: "2024 Intake D",
-    courseName: "Seminars 001",
-    duration: 60,
-    status: "scheduled",
-  },
-  {
-    id: 25,
-    title: "Guest Lecture: AI",
-    topic: "Intro to AI",
-    type: "Online Zoom Class",
-    date: "2026-02-07",
-    startTime: "17:00",
-    endTime: "18:30",
-    platform: "Zoom",
-    joinUrl: "https://zoom.us/j/5555555555",
-    intakeName: "2026 Intake A",
-    courseName: "CS 301",
-    duration: 90,
-    status: "scheduled",
-  },
 ];
-
-// Compact date/time bar for mobile header
-function MobileDateTimeBar() {
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (!now) {
-    return (
-      <div className="flex items-center justify-center text-xs text-gray-400">
-        Loading time...
-      </div>
-    );
-  }
-
-  const dateLabel = now.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
-  const timeLabel = now.toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-
-  return (
-    <div className="flex flex-col items-center justify-center text-center">
-      <span className="text-xl font-semibold text-blue-600 leading-tight">
-        {timeLabel}
-      </span>
-      <span className="text-xs font-medium text-gray-700 mt-1">
-        {dateLabel}
-      </span>
-    </div>
-  );
-}
 
 const statsData = [
   {
     title: "Active Students",
     value: 1234,
     icon: Users,
-    bgColor: "bg-blue-100",
+    bgColor: "bg-blue-50",
     iconColor: "text-blue-600",
     trend: { value: "2.5%", isPositive: true },
   },
@@ -156,7 +87,7 @@ const statsData = [
     title: "Active Intakes",
     value: 4,
     icon: GraduationCap,
-    bgColor: "bg-green-100",
+    bgColor: "bg-green-50",
     iconColor: "text-green-600",
     trend: { value: "1.2%", isPositive: true },
   },
@@ -164,13 +95,11 @@ const statsData = [
     title: "Pending Payments",
     value: 12,
     icon: DollarSign,
-    bgColor: "bg-yellow-100",
-    iconColor: "text-yellow-600",
+    bgColor: "bg-orange-50",
+    iconColor: "text-orange-600",
     trend: { value: "0.8%", isPositive: false },
   },
 ];
-
-import StatsCarousel from "@/components/admin/StatsCarousel";
 
 export default function AdminDashboard() {
   const [isAllSchedulesOpen, setIsAllSchedulesOpen] = React.useState(false);
@@ -188,7 +117,7 @@ export default function AdminDashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex font-sans">
       <AdminSidebar
         adminName="Admin User"
         activeTab="overview"
@@ -197,187 +126,182 @@ export default function AdminDashboard() {
         setIsSidebarOpen={setIsSidebarOpen}
       />
 
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
+      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden transition-all duration-300">
         <main className="p-4 md:p-6 lg:p-8 flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
-          {/* Mobile header with hamburger — phones only */}
-          <div className="md:hidden mb-4">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-
-              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
-                ACADEMIX
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 group">
+            <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+              <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+                Dashboard <span className="text-indigo-600">Overview</span>
               </h1>
-
-              {/* Spacer to keep title centered */}
-              <div className="w-10" aria-hidden="true" />
             </div>
-            <div className="mt-2">
-              <MobileDateTimeBar />
-            </div>
-          </div>
-
-          {/* iPad header with hamburger — no compact clock since card clock is visible */}
-          <div className="hidden md:block lg:hidden mb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <DateTimeStatCard />
               <button
-                type="button"
+                className="lg:hidden p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
                 onClick={() => setIsSidebarOpen(true)}
-                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
               >
-                <Menu className="w-5 h-5" />
+                <Menu size={24} />
               </button>
-
-              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
-                ACADEMIX
-              </h1>
-
-              {/* Spacer to keep title centered */}
-              <div className="w-10" aria-hidden="true" />
             </div>
           </div>
 
-          {/* Desktop header */}
-          <div className="hidden lg:block mb-2">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Admin Dashboard
-            </h1>
-            <p className="text-gray-600 mt-0">
-              Manage all student accounts and enrollments
-            </p>
+          {/* Stats Section with Premium Styling */}
+          <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <StatsCarousel stats={statsData} />
           </div>
 
-          {/* Mobile/iPad header text */}
-          <div className="lg:hidden mb-4 text-center">
-            <h2 className="text-xl font-bold text-gray-900">Admin Dashboard</h2>
-            <p className="text-gray-600 text-sm mt-0">
-              Manage all student accounts and enrollments
-            </p>
-          </div>
-
-          {/* Stats Carousel - match student dashboard mobile size */}
-          <div className="w-full p-4">
-            <StatsCarousel stats={statsData}>
-              {/* Date/time card on iPad and desktop */}
-              <div>
-                <DateTimeStatCard />
-              </div>
-            </StatsCarousel>
-          </div>
-
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0 w-full max-w-full overflow-x-hidden">
-            {/* Calendar */}
-            <div className="bg-gray-200 rounded-lg shadow-md min-h-[300px] lg:min-h-0 overflow-hidden lg:row-span-2 max-w-full overflow-x-hidden">
-              <Calendar />
-            </div>
-
-            {/* Today's Classes */}
-            <div className="bg-white rounded-lg shadow-md p-4 flex flex-col min-h-[300px] lg:min-h-0 overflow-auto">
-              <div className="flex items-start justify-between mb-4">
-                <div className="text-xl font-semibold">
-                  Today&apos;s Classes
+          {/* Main Grid: 2 Column Desktop */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 w-full max-w-full overflow-x-hidden">
+            {/* Left: Calendar - 5 cols */}
+            <div className="lg:col-span-5 flex flex-col gap-6 animate-in fade-in slide-in-from-left-6 duration-700">
+              <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-2 overflow-hidden h-full min-h-[400px] hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
+                <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                    <CalendarIcon size={16} className="text-indigo-500" />{" "}
+                    Academic Calendar
+                  </h3>
                 </div>
-                <div>
+                <div className="p-4 h-full">
+                  <Calendar />
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Today's Classes & Quick Actions - 7 cols */}
+            <div className="lg:col-span-7 flex flex-col gap-8 animate-in fade-in slide-in-from-right-6 duration-700">
+              {/* Today's Classes Card */}
+              <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col min-h-[400px] hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                      Today&apos;s{" "}
+                      <span className="text-indigo-600">Classes</span>
+                    </h3>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                      Live updates from the system
+                    </p>
+                  </div>
                   <button
                     onClick={() => setIsAllSchedulesOpen(true)}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                    className="px-6 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
                   >
-                    View all
+                    View Schedule
                   </button>
                 </div>
-              </div>
-              <div className="flex-1 flex flex-col gap-2 overflow-auto">
-                <AnimatedList
-                  items={todaysClasses.slice(0, 3).map((cls) => (
+
+                <div className="flex-1 space-y-4">
+                  {todaysClasses.map((cls) => (
                     <div
                       key={cls.id}
-                      className="bg-white rounded-md border border-gray-200 flex items-center justify-between gap-4 flex-1 min-h-0 py-4 px-4"
-                      style={{ minHeight: 0 }}
+                      className="group bg-gray-50/50 hover:bg-white border border-gray-100 hover:border-indigo-100 rounded-[1.8rem] p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/[0.05]"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-gray-900 truncate">
-                          {cls.title}
+                      <div className="flex items-center gap-5">
+                        <div
+                          className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all duration-300 ${cls.status === "ongoing" ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50" : "bg-white text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}
+                        >
+                          <Video size={24} />
                         </div>
-                        {cls.topic && (
-                          <div className="text-xs text-gray-500 truncate">
-                            {cls.topic}
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
+                            {cls.title}
+                          </span>
+                          <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                            <span className="text-indigo-500">
+                              {cls.courseName}
+                            </span>
+                            <span>•</span>
+                            <span>{cls.platform}</span>
+                            {cls.status === "ongoing" && (
+                              <span className="flex items-center gap-1 text-green-500 ml-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />{" "}
+                                LIVE
+                              </span>
+                            )}
                           </div>
-                        )}
-                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-2 truncate">
-                          <span className="inline-block truncate">
-                            <span className="font-medium">Time:</span>{" "}
-                            {cls.startTime}–{cls.endTime}
-                          </span>
-                          <span className="text-gray-400">•</span>
-                          <span className="inline-block truncate">
-                            <span className="font-medium">Loc:</span>{" "}
-                            {cls.platform}
-                          </span>
                         </div>
                       </div>
-                      <div className="flex-shrink-0">
-                        {cls.platform === "Zoom" && cls.joinUrl ? (
-                          <a
-                            href={cls.joinUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-1 rounded"
-                          >
-                            Specate
-                          </a>
-                        ) : (
-                          <div className="text-xs text-gray-500">
-                            {cls.platform}
+
+                      <div className="flex items-center gap-6">
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">
+                            Session Timing
+                          </span>
+                          <div className="flex items-center gap-2 font-bold text-gray-900">
+                            <Clock size={14} className="text-indigo-400" />
+                            {cls.startTime} - {cls.endTime}
                           </div>
+                        </div>
+                        {cls.joinUrl && (
+                          <button className="px-6 py-3 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95 uppercase">
+                            Spectate
+                          </button>
                         )}
                       </div>
                     </div>
                   ))}
-                  showGradients={false}
-                  displayScrollbar={false}
-                  className="h-full min-h-0"
-                  itemClassName="w-full flex-1 min-h-0"
-                  onItemSelect={() => {}}
-                />
+                </div>
               </div>
-              <AllSchedulesModal
-                isOpen={isAllSchedulesOpen}
-                onClose={() => setIsAllSchedulesOpen(false)}
-                classes={mappedSchedulesForModal}
-              />
-            </div>
 
-            {/* Section 7 — right column on desktop (below Today's Classes), full width on mobile */}
-            <div className="bg-gray-200 rounded-lg shadow-md p-2 min-h-0 overflow-hidden">
-              <div className="w-full h-full grid grid-cols-2 gap-2 min-h-0">
-                <div className="bg-white rounded shadow flex items-center justify-center min-h-[60px]">
-                  Section 7.1
-                </div>
-                <div className="bg-white rounded shadow flex items-center justify-center min-h-[60px]">
-                  Section 7.2
-                </div>
-                <div className="bg-white rounded shadow flex items-center justify-center min-h-[60px]">
-                  Section 7.3
-                </div>
-                <div className="bg-white rounded shadow flex items-center justify-center min-h-[60px]">
-                  Section 7.4
-                </div>
+              {/* Quick Insights Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  {
+                    label: "Active Sessions",
+                    value: "12",
+                    icon: Zap,
+                    color: "text-amber-500",
+                    bg: "bg-amber-50",
+                  },
+                  {
+                    label: "New Notifications",
+                    value: "08",
+                    icon: Bell,
+                    color: "text-indigo-500",
+                    bg: "bg-indigo-50",
+                  },
+                  {
+                    label: "Live Traffic",
+                    value: "High",
+                    icon: Activity,
+                    color: "text-green-500",
+                    bg: "bg-green-50",
+                  },
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    className="bg-white rounded-[2rem] border border-gray-100 p-6 flex items-center gap-5 hover:shadow-lg transition-all duration-300 group"
+                  >
+                    <div
+                      className={`w-12 h-12 ${item.bg} ${item.color} rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-sm`}
+                    >
+                      <item.icon size={20} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        {item.label}
+                      </span>
+                      <span className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
+                        {item.value}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </main>
       </div>
+
+      <AllSchedulesModal
+        isOpen={isAllSchedulesOpen}
+        onClose={() => setIsAllSchedulesOpen(false)}
+        classes={mappedSchedulesForModal}
+      />
     </div>
   );
 }
 
-// DateTimeStatCard component outside AdminDashboard
 function DateTimeStatCard() {
   const [now, setNow] = useState<Date | null>(null);
 
@@ -389,31 +313,32 @@ function DateTimeStatCard() {
     return () => clearInterval(timer);
   }, []);
 
-  if (!now) {
-    return (
-      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 flex flex-col items-center justify-center w-full animate-pulse">
-        <div className="h-10 w-32 bg-gray-200 rounded mb-2"></div>
-        <div className="h-6 w-24 bg-gray-100 rounded"></div>
-      </div>
-    );
-  }
+  if (!now) return null;
 
-  const time = now.toLocaleTimeString("en-US", { hour12: false });
+  const time = now.toLocaleTimeString("en-US", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   const date = now.toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
-    year: "numeric",
   });
 
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 flex flex-col items-center justify-center w-full">
-      <span className="text-4xl md:text-5xl font-extrabold text-blue-600 mb-2 tracking-wider">
-        {time}
-      </span>
-      <span className="text-lg md:text-xl font-semibold text-gray-800">
-        {date}
-      </span>
+    <div className="bg-white rounded-[1.8rem] shadow-sm border border-gray-100 px-6 py-3 flex items-center gap-4 hover:shadow-md transition-all group">
+      <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+        <Clock size={18} />
+      </div>
+      <div className="flex flex-col">
+        <span className="text-xl font-black text-gray-900 tracking-tight leading-none group-hover:text-indigo-600 transition-colors">
+          {time}
+        </span>
+        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">
+          {date.toUpperCase()}
+        </span>
+      </div>
     </div>
   );
 }
