@@ -269,8 +269,8 @@ const subjectsData = {
 export default function SubjectPage() {
   const params = useParams();
   const router = useRouter();
-  const subjectId = params.subjectId as string;
-  const courseId = params.courseId as string;
+  const subjectId = params?.subjectId as string;
+  const courseId = params?.courseId as string;
   const [showNotifications, setShowNotifications] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [showLogout, setShowLogout] = useState(false);

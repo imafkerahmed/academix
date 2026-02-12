@@ -363,7 +363,28 @@ export default function IntakeDetailsPage() {
                   ci.courseDetails ? (
                     <tr
                       key={ci.id}
-                      className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                      className={
+                        (idx % 2 === 0 ? "bg-white" : "bg-gray-50") +
+                        " cursor-pointer hover:bg-indigo-50 transition-colors"
+                      }
+                      onClick={() => {
+                        if (ci.courseDetails) {
+                          router.push(
+                            `/dashboard/admin/intakes/${intakeId}/${ci.courseDetails?.id}`,
+                          );
+                        }
+                      }}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          router.push(
+                            ci.courseDetails
+                              ? `/dashboard/admin/intakes/${intakeId}/${ci.courseDetails.id}`
+                              : "#",
+                          );
+                        }
+                      }}
+                      aria-label={`View details for ${ci.courseDetails.name}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                         {ci.courseDetails.name}
