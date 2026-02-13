@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList.jsx"), {
   ssr: false,
 });
+import { ModernModal } from "@/components/ui/modern-modal";
 
 // Mock event data structure
 const mockEvents = [
@@ -557,91 +558,86 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
         {view === "day" && renderDay()}
       </div>
 
-      {/* Modal for expanded day events */}
-      {modalDate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,41,59,0.25)] backdrop-blur-sm"
-          onClick={closeModal}
-        >
-          <div
-            className="bg-white rounded-2xl p-8 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
-            style={{ minHeight: "340px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 text-2xl font-bold"
-              onClick={() => {
-                const modal = document.getElementById("calendar-modal");
-                if (modal) {
-                  modal.classList.remove("animate-zoomIn");
-                  modal.classList.add("animate-zoomOut");
-                  const calendar = document.getElementById("calendar-root");
-                  if (calendar) {
-                    calendar.classList.remove("animate-zoomOut");
-                    calendar.classList.add("animate-zoomIn");
-                  }
-                  setTimeout(() => closeModal(), 200);
-                } else {
-                  closeModal();
-                }
-              }}
-              aria-label="Close"
-            >
-              &times;
-            </button>
-            <h3 className="text-lg font-bold mb-4 uppercase">
-              {(() => {
+      {/* ModernModal for expanded day events */}
+      <ModernModal
+        open={!!modalDate}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+        title={
+          modalDate
+            ? (() => {
                 const d = new Date(modalDate);
                 return `${weekDays[d.getDay()]}, ${d.toLocaleDateString()}`;
-              })()}
-            </h3>
-            <div className="max-h-[400px] overflow-y-auto no-scrollbar">
-              <AnimatedList
-                items={getEventsForDate(modalDate).map((event) => (
-                  <div
-                    key={event.id}
-                    className={`p-3 rounded-lg border-4 flex flex-col bg-white w-full ${
+              })()
+            : ""
+        }
+        subtitle={
+          modalDate
+            ? `${getEventsForDate(modalDate).length} event(s)`
+            : undefined
+        }
+        avatarChar={modalDate ? `${new Date(modalDate).getDate()}` : undefined}
+        avatarColor="bg-indigo-600"
+        className="max-w-2xl"
+      >
+        <div className="max-h-[400px] overflow-y-auto no-scrollbar">
+          <AnimatedList
+            items={getEventsForDate(modalDate).map((event) => (
+              <div
+                key={event.id}
+                className={`bg-white border border-gray-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm hover:shadow-lg transition-all duration-300 w-full ${
+                  event.type === "Online Zoom Class"
+                    ? "border-blue-200"
+                    : event.type === "Physical Class"
+                      ? "border-yellow-200"
+                      : event.type === "Assignment"
+                        ? "border-green-200"
+                        : event.type === "Holiday"
+                          ? "border-purple-200"
+                          : "border-gray-200"
+                }`}
+              >
+                <div className="flex items-center gap-2 justify-between">
+                  <span className="font-bold text-gray-900 text-base tracking-tight line-clamp-2" title={event.title}>
+                    {event.title}
+                  </span>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full font-bold ml-2 ${
                       event.type === "Online Zoom Class"
-                        ? "border-blue-200"
+                        ? "bg-blue-100 text-blue-700"
                         : event.type === "Physical Class"
-                          ? "border-yellow-200"
+                          ? "bg-yellow-100 text-yellow-700"
                           : event.type === "Assignment"
-                            ? "border-green-200"
+                            ? "bg-green-100 text-green-700"
                             : event.type === "Holiday"
-                              ? "border-purple-200"
-                              : "border-gray-200"
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-gray-100 text-gray-700"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-base">{event.title}</span>
-                      <span
-                        className={`text-xs px-2 py-1 rounded border ml-2 font-semibold ${typeBadge[event.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
-                      >
-                        {event.type}
-                      </span>
-                    </div>
-                    {event.topic && (
-                      <div className="text-sm text-blue-600 mt-1">
-                        {event.topic}
-                      </div>
-                    )}
-                    <div className="text-xs text-gray-500 mt-1">
-                      {event.date} {event.startTime && `| ${event.startTime}`}
-                    </div>
+                    {event.type}
+                  </span>
+                </div>
+                {event.topic && (
+                  <div className="text-xs text-blue-600 mt-1">
+                    {event.topic}
                   </div>
-                ))}
-                displayScrollbar={false}
-                showGradients={false}
-                itemClassName=""
-                onItemSelect={() => {}}
-              />
-              {getEventsForDate(modalDate).length === 0 && (
-                <div className="text-gray-400">No events for this day.</div>
-              )}
-            </div>
-          </div>
+                )}
+                <div className="text-xs text-gray-500 mt-1">
+                  {event.date} {event.startTime && `| ${event.startTime}`}
+                </div>
+              </div>
+            ))}
+            displayScrollbar={false}
+            showGradients={false}
+            itemClassName=""
+            onItemSelect={() => {}}
+          />
+          {modalDate && getEventsForDate(modalDate).length === 0 && (
+            <div className="text-gray-400">No events for this day.</div>
+          )}
         </div>
-      )}
+      </ModernModal>
     </div>
   );
 };

@@ -203,28 +203,38 @@ export default function AdminDashboard() {
 
                 {/* Only the new list view is rendered */}
                 <div className="flex-1 max-h-[420px] overflow-y-auto pr-1">
-                  <div className="flex flex-col space-y-4">
+                  <div className="flex flex-col gap-5">
                     {todaysClasses.map((cls) => (
                       <div
                         key={cls.id}
-                        className="group bg-gray-50/50 hover:bg-white border border-gray-100 hover:border-indigo-100 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/[0.05]"
+                        className="bg-white border border-gray-100 rounded-2xl p-6 flex flex-col gap-3 shadow-sm hover:shadow-lg transition-all duration-300"
                       >
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-start gap-4">
                           <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 ${cls.status === "ongoing" ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50" : "bg-white text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 mt-1 ${cls.status === "ongoing" ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}
                           >
-                            <Video size={20} />
+                            <Video size={22} />
                           </div>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-gray-900 text-base group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
-                              {cls.title}
-                            </span>
-                            <span className="text-xs text-gray-500 font-semibold">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors tracking-tight line-clamp-2"
+                                title={cls.title}
+                              >
+                                {cls.title}
+                              </span>
+                              {cls.status === "ongoing" && (
+                                <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full animate-pulse">
+                                  LIVE
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 font-semibold mt-1 truncate">
                               {cls.courseName} &bull; {cls.platform}
-                            </span>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between mt-2 md:mt-0 md:flex-col md:items-end md:gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
                           <span className="text-xs text-gray-400 font-bold">
                             {cls.startTime} - {cls.endTime}
                           </span>
@@ -233,7 +243,7 @@ export default function AdminDashboard() {
                               href={cls.joinUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm text-center mt-2 md:mt-0"
+                              className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm text-center"
                             >
                               Spectate
                             </a>
