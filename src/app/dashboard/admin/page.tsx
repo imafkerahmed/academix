@@ -99,6 +99,14 @@ const statsData = [
     iconColor: "text-orange-600",
     trend: { value: "0.8%", isPositive: false },
   },
+  {
+    title: "Total Courses",
+    value: 27,
+    icon: BookOpen,
+    bgColor: "bg-purple-50",
+    iconColor: "text-purple-600",
+    trend: { value: "1.7%", isPositive: true },
+  },
 ];
 
 export default function AdminDashboard() {
@@ -120,12 +128,21 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50 flex font-sans">
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden transition-all duration-300">
         <main className="p-4 md:p-6 lg:p-8 flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
-          {/* Header Section */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 group">
-            <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-              <h1 className="text-4xl thfont-black text-gray-900 tracking-tight">
-                Dashboard <span className="text-indigo-600">Overview</span>
-              </h1>
+          {/* Header Section - Consistent with subpages */}
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex items-center gap-6">
+              <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+                <Layout size={40} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                  Dashboard <span className="text-indigo-600">Overview</span>
+                </h1>
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                  <TrendingUp size={14} className="text-indigo-400" />
+                  Insights & Quick Stats
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <DateTimeStatCard />
@@ -184,103 +201,48 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                <div className="flex-1 space-y-4">
-                  {todaysClasses.map((cls) => (
-                    <div
-                      key={cls.id}
-                      className="group bg-gray-50/50 hover:bg-white border border-gray-100 hover:border-indigo-100 rounded-[1.8rem] p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/[0.05]"
-                    >
-                      <div className="flex items-center gap-5">
-                        <div
-                          className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all duration-300 ${cls.status === "ongoing" ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50" : "bg-white text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}
-                        >
-                          <Video size={24} />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
-                            {cls.title}
-                          </span>
-                          <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                            <span className="text-indigo-500">
-                              {cls.courseName}
+                {/* Only the new list view is rendered */}
+                <div className="flex-1 max-h-[420px] overflow-y-auto pr-1">
+                  <div className="flex flex-col space-y-4">
+                    {todaysClasses.map((cls) => (
+                      <div
+                        key={cls.id}
+                        className="group bg-gray-50/50 hover:bg-white border border-gray-100 hover:border-indigo-100 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/[0.05]"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 ${cls.status === "ongoing" ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50" : "bg-white text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}
+                          >
+                            <Video size={20} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-900 text-base group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
+                              {cls.title}
                             </span>
-                            <span>•</span>
-                            <span>{cls.platform}</span>
-                            {cls.status === "ongoing" && (
-                              <span className="flex items-center gap-1 text-green-500 ml-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />{" "}
-                                LIVE
-                              </span>
-                            )}
+                            <span className="text-xs text-gray-500 font-semibold">
+                              {cls.courseName} &bull; {cls.platform}
+                            </span>
                           </div>
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-6">
-                        <div className="flex flex-col items-end">
-                          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">
-                            Session Timing
-                          </span>
-                          <div className="flex items-center gap-2 font-bold text-gray-900">
-                            <Clock size={14} className="text-indigo-400" />
+                        <div className="flex items-center justify-between mt-2 md:mt-0 md:flex-col md:items-end md:gap-2">
+                          <span className="text-xs text-gray-400 font-bold">
                             {cls.startTime} - {cls.endTime}
-                          </div>
+                          </span>
+                          {cls.joinUrl && (
+                            <a
+                              href={cls.joinUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm text-center mt-2 md:mt-0"
+                            >
+                              Spectate
+                            </a>
+                          )}
                         </div>
-                        {cls.joinUrl && (
-                          <button className="px-6 py-3 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95 uppercase">
-                            Spectate
-                          </button>
-                        )}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quick Insights Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  {
-                    label: "Active Sessions",
-                    value: "12",
-                    icon: Zap,
-                    color: "text-amber-500",
-                    bg: "bg-amber-50",
-                  },
-                  {
-                    label: "New Notifications",
-                    value: "08",
-                    icon: Bell,
-                    color: "text-indigo-500",
-                    bg: "bg-indigo-50",
-                  },
-                  {
-                    label: "Live Traffic",
-                    value: "High",
-                    icon: Activity,
-                    color: "text-green-500",
-                    bg: "bg-green-50",
-                  },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="bg-white rounded-[2rem] border border-gray-100 p-6 flex items-center gap-5 hover:shadow-lg transition-all duration-300 group"
-                  >
-                    <div
-                      className={`w-12 h-12 ${item.bg} ${item.color} rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-sm`}
-                    >
-                      <item.icon size={20} />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                        {item.label}
-                      </span>
-                      <span className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
-                        {item.value}
-                      </span>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
             </div>
           </div>
