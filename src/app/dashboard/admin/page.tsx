@@ -123,7 +123,7 @@ export default function AdminDashboard() {
           {/* Header Section */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 group">
             <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-              <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+              <h1 className="text-4xl thfont-black text-gray-900 tracking-tight">
                 Dashboard <span className="text-indigo-600">Overview</span>
               </h1>
             </div>
@@ -145,23 +145,25 @@ export default function AdminDashboard() {
 
           {/* Main Grid: 2 Column Desktop */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 w-full max-w-full overflow-x-hidden">
-            {/* Left: Calendar - 5 cols */}
-            <div className="lg:col-span-5 flex flex-col gap-6 animate-in fade-in slide-in-from-left-6 duration-700">
-              <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-2 overflow-hidden h-full min-h-[400px] hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
-                <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                    <CalendarIcon size={16} className="text-indigo-500" />{" "}
+            {/* Calendar: Make more prominent on desktop */}
+            <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6 animate-in fade-in slide-in-from-left-6 duration-700">
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-2 lg:p-4 overflow-hidden hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02] flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg lg:text-xl font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                    <CalendarIcon size={20} className="text-indigo-500" />{" "}
                     Academic Calendar
                   </h3>
                 </div>
-                <div className="p-4 h-full">
-                  <Calendar />
+                <div className="flex items-start justify-center">
+                  <div className="w-full">
+                    <Calendar />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Right: Today's Classes & Quick Actions - 7 cols */}
-            <div className="lg:col-span-7 flex flex-col gap-8 animate-in fade-in slide-in-from-right-6 duration-700">
+            {/* Right: Today's Classes & Quick Insights */}
+            <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-8 animate-in fade-in slide-in-from-right-6 duration-700">
               {/* Today's Classes Card */}
               <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col min-h-[400px] hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
                 <div className="flex justify-between items-center mb-8">
