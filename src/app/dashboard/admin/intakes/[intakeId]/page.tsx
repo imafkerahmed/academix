@@ -4,6 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import AdminActionBar from "@/components/admin/AdminActionBar";
+import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 import {
   Plus,
   Filter,
@@ -230,6 +231,12 @@ export default function IntakeDetailsPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans">
+      <AdminBreadcrumbs
+        items={[
+          { label: "Intakes", href: "/dashboard/admin/intakes" },
+          { label: intake.code },
+        ]}
+      />
       {/* Intake Details Card */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-8 flex flex-col gap-8 transition-all hover:shadow-md">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">

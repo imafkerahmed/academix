@@ -6,6 +6,7 @@ import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
+import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 import {
   DollarSign,
   CheckCircle,

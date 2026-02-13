@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { ModernModal } from "@/components/ui/modern-modal";
 import AdminActionBar from "@/components/admin/AdminActionBar";
+import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 
 // --- Mock Data ---
 const mockIntakes = [
@@ -235,6 +236,16 @@ export default function CourseDetailsPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans">
+      <AdminBreadcrumbs
+        items={[
+          { label: "Intakes", href: "/dashboard/admin/intakes" },
+          {
+            label: intake?.code || "Intake",
+            href: intake ? `/dashboard/admin/intakes/${intake.id}` : undefined,
+          },
+          { label: course?.name || "Course" },
+        ]}
+      />
       {/* Header Card */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 mb-8 flex flex-col gap-8 transition-all hover:shadow-md">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">

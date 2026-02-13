@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
+import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 import { useRouter } from "next/navigation";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +140,7 @@ export default function IntakeCourseManagement() {
       <main className="p-4 md:p-6 lg:p-8 space-y-8">
         {/* Mobile Header */}
         <div className="lg:hidden flex items-center justify-between mb-4">
+          <AdminBreadcrumbs items={[{ label: "Intakes" }]} />
           <button
             onClick={() => setIsSidebarOpen(true)}
             className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"

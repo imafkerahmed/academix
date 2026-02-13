@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 
 interface Submission {
   id: string;
@@ -355,6 +356,12 @@ export default function AdminAssignmentSubmissionsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-2 md:px-6 md:py-3 pt-8 relative">
+      <AdminBreadcrumbs
+        items={[
+          { label: "Assignments", href: "/dashboard/admin/assignments" },
+          { label: assignment?.title || "Assignment" },
+        ]}
+      />
       <div className="max-w-6xl mx-auto space-y-4">
         <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <DialogContent className="sm:max-w-4xl h-[80vh] flex flex-col">
