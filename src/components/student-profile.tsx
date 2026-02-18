@@ -10,6 +10,8 @@ interface StudentProfileProps {
   accountStatus: string;
   advisorName: string;
   advisorEmail: string;
+  compact?: boolean;
+  avatarSize?: "default" | "large";
 }
 
 export default function StudentProfile({
@@ -20,35 +22,40 @@ export default function StudentProfile({
   accountStatus,
   advisorName,
   advisorEmail,
+  compact = false,
+  avatarSize = "default",
 }: StudentProfileProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 md:gap-10 items-center">
+    <div
+      className={`flex ${compact ? "flex-row gap-3" : "flex-col md:flex-row gap-6 md:gap-8"} items-center min-h-0`}
+    >
       {/* Avatar and Role Badge */}
       <div className="flex flex-col items-center gap-3 shrink-0">
-        <div className="relative">
+        <div className="relative flex flex-col items-center">
           <img
             src={avatarUrl}
             alt={fullName}
-            className="w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-blue-400 shadow-lg"
+            className={`object-cover border-4 border-blue-400 shadow-lg ${
+              avatarSize === "large"
+                ? "w-32 h-32 md:w-48 md:h-48"
+                : compact
+                  ? "w-24 h-24"
+                  : "w-28 h-28 md:w-44 md:h-44"
+            } rounded-[1.25rem]`}
           />
-          <div
-            className={`absolute -bottom-2 -right-2 w-8 h-8 md:w-10 md:h-10 rounded-full border-4 border-white shadow-md ${
-              accountStatus === "Active" ? "bg-green-500" : "bg-red-500"
-            }`}
-          ></div>
+          <span className="mt-3 px-4 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full text-xs font-bold uppercase tracking-wider shadow-md">
+            {role}
+          </span>
         </div>
-        <span className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full text-xs font-bold uppercase tracking-wider shadow-md">
-          {role}
-        </span>
       </div>
 
       {/* Details */}
       <div className="flex flex-col flex-1 gap-5 w-full">
         {/* Name and ID */}
-        <div className="space-y-1 text-center md:text-left">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+        <div className="space-y-1 text-center md:text-left min-w-0">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight break-words">
             {fullName}
           </h2>
           <p className="text-sm text-gray-500 font-medium">
@@ -81,9 +88,9 @@ export default function StudentProfile({
 
         {/* Collapsible Content - Hidden on mobile unless expanded, always visible on desktop */}
         <div
-          className={`transition-all duration-300 ease-in-out overflow-hidden md:!flex md:!flex-col md:!gap-5 md:!max-h-none md:!opacity-100 ${
+          className={`transition-all duration-300 ease-in-out overflow-hidden md:!flex md:!flex-col md:!gap-4 md:!max-h-none md:!opacity-100 ${
             isExpanded
-              ? "flex flex-col gap-5 max-h-[1000px] opacity-100"
+              ? "flex flex-col gap-4 max-h-[1000px] opacity-100"
               : "max-h-0 opacity-0"
           }`}
         >
@@ -117,10 +124,10 @@ export default function StudentProfile({
           </div>
 
           {/* Academic Advisor */}
-          <div className="p-3 md:p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100 shadow-sm">
+          <div className="p-2 md:p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100 shadow-sm">
             <div className="flex items-center gap-2 mb-1.5 md:mb-3">
               <svg
-                className="w-4 h-4 md:w-6 md:h-6 text-blue-600"
+                className="w-4 h-4 md:w-5 md:h-5 text-blue-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -137,14 +144,14 @@ export default function StudentProfile({
               </h3>
             </div>
             <p className="text-sm md:text-lg font-semibold text-gray-900 mb-0.5 md:mb-2">
-              {advisorName}
+              <span className="text-sm md:text-base">{advisorName}</span>
             </p>
             <a
               href={`mailto:${advisorEmail}`}
-              className="inline-flex items-center gap-1 text-sm md:text-base text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
+              className="inline-flex items-center gap-1 text-xs md:text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
             >
               <svg
-                className="w-4 h-4 md:w-5 md:h-5"
+                className="w-3 h-3 md:w-4 md:h-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

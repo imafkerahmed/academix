@@ -1061,38 +1061,289 @@ function AssignmentsTab({ groupedAssignments, onAdd, onView, router }: any) {
 }
 
 function MaterialsTab() {
-  const mats = [
+  // Mock subjects and materials for demonstration
+  const subjects = [
+    { id: "subj-1", name: "Algebra" },
+    { id: "subj-2", name: "Calculus" },
+    { id: "subj-3", name: "Geometry" },
+  ];
+  const initialMaterials = [
     {
-      title: "Course Introduction.pdf",
+      id: "mat-1",
+      title: "Lecture Notes.pdf",
       type: "document",
-      date: "Jan 12, 2026",
+      subjectId: "subj-1",
+      date: "2026-01-15",
     },
-    { title: "Weekly Seminar Recap.mp4", type: "video", date: "Jan 15, 2026" },
-    { title: "Calculus Deep Dive.pdf", type: "document", date: "Jan 18, 2026" },
+    {
+      id: "mat-2",
+      title: "Syllabus.docx",
+      type: "document",
+      subjectId: "subj-1",
+      date: "2026-01-20",
+    },
+    {
+      id: "mat-3",
+      title: "Intro Video",
+      type: "video",
+      subjectId: "subj-1",
+      date: "2026-01-21",
+      videoUrl: "https://youtu.be/example",
+    },
+    {
+      id: "mat-4",
+      title: "Calculus Deep Dive.pdf",
+      type: "document",
+      subjectId: "subj-2",
+      date: "2026-01-18",
+    },
+    {
+      id: "mat-5",
+      title: "Limits Explained",
+      type: "video",
+      subjectId: "subj-2",
+      date: "2026-01-22",
+      videoUrl: "https://youtu.be/example2",
+    },
   ];
 
+  const [materials, setMaterials] = useState(initialMaterials);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formData, setFormData] = useState<{
+    title: string;
+    type: string;
+    subjectId: string;
+    file: string | null;
+    videoUrl: string;
+  }>({
+    title: "",
+    type: "document",
+    subjectId: subjects[0].id,
+    file: null,
+    videoUrl: "",
+  });
+
+  interface Material {
+    id: string;
+    title: string;
+    type: "document" | "video";
+    subjectId: string;
+    date: string;
+    file?: string | null;
+    videoUrl?: string;
+  }
+
+  interface MaterialFormData {
+    title: string;
+    type: "document" | "video";
+    subjectId: string;
+    file: string | null;
+    videoUrl: string;
+  }
+
+  const handleAddMaterial = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!formData.title || !formData.subjectId) return;
+    setMaterials([
+      {
+        id: `mat-${Date.now()}`,
+        title: formData.title,
+        type: formData.type,
+        subjectId: formData.subjectId,
+        date: new Date().toISOString().slice(0, 10),
+        file: formData.type === "document" ? formData.file : undefined,
+        videoUrl: formData.type === "video" ? formData.videoUrl : undefined,
+      } as Material,
+      ...materials,
+    ]);
+    setShowAddForm(false);
+    setFormData({
+      title: "",
+      type: "document",
+      subjectId: subjects[0].id,
+      file: null,
+      videoUrl: "",
+    });
+  };
+
+  // Group materials by subject and type
+  const grouped = subjects.map((subject) => ({
+    ...subject,
+    documents: materials.filter(
+      (m) => m.subjectId === subject.id && m.type === "document",
+    ),
+    videos: materials.filter(
+      (m) => m.subjectId === subject.id && m.type === "video",
+    ),
+  }));
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {mats.map((m, i) => (
-        <div
-          key={i}
-          className="bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm group hover:shadow-xl hover:translate-y-[-4px] transition-all"
+    <div className="space-y-8">
+      <div className="flex justify-end">
+        <button
+          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-xs tracking-widest shadow-xl shadow-indigo-100 transition-all active:scale-95"
+          onClick={() => setShowAddForm((v) => !v)}
         >
-          <div
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 shadow-sm ring-4 ring-opacity-50 ${m.type === "video" ? "bg-amber-100 text-amber-600 ring-amber-50" : "bg-red-100 text-red-600 ring-red-50"}`}
-          >
-            {m.type === "video" ? <Video size={24} /> : <Download size={24} />}
+          {showAddForm ? "Cancel" : "+ Add Material"}
+        </button>
+      </div>
+      {showAddForm && (
+        <form
+          className="bg-white border border-gray-100 rounded-2xl p-6 mb-6"
+          onSubmit={handleAddMaterial}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Title *
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="Enter material title"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Subject *
+              </label>
+              <select
+                value={formData.subjectId}
+                onChange={(e) =>
+                  setFormData({ ...formData, subjectId: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                required
+              >
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Type
+              </label>
+              <select
+                value={formData.type}
+                onChange={(e) =>
+                  setFormData({ ...formData, type: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="document">Document (.pdf, .docx, .pptx)</option>
+                <option value="video">Video (YouTube or local)</option>
+              </select>
+            </div>
+            {formData.type === "video" ? (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Video URL (YouTube or local)
+                </label>
+                <input
+                  type="url"
+                  value={formData.videoUrl}
+                  onChange={(e) =>
+                    setFormData({ ...formData, videoUrl: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="https://youtube.com/... or local video URL"
+                  required
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Document File (mock)
+                </label>
+                <input
+                  type="text"
+                  value={formData.file || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, file: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="file-name.pdf"
+                  required
+                />
+              </div>
+            )}
           </div>
-          <h4 className="font-bold text-gray-900 mb-2 truncate group-hover:text-indigo-600 transition-colors">
-            {m.title}
-          </h4>
-          <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              {m.date}
-            </span>
-            <button className="text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:underline">
-              Download
+          <div className="mt-4 flex gap-2">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
+            >
+              Add Material
             </button>
+          </div>
+        </form>
+      )}
+      {grouped.map((subject) => (
+        <div
+          key={subject.id}
+          className="bg-white rounded-2xl border border-gray-100 p-6"
+        >
+          <h3 className="text-lg font-bold text-gray-900 mb-4">
+            {subject.name}
+          </h3>
+          <div className="mb-4">
+            <h4 className="font-semibold text-gray-700 mb-2">Documents</h4>
+            {subject.documents.length === 0 ? (
+              <div className="text-gray-400 text-sm mb-2">
+                No documents uploaded.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {subject.documents.map((doc) => (
+                  <li
+                    key={doc.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100"
+                  >
+                    <span className="font-medium text-gray-900">
+                      {doc.title}
+                    </span>
+                    <span className="text-xs text-gray-400">{doc.date}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="font-semibold text-gray-700 mb-2">Videos</h4>
+            {subject.videos.length === 0 ? (
+              <div className="text-gray-400 text-sm mb-2">
+                No videos uploaded.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {subject.videos.map((vid) => (
+                  <li
+                    key={vid.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100"
+                  >
+                    <span className="font-medium text-gray-900">
+                      {vid.title}
+                    </span>
+                    <a
+                      href={vid.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-600 hover:underline"
+                    >
+                      View Video
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       ))}

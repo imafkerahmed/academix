@@ -142,22 +142,6 @@ export default function AssignmentManagement() {
   return (
     <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
       <main className="p-4 md:p-6 lg:p-8 space-y-8">
-        {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between mb-4">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
-          >
-            <Menu size={24} />
-          </button>
-          <h1 className="text-xl font-black text-gray-900 tracking-tighter uppercase">
-            Academix
-          </h1>
-          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-            <FileText size={20} />
-          </div>
-        </div>
-
         {/* Page Header Card */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-6">

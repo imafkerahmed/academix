@@ -388,8 +388,8 @@ export default function AssignmentMarkingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-2 md:px-6 md:py-3 pt-8 relative">
-      <div className="max-w-6xl mx-auto space-y-2">
+    <div className="min-h-screen bg-gray-50 px-4 py-4 md:px-8 md:py-6 pt-6 relative lg:ml-64">
+      <div className="max-w-6xl mx-auto space-y-4">
         <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <DialogContent className="sm:max-w-4xl h-[80vh] flex flex-col">
             <DialogHeader>
@@ -444,108 +444,101 @@ export default function AssignmentMarkingPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 mt-8">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full"
+        {/* Header Card */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-4">
+            <button
               onClick={() => router.push("/dashboard/lecturer")}
+              className="p-3 bg-gray-50 border border-gray-100 rounded-2xl text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all"
             >
               <ArrowLeft size={18} />
-            </Button>
+            </button>
+            <div className="w-14 h-14 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl shadow-indigo-100 ring-4 ring-indigo-50">
+              <FileText size={28} />
+            </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">
                 {assignment.title}
               </h1>
-              <p className="text-sm text-gray-600">
-                {assignment.subjectCode} - {assignment.subjectName}
-                {assignment.courseName}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Intake: {assignment.intakeName} · Due: {assignment.dueDate}
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                {assignment.subjectCode} · {assignment.subjectName} · Due:{" "}
+                {assignment.dueDate}
               </p>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-4 text-sm text-gray-600">
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+          <div className="flex items-center gap-3">
+            <button
+              className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
               onClick={handleExportMarksheet}
             >
-              <FileSpreadsheet className="w-4 h-4 mr-1.5" />
-              Export marksheet
-            </Button>
+              <FileSpreadsheet className="w-4 h-4" />
+              Export Marksheet
+            </button>
           </div>
         </div>
 
-        {/* Filters (mobile summary below header) */}
-        <div className="flex flex-wrap items-center justify-start md:justify-end gap-2 md:gap-3">
-          <div className="flex flex-wrap gap-1.5 md:gap-2 text-xs md:text-sm">
-            {/* Filter tabs with counts */}
-            {(
-              [
-                {
-                  id: "submitted",
-                  label: "Submitted",
-                  count: stats.submitted,
-                  icon: Clock,
-                  iconColor: "text-amber-600",
-                },
-                {
-                  id: "not_submitted",
-                  label: "Not submitted",
-                  count: stats.notSubmitted,
-                  icon: X,
-                  iconColor: "text-gray-500",
-                },
-                {
-                  id: "marked",
-                  label: "Marked",
-                  count: stats.marked,
-                  icon: CheckCircle2,
-                  iconColor: "text-green-600",
-                },
-                {
-                  id: "resubmission",
-                  label: "Resubmission",
-                  count: assignment.submissions.filter((s) => s.canResubmit)
-                    .length,
-                  icon: RotateCcw,
-                  iconColor: "text-purple-600",
-                },
-              ] as const
-            ).map((f) => {
-              const IconComponent = f.icon;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setFilter(f.id)}
-                  className={`flex items-center gap-1 px-2 md:px-3 py-1 rounded-full border text-[11px] md:text-sm font-medium transition-colors ${
-                    filter === f.id
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  <IconComponent
-                    size={12}
-                    className={`md:w-[14px] md:h-[14px] ${filter === f.id ? "text-white" : f.iconColor}`}
-                  />
-                  {f.label} ({f.count})
-                </button>
-              );
-            })}
-          </div>
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          {(
+            [
+              {
+                id: "submitted",
+                label: "Submitted",
+                count: stats.submitted,
+                icon: Clock,
+                iconColor: "text-amber-600",
+              },
+              {
+                id: "not_submitted",
+                label: "Not submitted",
+                count: stats.notSubmitted,
+                icon: X,
+                iconColor: "text-gray-500",
+              },
+              {
+                id: "marked",
+                label: "Marked",
+                count: stats.marked,
+                icon: CheckCircle2,
+                iconColor: "text-green-600",
+              },
+              {
+                id: "resubmission",
+                label: "Resubmission",
+                count: assignment.submissions.filter((s) => s.canResubmit)
+                  .length,
+                icon: RotateCcw,
+                iconColor: "text-purple-600",
+              },
+            ] as const
+          ).map((f) => {
+            const IconComponent = f.icon;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                  filter === f.id
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100"
+                    : "bg-white text-gray-500 border-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100"
+                }`}
+              >
+                <IconComponent
+                  size={12}
+                  className={filter === f.id ? "text-white" : f.iconColor}
+                />
+                {f.label} ({f.count})
+              </button>
+            );
+          })}
         </div>
 
         {/* Main layout */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 items-start">
-          {/* Left column: assignment card + submissions list - visible on all screens */}
-          <div className="flex flex-col space-y-2 lg:col-span-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-start">
+          {/* Left column: assignment card + submissions list */}
+          <div className="flex flex-col space-y-3 lg:col-span-1">
             <div
-              className="bg-white rounded-lg shadow-sm border border-gray-200 px-3 py-2 space-y-1 cursor-pointer hover:bg-gray-50 transition-colors"
+              className="bg-white rounded-[2rem] shadow-sm border border-gray-100 px-5 py-4 space-y-1 cursor-pointer hover:shadow-md hover:border-indigo-100 transition-all"
               role="button"
               tabIndex={0}
               onClick={() => setIsSheetOpen(true)}
@@ -557,25 +550,25 @@ export default function AssignmentMarkingPage() {
               }}
             >
               <div className="space-y-0.5">
-                <h2 className="text-sm font-semibold text-gray-900">
-                  Assignment sheet & instructions
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">
+                  Assignment Sheet
                 </h2>
-                <p className="text-xs text-gray-500">
-                  Click to view assignment PDF and instructions.
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                  Click to view PDF & instructions
                 </p>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-900">
+            <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">
                   Submissions
                 </h2>
-                <span className="text-xs text-gray-500">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   {filteredSubmissions.length} shown
                 </span>
               </div>
-              <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
+              <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
                 {filteredSubmissions.map((s) => (
                   <button
                     key={s.id}
@@ -585,8 +578,10 @@ export default function AssignmentMarkingPage() {
                         setIsMobileMarkingModalOpen(true);
                       }
                     }}
-                    className={`w-full text-left px-4 py-3 flex flex-col gap-1 hover:bg-gray-50 transition-colors ${
-                      selectedSubmissionId === s.id ? "bg-blue-50" : "bg-white"
+                    className={`w-full text-left px-5 py-3 flex flex-col gap-1 hover:bg-indigo-50/50 transition-colors ${
+                      selectedSubmissionId === s.id
+                        ? "bg-indigo-50"
+                        : "bg-white"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -629,7 +624,7 @@ export default function AssignmentMarkingPage() {
           </div>
 
           {/* Marking panel - hidden on mobile, visible on md+ */}
-          <div className="hidden md:block bg-white rounded-lg shadow-sm border border-gray-200 md:col-span-2 lg:col-span-3">
+          <div className="hidden md:block bg-white rounded-[2rem] shadow-sm border border-gray-100 md:col-span-2 lg:col-span-3">
             <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2">
               <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
                 <h2 className="text-sm font-semibold text-gray-900 truncate">

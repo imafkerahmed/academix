@@ -1,12 +1,11 @@
 "use client";
 
 import React from "react";
-import { LucideIcon } from "lucide-react";
 
 interface AdminStatsCardProps {
   title: string;
   value: string | number;
-  icon: LucideIcon;
+  icon: React.ComponentType<any>;
   bgColor: string;
   iconColor: string;
   trend?: {

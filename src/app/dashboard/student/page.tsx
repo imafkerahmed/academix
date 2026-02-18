@@ -1,14 +1,20 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import GradientText from "@/components/ui/GradientText";
-import NotificationButton from "@/components/ui/notification-button";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import CourseList from "@/components/CourseList";
-import Calendar from "@/components/Calendar";
-import Section5Schedules from "@/components/Schedules";
+import React from "react";
+import {
+  LayoutDashboard,
+  TrendingUp,
+  Calendar as CalendarIcon,
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  GraduationCap,
+} from "lucide-react";
+import StatsCarousel from "@/components/admin/StatsCarousel";
+import AdminStatsCard from "@/components/admin/AdminStatsCard";
 import StudentProfile from "@/components/student-profile";
-import StudentPayment from "@/components/student-payment";
+import Section5Schedules from "@/components/Schedules";
+import Calendar from "@/components/Calendar";
 
 const courses = [
   {
@@ -46,153 +52,91 @@ const courses = [
 ];
 
 export default function StudentDashboard() {
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [showLogout, setShowLogout] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Animation durations (ms)
-  const OPEN_DURATION = 900;
-  const CLOSE_DURATION = 1500;
-
-  // Handle animation mount/unmount
-  React.useEffect(() => {
-    if (showNotifications) {
-      setDrawerVisible(true);
-      // Small delay to ensure the drawer is mounted before animation starts
-      const animationTimeout = setTimeout(() => {
-        // This forces a reflow, allowing the animation to play
-      }, 10);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      return () => clearTimeout(animationTimeout);
-    } else if (drawerVisible) {
-      timeoutRef.current = setTimeout(
-        () => setDrawerVisible(false),
-        CLOSE_DURATION,
-      );
-    }
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [showNotifications, drawerVisible]);
-
-  const handleCloseNotifications = () => {
-    setShowNotifications(false);
-  };
+  const statsData = [
+    {
+      title: "Enrolled Courses",
+      value: courses.length,
+      icon: BookOpen,
+      bgColor: "bg-blue-50",
+      iconColor: "text-blue-600",
+      trend: { value: "Active", isPositive: true },
+    },
+    {
+      title: "Completed",
+      value: courses.filter((c) => c.courseStatus === "Completed").length,
+      icon: CheckCircle2,
+      bgColor: "bg-green-50",
+      iconColor: "text-green-600",
+      trend: { value: "Finished", isPositive: true },
+    },
+    {
+      title: "In Progress",
+      value: courses.filter((c) => c.courseStatus === "Ongoing").length,
+      icon: Clock,
+      bgColor: "bg-amber-50",
+      iconColor: "text-amber-600",
+      trend: { value: "Ongoing", isPositive: true },
+    },
+    {
+      title: "Certificates",
+      value: courses.filter((c) => c.certificateStatus === "Issued").length,
+      icon: GraduationCap,
+      bgColor: "bg-indigo-50",
+      iconColor: "text-indigo-600",
+      trend: { value: "Issued", isPositive: true },
+    },
+  ];
 
   return (
-    <div className="min-h-screen pt-20">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 md:px-12 py-4 bg-white shadow">
-        {/* Left: Title with SplitText */}
-        <div className="flex items-center">
-          <GradientText className="text-2xl font-bold ml-0 md:ml-8">
-            ACADEMIX
-          </GradientText>
-        </div>
-        {/* Right: Notification Button and Profile Icon */}
-        <div className="flex items-center gap-2 md:gap-4 mr-0 md:mr-8 relative">
-          <NotificationButton
-            onClick={() => setShowNotifications(true)}
-            aria-label="Show notifications"
-          />
-          <button
-            className="p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            onClick={() => setShowLogout((prev) => !prev)}
-            aria-label="Account menu"
-          >
-            <AccountCircleIcon style={{ fontSize: 32, color: "black" }} />
-          </button>
-          {showLogout && (
-            <div className="absolute right-0 top-14 mt-2 w-40 bg-white border border-gray-200 rounded shadow-lg z-50 animate-dropdown">
-              <button
-                className="w-full text-left px-4 py-2 hover:bg-gray-100"
-                onClick={() => {
-                  setShowLogout(false);
-                  // Add your view profile logic here
-                }}
-              >
-                View Profile
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
-                onClick={() => {
-                  setShowLogout(false);
-                  // Add your logout logic here
-                }}
-              >
-                Logout
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-      {/* Notification Drawer */}
-      {drawerVisible && (
-        <div
-          className={`
-            fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-lg z-[60] flex flex-col border-l border-gray-200
-            transition-transform transition-opacity translate-x-full opacity-0
-            ${
-              showNotifications
-                ? `duration-[${OPEN_DURATION}ms] !translate-x-0 !opacity-100`
-                : `duration-[${CLOSE_DURATION}ms] pointer-events-none`
-            }
-          `}
-        >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 mt-0 pt-6">
-            <span className="font-semibold text-lg">Notifications</span>
-            <button
-              className="text-gray-500 hover:text-gray-800 text-2xl font-bold"
-              onClick={handleCloseNotifications}
-              aria-label="Close notifications"
-            >
-              &times;
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {/* Placeholder for notifications */}
-            <div className="text-gray-500 text-center mt-8">
-              No notifications yet.
-            </div>
+    <>
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+        {/* Profile */}
+        <div className="lg:col-span-6 xl:col-span-6 min-w-0">
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500">
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-6">
+              My <span className="text-indigo-600">Profile</span>
+            </h3>
+            <StudentProfile
+              fullName="Mohammed Inayathullah Afker Ahmed"
+              studentId="REG-2024-XYZ"
+              role="STUDENT"
+              avatarUrl="/profile-img.jpg"
+              accountStatus="Active"
+              advisorName="Dr. Sarah Johnson"
+              advisorEmail="sarah.johnson@academix.edu"
+              compact={true}
+            />
           </div>
         </div>
-      )}
-      {/* Main Grid Layout */}
 
-      <div className="grid gap-4 p-4 sm:p-6 md:p-8 grid-cols-1 grid-rows-none md:grid-cols-4 md:grid-rows-3">
-        {/* Section 1: Student Profile */}
-        <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-4 md:p-6 col-span-1 md:col-span-2 md:col-start-1 md:row-start-1">
-          <StudentProfile
-            fullName="Mohammed Inayathullah Afker Ahmed"
-            studentId="REG-2024-XYZ"
-            role="STUDENT"
-            avatarUrl="/profile-img.jpg"
-            accountStatus="Active"
-            advisorName="Dr. Sarah Johnson"
-            advisorEmail="sarah.johnson@academix.edu"
-          />
+        {/* Schedules */}
+        <div className="lg:col-span-6 xl:col-span-6 min-w-0">
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500">
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-6">
+              Upcoming <span className="text-indigo-600">Schedules</span>
+            </h3>
+            <Section5Schedules />
+          </div>
         </div>
-        {/* Section 2: Enrolled Courses */}
-        <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-4 md:row-span-2 md:col-start-1 md:row-start-2 flex flex-col">
-          <h2 className="text-xl font-semibold mb-4">Enrolled Courses</h2>
-          <CourseList courses={courses} />
-        </div>
-        {/* Merged Section 3 & 4: Calendar */}
-        <div className="border border-gray-300 rounded-xl min-w-0 w-full h-full md:col-span-3 md:row-span-2 md:col-start-2 md:row-start-2 p-4 flex flex-col">
-          <h2 className="text-xl font-semibold mb-4">Calendar</h2>
-          <div className="flex-1 min-h-0">
+      </div>
+
+      {/* Calendar Section */}
+      <div className="mt-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+              <CalendarIcon size={24} />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+              Academic <span className="text-indigo-600">Calendar</span>
+            </h3>
+          </div>
+          <div className="h-[600px]">
             <Calendar />
           </div>
         </div>
-        {/* Section 5 */}
-        {/* Section 5: Upcoming Schedules */}
-        <Section5Schedules />
-        {/* Section 6: Payments */}
-        <div className="md:col-start-4 md:row-start-1">
-          <StudentPayment />
-        </div>
       </div>
-    </div>
+    </>
   );
 }

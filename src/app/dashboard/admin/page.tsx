@@ -144,15 +144,6 @@ export default function AdminDashboard() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <DateTimeStatCard />
-              <button
-                className="lg:hidden p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
-                onClick={() => setIsSidebarOpen(true)}
-              >
-                <Menu size={24} />
-              </button>
-            </div>
           </div>
 
           {/* Stats Section with Premium Styling */}

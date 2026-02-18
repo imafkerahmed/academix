@@ -11,10 +11,8 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import GradientText from "@/components/ui/GradientText";
-import NotificationButton from "@/components/ui/notification-button";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { RouteLink } from "@/components/ui/route-link";
+import { ArrowLeft } from "lucide-react";
 
 // Mock data - will be replaced with actual API calls
 const subjectsData = {
@@ -519,16 +517,19 @@ export default function SubjectPage() {
 
   if (!subject) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight mb-2">
             Subject Not Found
           </h1>
+          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-6">
+            We couldn&apos;t find this subject
+          </p>
           <button
             onClick={() =>
               router.push(`/dashboard/student/courses/${courseId}`)
             }
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
           >
             Back to Course
           </button>
@@ -538,90 +539,46 @@ export default function SubjectPage() {
   }
 
   return (
-    <div className="min-h-screen pt-20 bg-gray-50">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 md:px-12 py-4 bg-white shadow">
-        <div className="flex items-center">
-          <GradientText className="text-2xl font-bold">ACADEMIX</GradientText>
-        </div>
-        <div className="flex items-center gap-2 md:gap-4 mr-0 md:mr-8 relative">
-          <NotificationButton
-            onClick={() => setShowNotifications(true)}
-            aria-label="Show notifications"
-          />
-          <button
-            className="p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            onClick={() => setShowLogout((prev) => !prev)}
-            aria-label="Account menu"
-          >
-            <AccountCircleIcon style={{ fontSize: 32, color: "black" }} />
-          </button>
-          {showLogout && (
-            <div className="absolute right-0 top-14 mt-2 w-40 bg-white border border-gray-200 rounded shadow-lg z-50 animate-dropdown">
-              <button className="w-full text-left px-4 py-2 hover:bg-gray-100">
-                View Profile
-              </button>
-              <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600">
-                Logout
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Notification Drawer */}
-      {drawerVisible && (
-        <div
-          className={`fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-lg z-[60] flex flex-col border-l border-gray-200 transition-transform transition-opacity translate-x-full opacity-0 ${
-            showNotifications
-              ? `duration-[${OPEN_DURATION}ms] !translate-x-0 !opacity-100`
-              : `duration-[${CLOSE_DURATION}ms] pointer-events-none`
-          }`}
-        >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 mt-0 pt-6">
-            <span className="font-semibold text-lg">Notifications</span>
-            <button
-              className="text-gray-500 hover:text-gray-800 text-2xl font-bold"
-              onClick={handleCloseNotifications}
-              aria-label="Close notifications"
-            >
-              &times;
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="text-gray-500 text-center mt-8">
-              No notifications yet.
-            </div>
-          </div>
-        </div>
-      )}
-
+    <div className="min-h-screen bg-gray-50">
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-gray-600 mb-6">
-          <RouteLink href="/dashboard/student" className="hover:text-gray-900">
+        <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+          <button
+            onClick={() => router.push("/dashboard/student")}
+            className="p-2 bg-white border border-gray-100 rounded-xl text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all mr-1"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <RouteLink
+            href="/dashboard/student"
+            className="hover:text-indigo-600 font-bold uppercase tracking-widest text-[10px] transition-colors"
+          >
             Dashboard
           </RouteLink>
-          <span>/</span>
+          <span className="text-gray-200">/</span>
           <RouteLink
             href={`/dashboard/student/courses/${courseId}`}
-            className="hover:text-gray-900"
+            className="hover:text-indigo-600 font-bold uppercase tracking-widest text-[10px] transition-colors"
           >
             {subject.courseName}
           </RouteLink>
-          <span>/</span>
-          <span className="text-gray-900 font-medium">{subject.name}</span>
+          <span className="text-gray-200">/</span>
+          <span className="text-indigo-600 font-black uppercase tracking-widest text-[10px]">
+            {subject.name}
+          </span>
         </div>
 
         {/* Subject Header */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-2">
                 {subject.name}
               </h1>
-              <p className="text-sm text-gray-500">Code: {subject.code}</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Code: {subject.code}
+              </p>
             </div>
           </div>
 
@@ -665,35 +622,35 @@ export default function SubjectPage() {
         </div>
 
         {/* Tabbed Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Tabs */}
-          <div className="flex gap-3 mb-6 overflow-x-auto pb-2 border-b border-gray-200">
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
             <button
               onClick={() => setActiveTab(0)}
-              className={`px-6 py-3 rounded-t-lg font-bold text-sm whitespace-nowrap transition-all duration-200 ${
+              className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-200 ${
                 activeTab === 0
-                  ? "bg-white border-b-3 border-indigo-600 text-indigo-700 -mb-[2px]"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                  : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
               }`}
             >
               Assignments
             </button>
             <button
               onClick={() => setActiveTab(1)}
-              className={`px-6 py-3 rounded-t-lg font-bold text-sm whitespace-nowrap transition-all duration-200 ${
+              className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-200 ${
                 activeTab === 1
-                  ? "bg-white border-b-3 border-indigo-600 text-indigo-700 -mb-[2px]"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                  : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
               }`}
             >
               Study Materials
             </button>
             <button
               onClick={() => setActiveTab(2)}
-              className={`px-6 py-3 rounded-t-lg font-bold text-sm whitespace-nowrap transition-all duration-200 ${
+              className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-200 ${
                 activeTab === 2
-                  ? "bg-white border-b-3 border-indigo-600 text-indigo-700 -mb-[2px]"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                  : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
               }`}
             >
               Video Materials

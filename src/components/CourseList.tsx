@@ -23,7 +23,7 @@ interface CourseListProps {
   courses: Course[];
 }
 
-const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList.jsx"), {
+const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList"), {
   ssr: false,
 });
 

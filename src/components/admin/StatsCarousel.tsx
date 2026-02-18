@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import AdminStatsCard from "./AdminStatsCard";
-import { LucideIcon } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 
 interface StatItem {
   title: string;
   value: string | number;
-  icon: LucideIcon;
+  icon: React.ComponentType<any>; // icon component
   bgColor: string;
   iconColor: string;
   trend?: {
@@ -42,11 +42,14 @@ export default function StatsCarousel({ stats, children }: StatsCarouselProps) {
               transform: `translateX(-${currentIndex * 100}%)`,
             }}
           >
-            {stats.map((stat, index) => (
-              <div key={index} className="w-full flex-shrink-0 p-1">
-                <AdminStatsCard {...stat} />
-              </div>
-            ))}
+            {stats.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <div key={index} className="w-full flex-shrink-0 p-1">
+                  <AdminStatsCard {...stat} icon={Icon} />
+                </div>
+              );
+            })}
           </div>
         </div>
         {/* Carousel Indicators - Refined Premium Dots */}

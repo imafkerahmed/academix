@@ -1,5 +1,6 @@
+"use client";
 import dynamic from "next/dynamic";
-const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList.jsx"), {
+const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList"), {
   ssr: false,
 });
 // Badge color mapping (referenced from Calendar.tsx)
@@ -54,7 +55,7 @@ export default function Section5Schedules() {
   }, [modalOpen]);
 
   return (
-    <div className="border border-gray-300 shadow-lg rounded-xl min-w-0 w-full h-full p-6 flex flex-col md:col-start-3 md:row-start-1 bg-white">
+    <div className="w-full h-full flex flex-col bg-transparent">
       <h2 className="text-xl font-semibold mb-4">Upcoming Schedules</h2>
       <div className="flex-1 overflow-y-auto mb-4">
         {upcoming.length === 0 ? (

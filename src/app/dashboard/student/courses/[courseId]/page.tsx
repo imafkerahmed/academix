@@ -9,9 +9,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import GradientText from "@/components/ui/GradientText";
-import NotificationButton from "@/components/ui/notification-button";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { RouteLink } from "@/components/ui/route-link";
 
 // Mock data - will be replaced with actual API calls
@@ -192,382 +189,235 @@ export default function CoursePage() {
   }
 
   return (
-    <div className="min-h-screen pt-20 bg-gray-50">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 md:px-12 py-4 bg-white shadow">
-        {/* Left: Title */}
-        <div className="flex items-center">
-          <GradientText className="text-2xl font-bold ml-0 md:ml-8">
-            ACADEMIX
-          </GradientText>
-        </div>
-        {/* Right: Notification Button and Profile Icon */}
-        <div className="flex items-center gap-2 md:gap-4 mr-0 md:mr-8 relative">
-          <NotificationButton
-            onClick={() => setShowNotifications(true)}
-            aria-label="Show notifications"
-          />
-          <button
-            className="p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            onClick={() => setShowLogout((prev) => !prev)}
-            aria-label="Account menu"
-          >
-            <AccountCircleIcon style={{ fontSize: 32, color: "black" }} />
-          </button>
-          {showLogout && (
-            <div className="absolute right-0 top-14 mt-2 w-40 bg-white border border-gray-200 rounded shadow-lg z-50 animate-dropdown">
-              <button
-                className="w-full text-left px-4 py-2 hover:bg-gray-100"
-                onClick={() => {
-                  setShowLogout(false);
-                  router.push("/dashboard/student");
-                }}
-              >
-                View Profile
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
-                onClick={() => {
-                  setShowLogout(false);
-                  // Add your logout logic here
-                }}
-              >
-                Logout
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-      {/* Notification Drawer */}
-      {drawerVisible && (
-        <div
-          className={`
-            fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-lg z-[60] flex flex-col border-l border-gray-200
-            transition-transform transition-opacity translate-x-full opacity-0
-            ${
-              showNotifications
-                ? `duration-[${OPEN_DURATION}ms] !translate-x-0 !opacity-100`
-                : `duration-[${CLOSE_DURATION}ms] pointer-events-none`
-            }
-          `}
+    <div className="space-y-8">
+      {/* Breadcrumb Navigation - Admin Style */}
+      <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2">
+        <RouteLink
+          href="/dashboard/student"
+          className="hover:text-indigo-600 transition-colors flex items-center gap-1"
         >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 mt-0 pt-6">
-            <span className="font-semibold text-lg">Notifications</span>
-            <button
-              className="text-gray-500 hover:text-gray-800 text-2xl font-bold"
-              onClick={handleCloseNotifications}
-              aria-label="Close notifications"
-            >
-              &times;
-            </button>
+          Dashboard
+        </RouteLink>
+        <span className="text-gray-300">/</span>
+        <RouteLink
+          href="/dashboard/student/courses"
+          className="hover:text-indigo-600 transition-colors flex items-center gap-1"
+        >
+          Courses
+        </RouteLink>
+        <span className="text-gray-300">/</span>
+        <span className="text-indigo-600">{course.name}</span>
+      </div>
+
+      {/* Header Card */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-start justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex items-start gap-6">
+          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50 shrink-0">
+            <span className="font-black text-2xl">{course.name.charAt(0)}</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {/* Placeholder for notifications */}
-            <div className="text-gray-500 text-center mt-8">
-              No notifications yet.
-            </div>
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-2">
+              {course.name}
+            </h1>
+            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <Badge
+                variant="secondary"
+                className="bg-indigo-50 text-indigo-600 border-none rounded-lg px-2 py-0.5"
+              >
+                {course.registrationNumber}
+              </Badge>
+              <span>•</span>
+              {course.intakeCode}
+            </p>
           </div>
+        </div>
+
+        <div className="flex gap-3 flex-wrap items-start">
+          <Badge
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-none ${
+              course.courseStatus.toLowerCase() === "ongoing"
+                ? "bg-amber-100 text-amber-700 hover:bg-amber-100"
+                : "bg-green-100 text-green-700 hover:bg-green-100"
+            }`}
+          >
+            {course.courseStatus}
+          </Badge>
+
+          <Badge
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-none ${
+              course.certificateStatus.toLowerCase() === "issued"
+                ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-100"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-100"
+            }`}
+          >
+            {course.certificateStatus}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-[2rem] border border-gray-100 p-6 flex flex-col gap-2 shadow-sm">
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            Start Date
+          </h3>
+          <p className="text-lg font-bold text-gray-900">
+            {new Date(course.startDate).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+        <div className="bg-white rounded-[2rem] border border-gray-100 p-6 flex flex-col gap-2 shadow-sm">
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            End Date
+          </h3>
+          <p className="text-lg font-bold text-gray-900">
+            {new Date(course.endDate).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+        <div className="bg-white rounded-[2rem] border border-gray-100 p-6 flex flex-col gap-2 shadow-sm">
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            Intake
+          </h3>
+          <p className="text-lg font-bold text-gray-900">{course.intakeCode}</p>
+        </div>
+      </div>
+
+      {course.description && (
+        <div className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
+          <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">
+            Course Description
+          </h3>
+          <p className="text-gray-600 leading-relaxed">{course.description}</p>
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-sm text-gray-600 mb-6">
-          <RouteLink
-            href="/dashboard/student"
-            className="hover:text-gray-900 transition-colors"
-          >
-            Dashboard
-          </RouteLink>
-          <span>/</span>
-          <span className="text-gray-900 font-medium">{course.name}</span>
-        </div>
+      {/* Subjects Section */}
+      <div>
+        <h2 className="text-2xl font-black text-gray-900 tracking-tight mb-6 flex items-center gap-2">
+          Enrolled <span className="text-indigo-600">Subjects</span>
+        </h2>
 
-        {/* Course Title and Info Card */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {course.name}
-              </h1>
-              <p className="text-sm text-gray-500">
-                Registration: {course.registrationNumber}
-              </p>
-            </div>
-            <div className="flex gap-3 flex-wrap items-start">
-              {/* Course Status Badge */}
-              <div
-                className={`px-5 py-2.5 rounded-full font-bold text-sm shadow-md flex items-center gap-2 ${
-                  course.courseStatus.toLowerCase() === "ongoing"
-                    ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white"
-                    : course.courseStatus.toLowerCase() === "completed"
-                      ? "bg-gradient-to-r from-green-500 to-green-600 text-white"
-                      : "bg-gray-500 text-white"
-                }`}
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  {course.courseStatus.toLowerCase() === "ongoing" ? (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  ) : (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  )}
-                </svg>
-                <span className="uppercase tracking-wide">
-                  {course.courseStatus}
-                </span>
-              </div>
-
-              {/* Certificate Status Badge */}
-              <div
-                className={`px-5 py-2.5 rounded-lg font-bold text-sm shadow-md border-2 flex items-center gap-2 ${
-                  course.certificateStatus.toLowerCase() === "issued"
-                    ? "bg-green-50 text-green-700 border-green-500"
-                    : "bg-red-50 text-red-700 border-red-500"
-                }`}
-              >
-                {course.certificateStatus.toLowerCase() === "issued" && (
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-                    />
-                  </svg>
-                )}
-                <span className="uppercase tracking-wide">
-                  {course.certificateStatus.toLowerCase() === "issued"
-                    ? "Certificate Issued"
-                    : "Certificate Not Issued"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* More Button - Mobile Only */}
-          <button
-            onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
-            className="md:hidden flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors mt-4"
-            aria-expanded={isDetailsExpanded}
-            aria-controls="course-details-collapsible"
-          >
-            <span>More</span>
-            <svg
-              className={`w-4 h-4 transition-transform duration-200 ${
-                isDetailsExpanded ? "rotate-180" : ""
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-
-          {/* Collapsible Content - Hidden on mobile unless expanded, always visible on desktop */}
-          <div
-            id="course-details-collapsible"
-            className={`transition-all duration-300 ease-in-out overflow-hidden md:!block md:!max-h-none md:!opacity-100 ${
-              isDetailsExpanded
-                ? "max-h-[1000px] opacity-100"
-                : "max-h-0 opacity-0"
-            }`}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 md:mt-0">
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                  Intake
-                </h3>
-                <p className="text-base font-bold text-gray-900">
-                  {course.intakeCode}
-                </p>
-              </div>
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                  Start Date
-                </h3>
-                <p className="text-base font-medium text-gray-900">
-                  {new Date(course.startDate).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                  End Date
-                </h3>
-                <p className="text-base font-medium text-gray-900">
-                  {new Date(course.endDate).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-            </div>
-
-            {course.description && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                  Description
-                </h3>
-                <p className="text-gray-700">{course.description}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Subjects Section with Semester Tabs */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Enrolled Subjects
-          </h2>
-
-          {/* Semester Tabs */}
-          {course.semesters && course.semesters.length > 0 && (
-            <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
-              {course.semesters
-                .filter((s) => !disabledSemesters.includes(s.name))
-                .map((semester, index) => {
-                  // Find the original index to maintain activeSemester logic or adjust it
-                  const displayIndex = course.semesters
-                    .filter((s) => !disabledSemesters.includes(s.name))
-                    .indexOf(semester);
-
-                  return (
-                    <button
-                      key={semester.id}
-                      onClick={() => setActiveSemester(displayIndex)}
-                      className={`px-6 py-3 rounded-lg font-bold text-sm whitespace-nowrap transition-all duration-200 ${
-                        activeSemester === displayIndex
-                          ? "bg-white border-3 border-indigo-600 text-indigo-700 shadow-md"
-                          : "bg-white border-2 border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50 shadow-sm"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{semester.name}</span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            activeSemester === displayIndex
-                              ? semester.status === "Ongoing"
-                                ? "bg-orange-500 text-white"
-                                : semester.status === "Completed"
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-500 text-white"
-                              : semester.status === "Ongoing"
-                                ? "bg-orange-100 text-orange-700"
-                                : semester.status === "Completed"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {semester.status}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-            </div>
-          )}
-
-          {/* Subjects Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Semester Tabs */}
+        {course.semesters && course.semesters.length > 0 && (
+          <div className="flex gap-3 mb-8 overflow-x-auto pb-2 custom-scrollbar">
             {course.semesters
               .filter((s) => !disabledSemesters.includes(s.name))
-              [activeSemester]?.subjects?.filter(
-                (subject) => !disabledSubjects.includes(subject.code),
-              )
-              ?.map((subject) => (
-                <RouteLink
-                  key={subject.id}
-                  href={`/dashboard/student/courses/${courseId}/subjects/${subject.id}`}
-                  className="block"
-                >
-                  <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer h-full">
-                    <CardHeader>
-                      <div className="flex items-start justify-between mb-2">
-                        <CardTitle className="text-lg">
-                          {subject.name}
-                        </CardTitle>
-                        <Badge variant="outline" className="ml-2">
-                          {subject.code}
-                        </Badge>
+              .map((semester, index) => {
+                const displayIndex = course.semesters
+                  .filter((s) => !disabledSemesters.includes(s.name))
+                  .indexOf(semester);
+
+                return (
+                  <button
+                    key={semester.id}
+                    onClick={() => setActiveSemester(displayIndex)}
+                    className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-200 ${
+                      activeSemester === displayIndex
+                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                        : "bg-white text-gray-500 border border-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{semester.name}</span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                          activeSemester === displayIndex
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {semester.status}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
+        )}
+
+        {/* Subjects Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {course.semesters
+            .filter((s) => !disabledSemesters.includes(s.name))
+            [activeSemester]?.subjects?.filter(
+              (subject) => !disabledSubjects.includes(subject.code),
+            )
+            ?.map((subject) => (
+              <RouteLink
+                key={subject.id}
+                href={`/dashboard/student/courses/${courseId}/subjects/${subject.id}`}
+                className="block group h-full"
+              >
+                <Card className="h-full border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-[2.5rem] overflow-hidden bg-white group-hover:border-indigo-100">
+                  <CardHeader className="p-8">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300 shadow-sm">
+                        <span className="font-black text-lg">
+                          {subject.name.charAt(0)}
+                        </span>
                       </div>
-                      <CardDescription className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm">
-                          <svg
-                            className="w-4 h-4 text-gray-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                            />
-                          </svg>
-                          <span>{subject.instructor}</span>
-                        </div>
-                      </CardDescription>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-bold uppercase tracking-widest border-indigo-100 text-indigo-400 bg-indigo-50/50"
+                      >
+                        {subject.code}
+                      </Badge>
+                    </div>
+
+                    <CardTitle className="text-lg font-black text-gray-900 group-hover:text-indigo-600 transition-colors mb-2 line-clamp-2">
+                      {subject.name}
+                    </CardTitle>
+
+                    <CardDescription className="space-y-4">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        <svg
+                          className="w-4 h-4 text-indigo-300"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                          />
+                        </svg>
+                        <span>{subject.instructor}</span>
+                      </div>
 
                       {/* Progress Bar */}
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                          <span>Progress</span>
-                          <span className="font-semibold">
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                          <span>Completion</span>
+                          <span className="text-indigo-600">
                             {subject.progress}%
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                           <div
-                            className={`h-2 rounded-full transition-all duration-300 ${
+                            className={`h-full rounded-full transition-all duration-500 ease-out ${
                               subject.progress === 100
                                 ? "bg-green-500"
-                                : subject.progress >= 50
-                                  ? "bg-blue-500"
-                                  : "bg-orange-500"
+                                : "bg-indigo-600"
                             }`}
                             style={{ width: `${subject.progress}%` }}
                           />
                         </div>
                       </div>
-                    </CardHeader>
-                  </Card>
-                </RouteLink>
-              ))}
-          </div>
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </RouteLink>
+            ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

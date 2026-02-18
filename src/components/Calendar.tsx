@@ -1,7 +1,9 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 
 import dynamic from "next/dynamic";
-const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList.jsx"), {
+const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList"), {
   ssr: false,
 });
 import { ModernModal } from "@/components/ui/modern-modal";
@@ -583,7 +585,7 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
       >
         <div className="max-h-[400px] overflow-y-auto no-scrollbar">
           <AnimatedList
-            items={getEventsForDate(modalDate).map((event) => (
+            items={getEventsForDate(modalDate || "").map((event) => (
               <div
                 key={event.id}
                 className={`bg-white border border-gray-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm hover:shadow-lg transition-all duration-300 w-full ${
@@ -599,7 +601,10 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
                 }`}
               >
                 <div className="flex items-center gap-2 justify-between">
-                  <span className="font-bold text-gray-900 text-base tracking-tight line-clamp-2" title={event.title}>
+                  <span
+                    className="font-bold text-gray-900 text-base tracking-tight line-clamp-2"
+                    title={event.title}
+                  >
                     {event.title}
                   </span>
                   <span

@@ -1,16 +1,30 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
 import { motion, useInView } from "motion/react";
 import "./AnimatedList.css";
 
-const AnimatedItem = ({
+interface AnimatedItemProps {
+  children: ReactNode;
+  delay?: number;
+  index: number;
+  onMouseEnter: () => void;
+  onClick: () => void;
+}
+
+const AnimatedItem: React.FC<AnimatedItemProps> = ({
   children,
   delay = 0,
   index,
   onMouseEnter,
   onClick,
 }) => {
-  const ref = useRef(null);
-  const inView = useInView(ref, { amount: 0.5, triggerOnce: false });
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { amount: 0.5, once: false });
   return (
     <motion.div
       ref={ref}
@@ -27,31 +41,18 @@ const AnimatedItem = ({
   );
 };
 
-/**
- * @param {Object} props
- * @param {Array<React.ReactNode>} [props.items]
- * @param {Function} props.onItemSelect
- * @param {boolean} [props.showGradients]
- * @param {boolean} [props.enableArrowNavigation]
- * @param {string} [props.className]
- * @param {string} [props.itemClassName]
- * @param {boolean} [props.displayScrollbar]
- * @param {number} [props.initialSelectedIndex]
- */
-/**
- * @typedef {Object} AnimatedListProps
- * @property {Array<React.ReactNode>} [items]
- * @property {Function} onItemSelect
- * @property {boolean} [showGradients]
- * @property {boolean} [enableArrowNavigation]
- * @property {string} [className]
- * @property {string} [itemClassName]
- * @property {boolean} [displayScrollbar]
- * @property {number} [initialSelectedIndex]
- */
+interface AnimatedListProps {
+  items?: ReactNode[];
+  onItemSelect?: (item: ReactNode, index: number) => void;
+  showGradients?: boolean;
+  enableArrowNavigation?: boolean;
+  className?: string;
+  itemClassName?: string;
+  displayScrollbar?: boolean;
+  initialSelectedIndex?: number;
+}
 
-/** @type {import('react').FC<AnimatedListProps>} */
-const AnimatedList = ({
+const AnimatedList: React.FC<AnimatedListProps> = ({
   items = [
     "Item 1",
     "Item 2",
@@ -77,18 +78,18 @@ const AnimatedList = ({
   displayScrollbar = true,
   initialSelectedIndex = -1,
 }) => {
-  const listRef = useRef(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(initialSelectedIndex);
   const [keyboardNav, setKeyboardNav] = useState(false);
   const [topGradientOpacity, setTopGradientOpacity] = useState(0);
   const [bottomGradientOpacity, setBottomGradientOpacity] = useState(1);
 
-  const handleItemMouseEnter = useCallback((index) => {
+  const handleItemMouseEnter = useCallback((index: number) => {
     setSelectedIndex(index);
   }, []);
 
   const handleItemClick = useCallback(
-    (item, index) => {
+    (item: ReactNode, index: number) => {
       setSelectedIndex(index);
       if (onItemSelect) {
         onItemSelect(item, index);
@@ -97,8 +98,8 @@ const AnimatedList = ({
     [onItemSelect],
   );
 
-  const handleScroll = useCallback((e) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.target;
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     setTopGradientOpacity(Math.min(scrollTop / 50, 1));
     const bottomDistance = scrollHeight - (scrollTop + clientHeight);
     setBottomGradientOpacity(
@@ -108,7 +109,7 @@ const AnimatedList = ({
 
   useEffect(() => {
     if (!enableArrowNavigation) return;
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) {
         e.preventDefault();
         setKeyboardNav(true);
@@ -136,7 +137,7 @@ const AnimatedList = ({
     const container = listRef.current;
     const selectedItem = container.querySelector(
       `[data-index="${selectedIndex}"]`,
-    );
+    ) as HTMLElement;
     if (selectedItem) {
       const extraMargin = 50;
       const containerScrollTop = container.scrollTop;
@@ -168,7 +169,6 @@ const AnimatedList = ({
         {items.map((item, index) => (
           <AnimatedItem
             key={index}
-            delay={0.1}
             index={index}
             onMouseEnter={() => handleItemMouseEnter(index)}
             onClick={() => handleItemClick(item, index)}

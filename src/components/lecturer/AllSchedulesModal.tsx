@@ -224,7 +224,7 @@ export default function AllSchedulesModal({
                           onClick={(event) => {
                             handleQuickJoin(classItem.zoomJoinUrl);
                           }}
-                          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
                           aria-label={`Join ${classItem.classTitle}`}
                         >
                           Quick Join

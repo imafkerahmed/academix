@@ -1,11 +1,19 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { ShieldX, Menu } from "lucide-react";
+import {
+  ShieldX,
+  Menu,
+  Layout,
+  TrendingUp,
+  Clock,
+  GraduationCap,
+  BookOpen,
+  FileEdit,
+  Video,
+  CalendarIcon,
+} from "lucide-react";
 import Sidebar from "@/components/lecturer/Sidebar";
-import BentoStats from "@/components/lecturer/BentoStats";
-import QuickActions from "@/components/lecturer/QuickActions";
 import UpcomingClasses, {
   type UpcomingClass,
 } from "@/components/lecturer/UpcomingClasses";
@@ -15,8 +23,7 @@ import IntakesTree, {
   type Course,
   type Subject,
 } from "@/components/lecturer/IntakesTree";
-
-import NotificationButton from "@/components/ui/notification-button";
+import StatsCarousel from "@/components/admin/StatsCarousel";
 
 // Mock user type
 interface MockUser {
@@ -145,115 +152,52 @@ const mockUpcomingClasses: UpcomingClass[] = [
   },
 ];
 
-function DateTimeCard() {
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    // Only start the clock on the client to avoid SSR hydration mismatches
-    setNow(new Date());
-
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  if (!now) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow flex items-center justify-center text-center">
-        <p className="text-sm text-gray-400">Loading time...</p>
-      </div>
-    );
-  }
-
-  const dateLabel = now.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
-  const timeLabel = now.toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col items-center justify-center text-center">
-      <p className="text-5xl font-extrabold text-blue-600 leading-tight mb-3">
-        {timeLabel}
-      </p>
-      <p className="text-lg font-semibold text-gray-800">{dateLabel}</p>
-    </div>
-  );
-}
-
-// Compact date/time bar for mobile header
-function MobileDateTimeBar() {
+function DateTimeStatCard() {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
     setNow(new Date());
-
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-
-    return () => clearInterval(interval);
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  if (!now) {
-    return (
-      <div className="flex items-center justify-center text-xs text-gray-400">
-        Loading time...
-      </div>
-    );
-  }
+  if (!now) return null;
 
-  const dateLabel = now.toLocaleDateString("en-GB", {
+  const time = now.toLocaleTimeString("en-US", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const date = now.toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
-    year: "numeric",
-  });
-
-  const timeLabel = now.toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
   });
 
   return (
-    <div className="flex flex-col items-center justify-center text-center">
-      <span className="text-xl font-semibold text-blue-600 leading-tight">
-        {timeLabel}
-      </span>
-      <span className="text-xs font-medium text-gray-700 mt-1">
-        {dateLabel}
-      </span>
+    <div className="bg-white rounded-[1.8rem] shadow-sm border border-gray-100 px-6 py-3 flex items-center gap-4 hover:shadow-md transition-all group">
+      <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+        <Clock size={18} />
+      </div>
+      <div className="flex flex-col">
+        <span className="text-xl font-black text-gray-900 tracking-tight leading-none group-hover:text-indigo-600 transition-colors">
+          {time}
+        </span>
+        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">
+          {date.toUpperCase()}
+        </span>
+      </div>
     </div>
   );
 }
 
 export default function LecturerDashboard() {
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<MockUser | null>(mockUser); // Set initial user data
-  const [activeTab, setActiveTab] = useState("Dashboard"); // Always start with Dashboard for SSR
+  const [user, setUser] = useState<MockUser | null>(mockUser);
+  const [activeTab, setActiveTab] = useState("Dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Animation durations (ms)
-  const OPEN_DURATION = 900;
-  const CLOSE_DURATION = 1500;
-
-  // Wrapper function to save active tab to localStorage
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
     if (typeof window !== "undefined") {
@@ -262,71 +206,12 @@ export default function LecturerDashboard() {
   };
 
   useEffect(() => {
-    // Authentication is handled by setting initial user state
-    // In a real app, this would check cookies/session/JWT and redirect if needed
-  }, []);
-
-  // Restore saved tab from localStorage after hydration
-  useEffect(() => {
     const savedTab = localStorage.getItem("lecturerActiveTab");
     if (savedTab && savedTab !== activeTab) {
       setActiveTab(savedTab);
     }
-  }, [activeTab]);
+  }, []);
 
-  // Handle notification drawer animation mount/unmount
-  useEffect(() => {
-    if (showNotifications) {
-      setDrawerVisible(true);
-      // Small delay to ensure the drawer is mounted before animation starts
-      const animationTimeout = setTimeout(() => {
-        // This forces a reflow, allowing the animation to play
-      }, 10);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      return () => clearTimeout(animationTimeout);
-    } else if (drawerVisible) {
-      timeoutRef.current = setTimeout(
-        () => setDrawerVisible(false),
-        CLOSE_DURATION,
-      );
-    }
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [showNotifications, drawerVisible]);
-
-  // Role gating
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center"></div>
-    );
-  }
-
-  if (!user || user.role !== "lecturer" || user.accountStatus === "disabled") {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border border-gray-200">
-          <div className="flex justify-center mb-4">
-            <ShieldX size={64} className="text-red-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-            Access Denied
-          </h1>
-          <p className="text-gray-600 mb-6">
-            You do not have permission to access the lecturer dashboard.
-          </p>
-          <Link
-            href="/"
-            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-          >
-            Back to Home
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate stats
   const stats = {
     totalIntakes: mockIntakes.length,
     totalCourses: mockIntakes.reduce(
@@ -348,131 +233,273 @@ export default function LecturerDashboard() {
     assignmentsToMark: 0,
   };
 
+  const statsData = [
+    {
+      title: "Active Intakes",
+      value: stats.totalIntakes,
+      icon: GraduationCap,
+      bgColor: "bg-blue-50",
+      iconColor: "text-blue-600",
+      trend: { value: "2 active", isPositive: true },
+    },
+    {
+      title: "Total Courses",
+      value: stats.totalCourses,
+      icon: BookOpen,
+      bgColor: "bg-green-50",
+      iconColor: "text-green-600",
+      trend: { value: "Assigned", isPositive: true },
+    },
+    {
+      title: "My Subjects",
+      value: stats.totalSubjects,
+      icon: Layout,
+      bgColor: "bg-purple-50",
+      iconColor: "text-purple-600",
+      trend: { value: "Teaching", isPositive: true },
+    },
+    {
+      title: "Upcoming Classes",
+      value: stats.upcomingClasses,
+      icon: Video,
+      bgColor: "bg-indigo-50",
+      iconColor: "text-indigo-600",
+      trend: { value: "This week", isPositive: true },
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
+            Loading Dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== "lecturer" || user.accountStatus === "disabled") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-red-50 rounded-[2rem] flex items-center justify-center text-red-500 mx-auto mb-6">
+            <ShieldX size={40} />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight mb-2">
+            Access Denied
+          </h1>
+          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-6">
+            Insufficient permissions
+          </p>
+          <a
+            href="/"
+            className="inline-block px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+          >
+            Back to Home
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case "Dashboard":
         return (
           <>
-            {/* Bento Grid Layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 mb-4 items-stretch">
-              <BentoStats stats={stats} />
-              {/* Show large date/time card only on desktop */}
-              <div className="hidden lg:block">
-                <DateTimeCard />
+            {/* Page Header Card */}
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+                  <Layout size={40} />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                    Lecturer <span className="text-indigo-600">Dashboard</span>
+                  </h1>
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                    <TrendingUp size={14} className="text-indigo-400" />
+                    Welcome back, {user.name.split(" ")[0]}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <DateTimeStatCard />
+                <button
+                  className="lg:hidden p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
+                  onClick={() => setIsSidebarOpen(true)}
+                >
+                  <Menu size={24} />
+                </button>
               </div>
             </div>
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-              {/* Upcoming Classes - Takes 2 columns */}
-              <div className="lg:col-span-2">
-                <UpcomingClasses
-                  classes={mockUpcomingClasses.slice(0, 3)}
-                  onViewAll={() => setIsModalOpen(true)}
-                />
+            {/* Stats Carousel */}
+            <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <StatsCarousel stats={statsData} />
+            </div>
+
+            {/* Main Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+              {/* Upcoming Classes */}
+              <div className="lg:col-span-7 xl:col-span-8">
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
+                  <div className="flex justify-between items-center mb-8">
+                    <div>
+                      <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                        Upcoming{" "}
+                        <span className="text-indigo-600">Classes</span>
+                      </h3>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                        Your scheduled sessions
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="px-6 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                    >
+                      View All
+                    </button>
+                  </div>
+                  <UpcomingClasses
+                    classes={mockUpcomingClasses.slice(0, 3)}
+                    onViewAll={() => setIsModalOpen(true)}
+                  />
+                </div>
               </div>
 
-              {/* Right Column - 2 sections stacked */}
-              <div className="space-y-4">
+              {/* Right Column */}
+              <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6">
                 {/* Recent Activity */}
-                <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
-                  <h3 className="text-base font-semibold text-gray-900 mb-2">
-                    Recent Activity
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-4">
+                    Recent <span className="text-indigo-600">Activity</span>
                   </h3>
-                  <div className="text-sm text-gray-500">
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
                     Activity feed will appear here.
-                  </div>
+                  </p>
                 </div>
 
                 {/* Announcements */}
-                <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
-                  <h3 className="text-base font-semibold text-gray-900 mb-2">
-                    Announcements
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-4">
+                    <span className="text-indigo-600">Announcements</span>
                   </h3>
-                  <div className="text-sm text-gray-500">
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
                     Important announcements will appear here.
-                  </div>
+                  </p>
                 </div>
               </div>
             </div>
           </>
         );
+
       case "Intakes":
-        return <IntakesTree intakes={mockIntakes} />;
-      case "Assignments":
-        return (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Coming Soon
-              </h2>
-              <p className="text-gray-600">
-                Assignments page is under development.
-              </p>
-            </div>
-          </div>
-        );
-      case "Materials":
-        return (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Coming Soon
-              </h2>
-              <p className="text-gray-600">
-                Materials page is under development.
-              </p>
-            </div>
-          </div>
-        );
-      default:
         return (
           <>
-            {/* Bento Grid Layout */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-4">
-              <BentoStats stats={stats} />
+            {/* Page Header Card */}
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+                  <GraduationCap size={40} />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                    My <span className="text-indigo-600">Intakes</span>
+                  </h1>
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                    <TrendingUp size={14} className="text-indigo-400" />
+                    Assigned Academic Terms
+                  </p>
+                </div>
+              </div>
+              <button
+                className="lg:hidden p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
+                onClick={() => setIsSidebarOpen(true)}
+              >
+                <Menu size={24} />
+              </button>
             </div>
+            <IntakesTree intakes={mockIntakes} />
+          </>
+        );
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-              {/* Upcoming Classes - Takes 2 columns */}
-              <div className="lg:col-span-2">
-                <UpcomingClasses
-                  classes={mockUpcomingClasses.slice(0, 3)}
-                  onViewAll={() => setIsModalOpen(true)}
-                />
-              </div>
-
-              {/* Right Column - 2 sections stacked */}
-              <div className="space-y-4">
-                {/* Section 1 - Placeholder */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                    Recent Activity
-                  </h3>
-                  <div className="text-xs text-gray-500">
-                    Activity feed will appear here
-                  </div>
+      case "Assignments":
+        return (
+          <>
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+                  <FileEdit size={40} />
                 </div>
-
-                {/* Section 2 - Placeholder */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                    Announcements
-                  </h3>
-                  <div className="text-xs text-gray-500">
-                    Important announcements will appear here
-                  </div>
+                <div>
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                    Assignment <span className="text-indigo-600">Hub</span>
+                  </h1>
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                    <TrendingUp size={14} className="text-indigo-400" />
+                    Grading & Submission Management
+                  </p>
                 </div>
               </div>
+            </div>
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-16 text-center">
+              <div className="w-20 h-20 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-200 mx-auto mb-6">
+                <FileEdit size={40} />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                Coming Soon
+              </h3>
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
+                Assignments page is under development
+              </p>
             </div>
           </>
         );
+
+      case "Materials":
+        return (
+          <>
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+                  <BookOpen size={40} />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                    Study <span className="text-indigo-600">Materials</span>
+                  </h1>
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                    <TrendingUp size={14} className="text-indigo-400" />
+                    Course Resources & Files
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-16 text-center">
+              <div className="w-20 h-20 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-200 mx-auto mb-6">
+                <BookOpen size={40} />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                Coming Soon
+              </h3>
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
+                Materials page is under development
+              </p>
+            </div>
+          </>
+        );
+
+      default:
+        return null;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex font-sans">
       <Sidebar
         lecturerName={user.name}
         activeTab={activeTab}
@@ -481,67 +508,28 @@ export default function LecturerDashboard() {
         setIsSidebarOpen={setIsSidebarOpen}
       />
 
-      {/* Main Content Area (no top header) */}
-      <div className="flex-1 lg:ml-64">
-        <main className="p-4 md:p-6">
-          {/* Mobile header with centered title and menu button */}
-          <div className="lg:hidden mb-4">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 active:bg-gray-100"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-
-              <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide text-center flex-1">
-                ACADEMIX
-              </h1>
-
-              {/* Spacer to keep title centered relative to menu button */}
-              <div className="w-10" aria-hidden="true" />
-            </div>
-            <div className="mt-2">
-              <MobileDateTimeBar />
+      {/* Main Content Area */}
+      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden transition-all duration-300">
+        <main className="p-4 md:p-6 lg:p-8 flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
+          {/* Mobile Header */}
+          <div className="lg:hidden flex items-center justify-between mb-6">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
+            >
+              <Menu size={24} />
+            </button>
+            <h1 className="text-xl font-black text-gray-900 tracking-tighter uppercase">
+              Academix
+            </h1>
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+              <Layout size={20} />
             </div>
           </div>
 
           {renderContent()}
         </main>
       </div>
-
-      {/* Notification Drawer */}
-      {drawerVisible && (
-        <div
-          className={`
-            fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-lg z-[70] flex flex-col border-l border-gray-200
-            transition-transform transition-opacity translate-x-full opacity-0
-            ${
-              showNotifications
-                ? `duration-[${OPEN_DURATION}ms] !translate-x-0 !opacity-100`
-                : `duration-[${CLOSE_DURATION}ms] pointer-events-none`
-            }
-          `}
-        >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 mt-0 pt-6">
-            <span className="font-semibold text-lg">Notifications</span>
-            <button
-              className="text-gray-500 hover:text-gray-800 text-2xl font-bold"
-              onClick={() => setShowNotifications(false)}
-              aria-label="Close notifications"
-            >
-              &times;
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {/* Placeholder for notifications */}
-            <div className="text-gray-500 text-center mt-8">
-              No notifications yet.
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* All Schedules Modal */}
       {isModalOpen && (

@@ -100,7 +100,7 @@ export default function UpcomingClasses({
           {onViewAll && (
             <button
               onClick={onViewAll}
-              className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
             >
               View All
             </button>
@@ -162,7 +162,7 @@ export default function UpcomingClasses({
                         e.stopPropagation();
                         handleQuickJoin(classItem.zoomJoinUrl);
                       }}
-                      className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition w-full sm:w-auto"
+                      className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition w-full sm:w-auto shadow-lg shadow-indigo-100"
                       aria-label={`Join ${classItem.classTitle}`}
                     >
                       Quick Join
@@ -208,7 +208,7 @@ export default function UpcomingClasses({
               {selectedClass.zoomJoinUrl ? (
                 <button
                   onClick={() => handleQuickJoin(selectedClass.zoomJoinUrl)}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
                 >
                   Join Class
                 </button>
