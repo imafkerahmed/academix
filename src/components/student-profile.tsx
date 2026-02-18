@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { motion } from "framer-motion";
 
 interface StudentProfileProps {
   fullName: string;
@@ -28,7 +29,12 @@ export default function StudentProfile({
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="flex flex-col gap-6 w-full">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="flex flex-col gap-6 w-full"
+    >
       {/* Header Row: Avatar and Name */}
       <div className="flex items-center gap-6">
         {/* Avatar */}
@@ -136,6 +142,6 @@ export default function StudentProfile({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

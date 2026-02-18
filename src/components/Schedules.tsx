@@ -1,8 +1,14 @@
-"use client";
-import dynamic from "next/dynamic";
-const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList"), {
-  ssr: false,
-});
+import React, { useState, useEffect } from "react";
+import {
+  ArrowRight,
+  X,
+  Clock,
+  Calendar as CalendarIcon,
+  BookOpen,
+  Info,
+} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import Calendar, { mockEvents } from "@/components/Calendar";
 // Badge color mapping (referenced from Calendar.tsx)
 const typeBadge: Record<string, string> = {
   "Online Zoom Class": "bg-blue-100 text-blue-700 border-blue-200",
@@ -10,8 +16,6 @@ const typeBadge: Record<string, string> = {
   Holiday: "bg-purple-100 text-purple-700 border-purple-200",
   Assignment: "bg-green-100 text-green-700 border-green-200",
 };
-import React, { useState, useEffect } from "react";
-import Calendar, { mockEvents } from "@/components/Calendar";
 
 interface EventType {
   id: number;
@@ -57,105 +61,212 @@ export default function Section5Schedules() {
   return (
     <div className="w-full h-full flex flex-col bg-transparent">
       <h2 className="text-xl font-semibold mb-4">Upcoming Schedules</h2>
-      <div className="flex-1 overflow-y-auto mb-4">
+      <div className="flex-1 overflow-y-auto mb-6 pr-2 -mr-2 no-scrollbar">
         {upcoming.length === 0 ? (
-          <div className="text-gray-400">No upcoming schedules.</div>
+          <div className="flex flex-col items-center justify-center py-10 opacity-40">
+            <Clock className="text-gray-300 mb-2" size={32} />
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+              Stable Horizon: No upcoming tasks
+            </p>
+          </div>
         ) : (
-          <ul className="space-y-3">
-            {upcoming.map((ev: EventType) => (
-              <li
-                key={ev.id}
-                className={`p-3 rounded-lg border flex flex-col ${ev.date === today ? "bg-indigo-50 border-indigo-400" : "bg-gray-50 border-gray-200"}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-base">{ev.title}</span>
-                  <span
-                    className={`text-xs px-2 py-1 rounded border ml-2 font-semibold ${typeBadge[ev.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
-                  >
-                    {ev.type}
-                  </span>
-                </div>
-                {ev.topic && (
-                  <div className="text-sm text-blue-600 mt-1">{ev.topic}</div>
-                )}
-                <div className="text-xs text-gray-500 mt-1">
-                  {ev.date} {ev.startTime && `| ${ev.startTime}`}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-4">
+            {upcoming.map((ev: EventType, idx: number) => {
+              const themeClass =
+                ev.type === "Online Zoom Class"
+                  ? "border-blue-100 bg-blue-50/20"
+                  : ev.type === "Assignment"
+                    ? "border-green-100 bg-green-50/20"
+                    : "border-gray-100 bg-gray-50/20";
+              const isToday = ev.date === today;
+
+              return (
+                <motion.div
+                  key={ev.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className={`relative p-5 rounded-[2rem] border transition-all duration-300 group hover:shadow-xl hover:shadow-indigo-100/30 hover:-translate-y-1 ${isToday ? "border-indigo-200 bg-indigo-50/30 ring-2 ring-indigo-50/50" : themeClass}`}
+                >
+                  {isToday && (
+                    <div className="absolute -top-2 -right-2 bg-indigo-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
+                      Active Now
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h4 className="font-black text-gray-900 text-base tracking-tight leading-tight group-hover:text-indigo-600 transition-colors uppercase">
+                          {ev.title}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span
+                            className={`text-[9px] px-2 py-0.5 rounded-lg border font-black uppercase tracking-widest ${typeBadge[ev.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
+                          >
+                            {ev.type}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center gap-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        <span className="flex items-center gap-1.5">
+                          <CalendarIcon size={12} className="text-gray-300" />{" "}
+                          {ev.date}
+                        </span>
+                        {ev.startTime && (
+                          <span className="flex items-center gap-1.5">
+                            <Clock size={12} className="text-gray-300" />{" "}
+                            {ev.startTime}
+                          </span>
+                        )}
+                      </div>
+
+                      {ev.type === "Online Zoom Class" ? (
+                        <button className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 hover:scale-105 transition-all">
+                          Schedule
+                        </button>
+                      ) : ev.type === "Assignment" ? (
+                        <button className="px-4 py-2 rounded-xl bg-green-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-700 hover:scale-105 transition-all">
+                          View
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         )}
       </div>
       <button
-        className="mt-auto px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+        className="mt-auto group relative flex items-center justify-center gap-3 bg-indigo-600 text-white font-black py-4 rounded-[1.5rem] shadow-xl shadow-indigo-100 hover:shadow-indigo-200 hover:-translate-y-1 transition-all duration-300 uppercase tracking-tighter w-full overflow-hidden"
         onClick={() => setModalOpen(true)}
       >
-        VIEW ALL SCHEDULES
+        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+        <span className="relative z-10 flex items-center gap-2">
+          VIEW ALL SCHEDULES <ArrowRight size={18} />
+        </span>
       </button>
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm"
-          onClick={() => setModalOpen(false)}
-        >
-          <div
-            className="bg-white rounded-2xl p-8 w-full max-w-2xl shadow-xl relative transition-transform duration-300 scale-100 animate-zoomIn"
-            style={{ minHeight: "340px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 text-2xl font-bold"
+      <AnimatePresence>
+        {modalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
               onClick={() => setModalOpen(false)}
-              aria-label="Close"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
             >
-              &times;
-            </button>
-            <h3 className="text-lg font-bold mb-4 uppercase">
-              ALL UPCOMING SCHEDULES
-            </h3>
-            <div className="max-h-[400px] overflow-y-auto no-scrollbar">
-              <AnimatedList
-                items={getUpcomingSchedules(mockEvents).map((ev: EventType) => (
-                  <div
-                    key={ev.id}
-                    className={`p-3 rounded-lg border-4 flex flex-col bg-white w-full ${
-                      ev.type === "Online Zoom Class"
-                        ? "border-blue-200"
-                        : ev.type === "Physical Class"
-                          ? "border-yellow-200"
-                          : ev.type === "Assignment"
-                            ? "border-green-200"
-                            : ev.type === "Holiday"
-                              ? "border-purple-200"
-                              : "border-gray-200"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-base">{ev.title}</span>
-                      <span
-                        className={`text-xs px-2 py-1 rounded border ml-2 font-semibold ${typeBadge[ev.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
+              <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white relative z-10">
+                <div>
+                  <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">
+                    Academic <span className="text-indigo-600">Schedules</span>
+                  </h2>
+                  <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-2">
+                    All your upcoming activities
+                  </p>
+                </div>
+                <button
+                  onClick={() => setModalOpen(false)}
+                  className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all font-bold"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-gray-50/30 no-scrollbar">
+                {getUpcomingSchedules(mockEvents).length > 0 ? (
+                  getUpcomingSchedules(mockEvents).map((ev: EventType) => {
+                    const badgeClass =
+                      typeBadge[ev.type] ||
+                      "bg-gray-100 text-gray-700 border-gray-200";
+                    return (
+                      <motion.div
+                        key={ev.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col gap-6 transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-1 group w-full relative overflow-hidden"
                       >
-                        {ev.type}
-                      </span>
-                    </div>
-                    {ev.topic && (
-                      <div className="text-sm text-blue-600 mt-1">
-                        {ev.topic}
-                      </div>
-                    )}
-                    <div className="text-xs text-gray-500 mt-1">
-                      {ev.date} {ev.startTime && `| ${ev.startTime}`}
-                    </div>
+                        <div
+                          className={`absolute top-0 right-0 w-32 h-32 opacity-[0.03] transition-transform duration-700 group-hover:scale-150 rounded-full -mr-16 -mt-16 ${ev.type === "Online Zoom Class" ? "bg-blue-600" : "bg-indigo-600"}`}
+                        />
+
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 relative z-10">
+                          <div className="flex-1">
+                            <h4 className="font-black text-gray-900 text-xl tracking-tight group-hover:text-indigo-600 transition-colors uppercase leading-tight">
+                              {ev.title}
+                            </h4>
+                            <div className="flex items-center gap-3 mt-3">
+                              <span
+                                className={`text-[10px] px-3 py-1 rounded-xl border font-black uppercase tracking-widest ${badgeClass}`}
+                              >
+                                {ev.type}
+                              </span>
+                              {ev.topic && (
+                                <div className="flex items-center gap-2 text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-xl uppercase tracking-widest">
+                                  <Info size={12} /> {ev.topic}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 flex gap-3">
+                            {ev.type === "Online Zoom Class" ? (
+                              <button className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-blue-100 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all">
+                                Schedule
+                              </button>
+                            ) : ev.type === "Assignment" ? (
+                              <button className="px-6 py-3 rounded-2xl bg-green-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-green-100 hover:bg-green-700 hover:scale-105 active:scale-95 transition-all">
+                                View
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 relative z-10 pt-2 border-t border-gray-50">
+                          <span className="flex items-center gap-2">
+                            <CalendarIcon size={14} className="text-gray-300" />{" "}
+                            {ev.date}
+                          </span>
+                          {ev.startTime && (
+                            <span className="flex items-center gap-2">
+                              <Clock size={14} className="text-gray-300" />{" "}
+                              {ev.startTime} - {ev.endTime}
+                            </span>
+                          )}
+                          {ev.platform && (
+                            <span className="flex items-center gap-2">
+                              <BookOpen size={14} className="text-gray-300" />{" "}
+                              {ev.platform}
+                            </span>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border border-dashed border-gray-200 opacity-50">
+                    <Clock className="text-gray-300 mb-4" size={48} />
+                    <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">
+                      No upcoming schedules found
+                    </p>
                   </div>
-                ))}
-                displayScrollbar={false}
-                showGradients={false}
-                itemClassName=""
-                onItemSelect={() => {}}
-              />
-            </div>
+                )}
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }

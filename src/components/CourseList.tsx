@@ -1,14 +1,12 @@
 import React from "react";
-import dynamic from "next/dynamic";
 import { RouteLink } from "./ui/route-link";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "./ui/card";
-import { Badge } from "./ui/badge";
+  ArrowRight,
+  Book,
+  GraduationCap,
+  Clock,
+  CheckCircle,
+} from "lucide-react";
 
 interface Course {
   id: string;
@@ -23,86 +21,139 @@ interface CourseListProps {
   courses: Course[];
 }
 
-const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList"), {
-  ssr: false,
-});
-
 const CourseList: React.FC<CourseListProps> = ({ courses }) => {
-  const renderCard = (course: Course, mobile: boolean = false) => (
-    <RouteLink
-      key={course.id}
-      href={`/dashboard/student/courses/${course.id}`}
-      className="block"
-    >
-      <Card
-        className={`transition-transform transition-shadow duration-300 hover:scale-105 hover:shadow-xl cursor-pointer ${mobile ? "min-w-[250px] flex-shrink-0" : ""}`}
-      >
-        <CardHeader>
-          <CardTitle>{course.name}</CardTitle>
-          <div className="text-xs text-gray-500 mb-1">
-            Reg. No: {course.registrationNumber}
-          </div>
-          {course.description && (
-            <CardDescription>{course.description}</CardDescription>
-          )}
-          <div className="flex gap-1 mt-2">
-            <Badge
-              className={
-                course.courseStatus.toLowerCase() === "ongoing"
-                  ? "bg-orange-500 text-white"
-                  : course.courseStatus.toLowerCase() === "completed"
-                    ? "bg-green-500 text-white"
-                    : ""
-              }
-            >
-              {course.courseStatus}
-            </Badge>
-            <Badge
-              className={
-                course.certificateStatus.toLowerCase() === "issued"
-                  ? "bg-green-500 text-white"
-                  : course.certificateStatus.toLowerCase() === "not issued"
-                    ? "bg-red-500 text-white"
-                    : ""
-              }
-            >
-              {course.certificateStatus.toLowerCase() === "issued"
-                ? "Certificate Issued"
-                : course.certificateStatus.toLowerCase() === "not issued"
-                  ? "Certificate Not Issued"
-                  : course.certificateStatus}
-            </Badge>
-          </div>
-        </CardHeader>
-      </Card>
-    </RouteLink>
-  );
+  const getStatusConfig = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "ongoing":
+        return {
+          bg: "bg-amber-50",
+          text: "text-amber-700",
+          border: "border-amber-100",
+          icon: Clock,
+          label: "In Progress",
+        };
+      case "completed":
+        return {
+          bg: "bg-green-50",
+          text: "text-green-700",
+          border: "border-green-100",
+          icon: CheckCircle,
+          label: "Completed",
+        };
+      default:
+        return {
+          bg: "bg-gray-50",
+          text: "text-gray-700",
+          border: "border-gray-100",
+          icon: Book,
+          label: status,
+        };
+    }
+  };
 
-  const items = courses.map((course) => renderCard(course));
+  const getCertificateConfig = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "issued":
+        return {
+          bg: "bg-green-50",
+          text: "text-green-600",
+          border: "border-green-100",
+          icon: GraduationCap,
+          label: "Certificate Issued",
+        };
+      case "not issued":
+        return {
+          bg: "bg-gray-50",
+          text: "text-gray-500",
+          border: "border-gray-100",
+          icon: Book,
+          label: "Certificate Not Issued",
+        };
+      default:
+        return {
+          bg: "bg-gray-50",
+          text: "text-gray-500",
+          border: "border-gray-100",
+          icon: Book,
+          label: status,
+        };
+    }
+  };
+
+  const renderCourseCard = (course: Course) => {
+    const status = getStatusConfig(course.courseStatus);
+    const cert = getCertificateConfig(course.certificateStatus);
+    const StatusIcon = status.icon;
+    const CertIcon = cert.icon;
+
+    return (
+      <RouteLink
+        key={course.id}
+        href={`/dashboard/student/courses/${course.id}`}
+        className="group block"
+      >
+        <div className="bg-white rounded-[2rem] border border-gray-100 p-6 h-full flex flex-col transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-2 group-hover:border-indigo-100 relative overflow-hidden">
+          {/* Subtle Background Pattern */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full -mr-16 -mt-16 transition-transform duration-700 group-hover:scale-150" />
+
+          <div className="relative z-10 flex flex-col h-full">
+            {/* Header: Icon & Status */}
+            <div className="flex items-start justify-between mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-500">
+                <Book size={24} />
+              </div>
+              <div
+                className={`px-3 py-1.5 rounded-xl border ${status.bg} ${status.text} ${status.border} flex items-center gap-1.5 shadow-sm`}
+              >
+                <StatusIcon size={14} />
+                <span className="text-[10px] font-black uppercase tracking-wider">
+                  {status.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors duration-300 mb-1">
+                {course.name}
+              </h3>
+              <p className="text-xs text-gray-400 font-medium mb-3">
+                REG:{" "}
+                <span className="text-gray-600 font-bold">
+                  {course.registrationNumber}
+                </span>
+              </p>
+              {course.description && (
+                <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                  {course.description}
+                </p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-6 pt-6 border-t border-gray-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`flex items-center gap-1.5 text-[10px] font-bold ${cert.text} ${cert.bg} px-2.5 py-1.5 rounded-lg border ${cert.border} shadow-sm transition-all duration-300`}
+                >
+                  <CertIcon size={12} />
+                  {cert.label.toUpperCase()}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-indigo-600 font-bold text-sm tracking-tight opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
+                Enter Course
+                <ArrowRight size={16} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </RouteLink>
+    );
+  };
 
   return (
-    <div className="w-full">
-      {/* Mobile: horizontal scroll */}
-      <div className="md:hidden">
-        <div
-          className="flex flex-row overflow-x-auto gap-4"
-          style={{ WebkitOverflowScrolling: "touch" }}
-        >
-          {courses.map((course) => renderCard(course, true))}
-        </div>
-      </div>
-
-      {/* Desktop: vertical animated list with scrollbar */}
-      <div className="hidden md:block">
-        <AnimatedList
-          items={items}
-          onItemSelect={() => {}}
-          showGradients={false}
-          displayScrollbar={false}
-          className="w-full"
-          itemClassName=""
-        />
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      {courses.map((course) => renderCourseCard(course))}
     </div>
   );
 };

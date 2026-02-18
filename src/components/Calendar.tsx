@@ -2,11 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 
-import dynamic from "next/dynamic";
-const AnimatedList = dynamic(() => import("@/components/ui/AnimatedList"), {
-  ssr: false,
-});
 import { ModernModal } from "@/components/ui/modern-modal";
+import {
+  X,
+  CheckCircle,
+  Clock,
+  Calendar as CalendarIcon,
+  Info,
+} from "lucide-react";
 
 // Mock event data structure
 const mockEvents = [
@@ -262,7 +265,6 @@ function DayCell({
   isToday,
   isSelected,
   onClick,
-  onDoubleClick,
 }: {
   day: number;
   date: string;
@@ -270,7 +272,6 @@ function DayCell({
   isToday: boolean;
   isSelected: boolean;
   onClick: () => void;
-  onDoubleClick?: () => void;
 }) {
   return (
     <button
@@ -280,7 +281,6 @@ function DayCell({
         min-w-0 max-w-full overflow-hidden`}
       style={{ minWidth: 0 }}
       onClick={onClick}
-      onDoubleClick={onDoubleClick}
     >
       <span
         className={`text-lg font-bold ${isToday ? "text-indigo-600" : "text-gray-700"}`}
@@ -324,10 +324,10 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
           events={events}
           isToday={dateStr === todayStr}
           isSelected={selected === dateStr}
-          onClick={() => setSelected(dateStr)}
-          onDoubleClick={() => {
+          onClick={() => {
             setSelected(dateStr);
             setModalDate(dateStr);
+            if (onModalOpenChange) onModalOpenChange(true);
           }}
         />
       </div>
@@ -418,8 +418,7 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
           events={events}
           isToday={dateStr === todayStr}
           isSelected={selected === dateStr}
-          onClick={() => setSelected(dateStr)}
-          onDoubleClick={() => {
+          onClick={() => {
             setSelected(dateStr);
             setModalDate(dateStr);
             if (onModalOpenChange) onModalOpenChange(true);
@@ -461,10 +460,10 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
           events={events}
           isToday={dateStr === todayStr}
           isSelected={selected === dateStr}
-          onClick={() => setSelected(dateStr)}
-          onDoubleClick={() => {
+          onClick={() => {
             setSelected(dateStr);
             setModalDate(dateStr);
+            if (onModalOpenChange) onModalOpenChange(true);
           }}
         />,
       );
@@ -583,61 +582,78 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
         avatarColor="bg-indigo-600"
         className="max-w-2xl"
       >
-        <div className="max-h-[400px] overflow-y-auto no-scrollbar">
-          <AnimatedList
-            items={getEventsForDate(modalDate || "").map((event) => (
-              <div
-                key={event.id}
-                className={`bg-white border border-gray-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm hover:shadow-lg transition-all duration-300 w-full ${
-                  event.type === "Online Zoom Class"
-                    ? "border-blue-200"
-                    : event.type === "Physical Class"
-                      ? "border-yellow-200"
-                      : event.type === "Assignment"
-                        ? "border-green-200"
-                        : event.type === "Holiday"
-                          ? "border-purple-200"
-                          : "border-gray-200"
-                }`}
-              >
-                <div className="flex items-center gap-2 justify-between">
-                  <span
-                    className="font-bold text-gray-900 text-base tracking-tight line-clamp-2"
-                    title={event.title}
-                  >
+        <div className="max-h-[500px] overflow-y-auto no-scrollbar py-2 space-y-4">
+          {getEventsForDate(modalDate || "").map((event) => (
+            <div
+              key={event.id}
+              className={`bg-white border rounded-[2.5rem] p-8 flex flex-col gap-6 shadow-sm hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-300 w-full group relative overflow-hidden ${
+                event.type === "Online Zoom Class"
+                  ? "border-blue-100"
+                  : event.type === "Physical Class"
+                    ? "border-yellow-100"
+                    : event.type === "Assignment"
+                      ? "border-green-100"
+                      : event.type === "Holiday"
+                        ? "border-purple-100"
+                        : "border-gray-100"
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 relative z-10">
+                <div className="flex-1">
+                  <h4 className="font-black text-gray-900 text-xl tracking-tight group-hover:text-indigo-600 transition-colors uppercase leading-tight">
                     {event.title}
-                  </span>
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full font-bold ml-2 ${
-                      event.type === "Online Zoom Class"
-                        ? "bg-blue-100 text-blue-700"
-                        : event.type === "Physical Class"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : event.type === "Assignment"
-                            ? "bg-green-100 text-green-700"
-                            : event.type === "Holiday"
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {event.type}
-                  </span>
-                </div>
-                {event.topic && (
-                  <div className="text-xs text-blue-600 mt-1">
-                    {event.topic}
+                  </h4>
+                  <div className="flex items-center gap-3 mt-3">
+                    <span
+                      className={`text-[10px] px-3 py-1 rounded-xl font-black uppercase tracking-widest ${
+                        event.type === "Online Zoom Class"
+                          ? "bg-blue-50 text-blue-700"
+                          : event.type === "Physical Class"
+                            ? "bg-yellow-50 text-yellow-700"
+                            : event.type === "Assignment"
+                              ? "bg-green-50 text-green-700"
+                              : event.type === "Holiday"
+                                ? "bg-purple-50 text-purple-700"
+                                : "bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      {event.type}
+                    </span>
+                    {event.topic && (
+                      <div className="flex items-center gap-2 text-[10px] font-black text-blue-600 bg-blue-50/50 w-fit px-3 py-1 rounded-xl uppercase tracking-widest">
+                        <Info size={12} /> {event.topic}
+                      </div>
+                    )}
                   </div>
-                )}
-                <div className="text-xs text-gray-500 mt-1">
-                  {event.date} {event.startTime && `| ${event.startTime}`}
+                </div>
+
+                <div className="shrink-0 flex gap-3">
+                  {event.type === "Online Zoom Class" ? (
+                    <button className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-blue-100 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all">
+                      Schedule
+                    </button>
+                  ) : event.type === "Assignment" ? (
+                    <button className="px-6 py-3 rounded-2xl bg-green-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-green-100 hover:bg-green-700 hover:scale-105 active:scale-95 transition-all">
+                      View
+                    </button>
+                  ) : null}
                 </div>
               </div>
-            ))}
-            displayScrollbar={false}
-            showGradients={false}
-            itemClassName=""
-            onItemSelect={() => {}}
-          />
+
+              <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 relative z-10 pt-4 border-t border-gray-50">
+                <span className="flex items-center gap-2">
+                  <CalendarIcon size={14} className="text-gray-300" />{" "}
+                  {event.date}
+                </span>
+                {event.startTime && (
+                  <span className="flex items-center gap-2">
+                    <Clock size={14} className="text-gray-300" />{" "}
+                    {event.startTime} - {event.endTime}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
           {modalDate && getEventsForDate(modalDate).length === 0 && (
             <div className="text-gray-400">No events for this day.</div>
           )}

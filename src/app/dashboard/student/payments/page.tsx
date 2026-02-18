@@ -2,29 +2,238 @@
 
 import React from "react";
 import StudentPayment from "@/components/student-payment";
-import { CreditCard, TrendingUp } from "lucide-react";
+import { CreditCard, TrendingUp, BookOpen, ArrowRight } from "lucide-react";
 
 export default function StudentPaymentsPage() {
-  return (
-    <>
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-        <div className="flex items-center gap-6">
-          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+  const [selectedCourse, setSelectedCourse] = React.useState<string | null>(
+    null,
+  );
+
+  // Mock enrollment data - in a real app, this would come from an API/Context
+  const enrolledCourses = [
+    {
+      id: "1",
+      name: "Graphic Design",
+      icon: BookOpen,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+    },
+    {
+      id: "2",
+      name: "Web Development",
+      icon: TrendingUp,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+    },
+  ];
+
+  // Auto-select if only one course
+  React.useEffect(() => {
+    if (enrolledCourses.length === 1 && !selectedCourse) {
+      setSelectedCourse(enrolledCourses[0].name);
+    }
+  }, [enrolledCourses, selectedCourse]);
+
+  if (!selectedCourse && enrolledCourses.length > 1) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-700">
+        <div className="text-center mb-12">
+          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 mx-auto mb-6">
             <CreditCard size={40} />
           </div>
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-              My <span className="text-indigo-600">Payments</span>
-            </h1>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
-              <TrendingUp size={14} className="text-indigo-400" />
-              Financial Records
-            </p>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-2">
+            Select a <span className="text-indigo-600">Course</span>
+          </h1>
+          <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
+            Choose a program to manage your financial records
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl px-6">
+          {enrolledCourses.map((course) => (
+            <button
+              key={course.id}
+              onClick={() => setSelectedCourse(course.name)}
+              className="group bg-white rounded-[2.5rem] border border-gray-100 p-8 text-left transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-2 hover:border-indigo-100 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full -mr-16 -mt-16 transition-transform duration-700 group-hover:scale-150" />
+              <div className="relative z-10">
+                <div
+                  className={`w-14 h-14 rounded-2xl ${course.bg} ${course.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 shadow-sm font-black`}
+                >
+                  <course.icon size={28} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
+                  {course.name}
+                </h3>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-loose flex items-center gap-2">
+                  Manage Payments
+                  <ArrowRight
+                    size={14}
+                    className="group-hover:translate-x-1 transition-transform"
+                  />
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100 ring-4 ring-indigo-50">
+              <CreditCard size={32} />
+            </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                  My <span className="text-indigo-600">Payments</span>
+                </h1>
+                {enrolledCourses.length > 1 && (
+                  <button
+                    onClick={() => setSelectedCourse(null)}
+                    className="px-3 py-1 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 rounded-lg text-[10px] font-black text-gray-400 hover:text-indigo-600 uppercase tracking-widest transition-all"
+                  >
+                    Switch Course
+                  </button>
+                )}
+              </div>
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+                <TrendingUp size={14} className="text-indigo-400" />
+                {selectedCourse} • Financial Overview
+              </p>
+            </div>
           </div>
         </div>
       </div>
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8">
-        <StudentPayment />
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Main Section - Activity & Stats */}
+        <div className="lg:col-span-8 space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-[2rem] border border-gray-100 p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-100/30 transition-all duration-500 group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors duration-500">
+                  <TrendingUp size={20} />
+                </div>
+              </div>
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">
+                Total Paid ({selectedCourse})
+              </h3>
+              <p className="text-3xl font-black text-gray-900">$4,500.00</p>
+            </div>
+
+            <div className="bg-white rounded-[2rem] border border-gray-100 p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-100/30 transition-all duration-500 group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-500">
+                  <CreditCard size={20} />
+                </div>
+              </div>
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">
+                Total Balance
+              </h3>
+              <p className="text-3xl font-black text-gray-900">$250.00</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                Recent <span className="text-indigo-600">Transactions</span>
+              </h2>
+              <button
+                onClick={() =>
+                  window.dispatchEvent(new CustomEvent("open-history-modal"))
+                }
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors uppercase tracking-widest"
+              >
+                View All
+              </button>
+            </div>
+            <StudentPayment selectedCourse={selectedCourse || undefined} />
+          </div>
+        </div>
+
+        {/* Sidebar - Actions & Invoices */}
+        <div className="lg:col-span-4 space-y-8 animate-in fade-in slide-in-from-right-6 duration-700 delay-200">
+          <div className="bg-indigo-600 rounded-[2.5rem] p-8 shadow-2xl shadow-indigo-200 text-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700" />
+            <div className="relative z-10">
+              <h3 className="text-xl font-bold mb-2">Need to Pay?</h3>
+              <p className="text-indigo-100 text-sm mb-6 leading-relaxed">
+                Submit your payment receipt or proceed with online transaction
+                to clear your dues for {selectedCourse}.
+              </p>
+              <button
+                onClick={() =>
+                  window.dispatchEvent(
+                    new CustomEvent("open-pay-modal", {
+                      detail: { course: selectedCourse },
+                    }),
+                  )
+                }
+                className="w-full bg-white text-indigo-600 font-black py-4 rounded-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 uppercase tracking-tighter"
+              >
+                Raise New Payment
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-6">
+              Upcoming Invoices
+            </h3>
+            <div className="space-y-6">
+              {[
+                {
+                  name: "Exam Fee",
+                  date: "Feb 28, 2026",
+                  amount: "$150.00",
+                  color: "text-amber-600",
+                  bg: "bg-amber-50",
+                  courseTag: selectedCourse,
+                },
+                {
+                  name: "Course Fee Refund",
+                  date: "Mar 15, 2026",
+                  amount: "$400.00",
+                  color: "text-indigo-600",
+                  bg: "bg-indigo-50",
+                  courseTag: selectedCourse,
+                },
+              ].map((inv, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-10 h-10 rounded-xl ${inv.bg} flex items-center justify-center ${inv.color}`}
+                    >
+                      <CreditCard size={18} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-sm group-hover:text-indigo-600 transition-colors">
+                        {inv.name}
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
+                        {inv.date}
+                      </p>
+                    </div>
+                  </div>
+                  <p className={`font-black text-sm ${inv.color}`}>
+                    {inv.amount}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );
