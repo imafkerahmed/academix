@@ -60,7 +60,6 @@ export default function Section5Schedules() {
 
   return (
     <div className="w-full h-full flex flex-col bg-transparent">
-      <h2 className="text-xl font-semibold mb-4">Upcoming Schedules</h2>
       <div className="flex-1 overflow-y-auto mb-6 pr-2 -mr-2 no-scrollbar">
         {upcoming.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 opacity-40">
