@@ -2,13 +2,6 @@
 
 import React from "react";
 import { Clock, Timer } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { ModernModal } from "@/components/ui/modern-modal";
 
 export interface UpcomingClass {
   id: string;
@@ -23,17 +16,9 @@ export interface UpcomingClass {
 
 interface UpcomingClassesProps {
   classes: UpcomingClass[];
-  onViewAll?: () => void;
 }
 
-export default function UpcomingClasses({
-  classes,
-  onViewAll,
-}: UpcomingClassesProps) {
-  const [selectedClass, setSelectedClass] =
-    React.useState<UpcomingClass | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-
+export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
   const getWeekdayLabel = (startTime: string) => {
     const date = new Date(startTime);
     if (Number.isNaN(date.getTime())) return "";
@@ -57,166 +42,86 @@ export default function UpcomingClasses({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const openDetails = (classItem: UpcomingClass) => {
-    setSelectedClass(classItem);
-    setIsDialogOpen(true);
-  };
-
-  const handleDialogChange = (open: boolean) => {
-    setIsDialogOpen(open);
-    if (!open) setSelectedClass(null);
-  };
-
   if (classes.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-gray-900">
-            Upcoming Classes (Next 7 Days)
-          </h2>
-          {onViewAll && (
-            <button
-              onClick={onViewAll}
-              className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
-            >
-              View All
-            </button>
-          )}
-        </div>
-        <div className="text-center py-6 text-gray-500 text-sm">
-          <p>No upcoming classes scheduled</p>
-        </div>
+      <div className="text-center py-10 opacity-40">
+        <Clock className="text-gray-300 mb-2 mx-auto" size={32} />
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+          No upcoming classes scheduled
+        </p>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="bg-white rounded-lg shadow-sm p-3 lg:p-4 border border-gray-200">
-        <div className="flex items-center justify-between mb-3 lg:mb-4">
-          <h2 className="text-base lg:text-lg font-semibold text-gray-900">
-            Upcoming Classes
-          </h2>
-          {onViewAll && (
-            <button
-              onClick={onViewAll}
-              className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
-            >
-              View All
-            </button>
-          )}
-        </div>
+    <div className="max-h-[500px] overflow-y-auto pr-2 no-scrollbar">
+      <div className="space-y-4">
+        {classes.map((classItem) => {
+          const isOngoing = classItem.status === "ongoing";
+          const themeClass = isOngoing
+            ? "border-indigo-200 bg-indigo-50/30 ring-2 ring-indigo-50/50"
+            : "border-gray-100 bg-gray-50/20";
 
-        <div className="space-y-3 lg:space-y-4">
-          {classes.map((classItem) => (
+          return (
             <div
               key={classItem.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => openDetails(classItem)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  openDetails(classItem);
-                }
-              }}
-              className="w-full cursor-pointer border border-gray-200 rounded-lg p-3 lg:p-4 hover:shadow-md hover:border-blue-200 transition-shadow transition-colors bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`relative p-5 rounded-[2rem] border transition-all duration-300 group hover:shadow-xl hover:shadow-indigo-100/30 hover:-translate-y-1 ${themeClass}`}
             >
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 lg:gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className={`text-xs px-2 py-1 rounded border font-semibold ${getStatusColor(classItem.status)}`}
-                    >
-                      {classItem.status.toUpperCase()}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-base lg:text-lg text-gray-800 mb-1">
-                    {classItem.classTitle}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-1">
-                    <span className="font-semibold">Intake:</span>{" "}
-                    {classItem.intakeName} •{" "}
-                    <span className="font-semibold">Course:</span>{" "}
-                    {classItem.courseName}
-                  </p>
-                  <div className="text-xs lg:text-sm text-gray-500 flex flex-wrap items-center gap-3 lg:gap-4">
-                    <span className="flex items-center gap-1">
-                      <Clock size={14} />
-                      <span className="font-medium text-gray-800">
-                        {getWeekdayLabel(classItem.startTime)}
+              {isOngoing && (
+                <div className="absolute -top-2 -right-2 bg-indigo-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10 animate-pulse">
+                  Active Now
+                </div>
+              )}
+
+              <div className="flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-black text-gray-900 text-base tracking-tight leading-tight group-hover:text-indigo-600 transition-colors uppercase">
+                      {classItem.classTitle}
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span
+                        className={`text-[9px] px-2 py-0.5 rounded-lg border font-black uppercase tracking-widest ${getStatusColor(classItem.status)}`}
+                      >
+                        {classItem.status.toUpperCase()}
                       </span>
-                      <span>• {classItem.startTime}</span>
+                      <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-lg">
+                        {classItem.intakeName}
+                      </span>
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                        {classItem.courseName}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center gap-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    <span className="flex items-center gap-1.5">
+                      <Clock size={12} className="text-gray-300" />{" "}
+                      {getWeekdayLabel(classItem.startTime)} •{" "}
+                      {classItem.startTime}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Timer size={14} />
+                    <span className="flex items-center gap-1.5">
+                      <Timer size={12} className="text-gray-300" />{" "}
                       {classItem.duration} min
                     </span>
                   </div>
-                </div>
 
-                <div className="mt-3 md:mt-0 flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                  {classItem.zoomJoinUrl ? (
+                  {classItem.zoomJoinUrl && (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleQuickJoin(classItem.zoomJoinUrl);
-                      }}
-                      className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition w-full sm:w-auto shadow-lg shadow-indigo-100"
-                      aria-label={`Join ${classItem.classTitle}`}
+                      onClick={() => handleQuickJoin(classItem.zoomJoinUrl)}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 transition-all"
                     >
                       Quick Join
                     </button>
-                  ) : null}
+                  )}
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
-
-      <ModernModal
-        open={isDialogOpen}
-        onOpenChange={handleDialogChange}
-        title={selectedClass?.classTitle ?? ""}
-        subtitle={
-          selectedClass
-            ? `${selectedClass.intakeName} • ${selectedClass.courseName}`
-            : ""
-        }
-        avatarChar={selectedClass?.classTitle.charAt(0)}
-      >
-        {selectedClass && (
-          <>
-            <div className="mt-3 space-y-2 text-sm text-gray-700">
-              <p>
-                <span className="font-semibold">Status:</span>{" "}
-                {selectedClass.status.toUpperCase()}
-              </p>
-              <p className="flex items-center gap-1">
-                <Clock size={14} />
-                <span className="font-medium text-gray-800">
-                  {getWeekdayLabel(selectedClass.startTime)}
-                </span>
-                <span>• {selectedClass.startTime}</span>
-              </p>
-              <p className="flex items-center gap-1">
-                <Timer size={14} /> {selectedClass.duration} min
-              </p>
-            </div>
-            <div className="mt-4 flex justify-end">
-              {selectedClass.zoomJoinUrl ? (
-                <button
-                  onClick={() => handleQuickJoin(selectedClass.zoomJoinUrl)}
-                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
-                >
-                  Join Class
-                </button>
-              ) : null}
-            </div>
-          </>
-        )}
-      </ModernModal>
-    </>
+    </div>
   );
 }

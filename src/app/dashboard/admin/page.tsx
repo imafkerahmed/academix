@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import UpcomingClasses from "@/components/lecturer/UpcomingClasses";
+
 import AllSchedulesModal from "@/components/admin/AllSchedulesModal";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import Calendar from "@/components/Calendar";

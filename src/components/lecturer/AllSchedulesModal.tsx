@@ -79,6 +79,18 @@ export default function AllSchedulesModal({
     setSelectedMonth(hasCurrentMonthClasses ? currentMonthKey : "");
   }, [isOpen, classes]);
 
+  // Body scroll lock
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       // Trigger animation after mount
@@ -127,113 +139,122 @@ export default function AllSchedulesModal({
     >
       {/* Modal */}
       <div
-        className={`relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden mx-4 transition-transform transition-opacity duration-300 ${
+        className={`relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden mx-4 transition-transform transition-opacity duration-300 ${
           isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
         onClick={(event) => event.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex flex-col gap-3 p-4 border-b border-gray-200 md:flex-row md:items-center md:justify-between">
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white relative z-10">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              All Scheduled Classes
+            <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">
+              Upcoming <span className="text-indigo-600">Classes</span>
             </h2>
-            {selectedMonth && (
-              <p className="text-xs text-gray-500 mt-1">
-                Filtering by:{" "}
-                {monthOptions.find((m) => m.value === selectedMonth)?.label ??
-                  selectedMonth}
+            <div className="flex items-center gap-4 mt-2">
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em]">
+                All your upcoming activities
               </p>
-            )}
+              {monthOptions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-1 rounded-full bg-gray-300" />
+                  <select
+                    value={selectedMonth}
+                    onChange={(event) => {
+                      setSelectedMonth(event.target.value);
+                    }}
+                    className="border-none bg-transparent text-[10px] font-black uppercase tracking-widest text-indigo-600 focus:outline-none cursor-pointer hover:text-indigo-700 transition-colors"
+                  >
+                    <option value="">All months</option>
+                    {monthOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {monthOptions.length > 0 && (
-              <select
-                value={selectedMonth}
-                onChange={(event) => {
-                  setSelectedMonth(event.target.value);
-                }}
-                className="border border-gray-300 rounded-md text-sm px-2 py-1 bg-white shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All months</option>
-                {monthOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            <button
-              onClick={handleClose}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Close modal"
-            >
-              <X size={20} className="text-gray-500" />
-            </button>
-          </div>
+          <button
+            onClick={handleClose}
+            className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all font-bold"
+          >
+            <X size={24} />
+          </button>
         </div>
 
-        {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-[calc(85vh-80px)]">
+        <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-gray-50/30 no-scrollbar">
           {filteredClasses.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p>No scheduled classes found</p>
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border border-dashed border-gray-200 opacity-50">
+              <Clock className="text-gray-300 mb-4" size={48} />
+              <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">
+                No scheduled classes found
+              </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredClasses.map((classItem) => (
-                <div
-                  key={classItem.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className={`text-xs px-2 py-1 rounded border font-semibold ${getStatusColor(classItem.status)}`}
-                        >
-                          {classItem.status.toUpperCase()}
-                        </span>
+            <div className="space-y-4">
+              {filteredClasses.map((classItem) => {
+                const isOngoing = classItem.status === "ongoing";
+                return (
+                  <div
+                    key={classItem.id}
+                    className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col gap-6 transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-1 group w-full relative overflow-hidden"
+                  >
+                    <div
+                      className={`absolute top-0 right-0 w-32 h-32 opacity-[0.03] transition-transform duration-700 group-hover:scale-150 rounded-full -mr-16 -mt-16 bg-indigo-600`}
+                    />
+
+                    {isOngoing && (
+                      <div className="absolute top-6 right-8 bg-indigo-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10 animate-pulse">
+                        Active Now
                       </div>
-                      <h3 className="font-semibold text-base text-gray-800 mb-1">
-                        {classItem.classTitle}
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-1">
-                        <span className="font-semibold">Intake:</span>{" "}
-                        {classItem.intakeName} →{" "}
-                        <span className="font-semibold">Course:</span>{" "}
-                        {classItem.courseName}
-                      </p>
-                      <div className="text-sm text-gray-500 flex items-center gap-3">
-                        <span className="flex items-center gap-1">
-                          <Clock size={14} />
-                          <span className="font-medium text-gray-800">
-                            {getWeekdayLabel(classItem.startTime)}
+                    )}
+
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 relative z-10">
+                      <div className="flex-1">
+                        <h4 className="font-black text-gray-900 text-xl tracking-tight group-hover:text-indigo-600 transition-colors uppercase leading-tight">
+                          {classItem.classTitle}
+                        </h4>
+                        <div className="flex items-center gap-3 mt-3">
+                          <span
+                            className={`text-[10px] px-3 py-1 rounded-xl border font-black uppercase tracking-widest ${getStatusColor(classItem.status)}`}
+                          >
+                            {classItem.status.toUpperCase()}
                           </span>
-                          <span>• {classItem.startTime}</span>
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Timer size={14} />
-                          {classItem.duration} min
-                        </span>
+                          <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-xl uppercase tracking-widest">
+                            {classItem.intakeName}
+                          </span>
+                        </div>
                       </div>
+
+                      {classItem.zoomJoinUrl && (
+                        <div className="shrink-0">
+                          <button
+                            onClick={() =>
+                              handleQuickJoin(classItem.zoomJoinUrl)
+                            }
+                            className="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all"
+                          >
+                            Join Class
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-2">
-                      {classItem.zoomJoinUrl ? (
-                        <button
-                          onClick={(event) => {
-                            handleQuickJoin(classItem.zoomJoinUrl);
-                          }}
-                          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
-                          aria-label={`Join ${classItem.classTitle}`}
-                        >
-                          Quick Join
-                        </button>
-                      ) : null}
+
+                    <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 relative z-10 pt-4 border-t border-gray-50">
+                      <span className="flex items-center gap-2">
+                        <Clock size={14} className="text-gray-300" />{" "}
+                        {getWeekdayLabel(classItem.startTime)} •{" "}
+                        {classItem.startTime}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Timer size={14} className="text-gray-300" />{" "}
+                        {classItem.duration} min
+                      </span>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

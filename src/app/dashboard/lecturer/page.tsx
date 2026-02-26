@@ -346,16 +346,21 @@ export default function LecturerDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
               {/* Upcoming Classes */}
               <div className="lg:col-span-7 xl:col-span-8">
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02] flex flex-col h-full">
                   <div className="flex justify-between items-center mb-8">
-                    <div>
-                      <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
-                        Upcoming{" "}
-                        <span className="text-indigo-600">Classes</span>
-                      </h3>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
-                        Your scheduled sessions
-                      </p>
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <Video size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                          Upcoming{" "}
+                          <span className="text-indigo-600">Classes</span>
+                        </h3>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
+                          Your scheduled sessions
+                        </p>
+                      </div>
                     </div>
                     <button
                       onClick={() => setIsModalOpen(true)}
@@ -364,10 +369,10 @@ export default function LecturerDashboard() {
                       View All
                     </button>
                   </div>
-                  <UpcomingClasses
-                    classes={mockUpcomingClasses.slice(0, 3)}
-                    onViewAll={() => setIsModalOpen(true)}
-                  />
+
+                  <div className="flex-1 overflow-hidden">
+                    <UpcomingClasses classes={mockUpcomingClasses} />
+                  </div>
                 </div>
               </div>
 
