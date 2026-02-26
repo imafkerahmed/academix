@@ -388,664 +388,524 @@ export default function AssignmentMarkingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-4 md:px-8 md:py-6 pt-6 relative">
-      <div className="max-w-6xl mx-auto space-y-4">
-        <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-          <DialogContent className="sm:max-w-4xl h-[80vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>{assignment.title}</DialogTitle>
-              <DialogDescription>
-                <span className="block text-xs text-gray-500 mb-1">
+    <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+      {/* Page Header Card */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => router.push("/dashboard/lecturer/intakes")}
+            className="group/back w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-indigo-600 hover:text-white transition-all duration-300 shadow-sm"
+          >
+            <ArrowLeft
+              size={24}
+              strokeWidth={3}
+              className="group-hover/back:-translate-x-1 transition-transform"
+            />
+          </button>
+          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+            <FileText size={40} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight leading-none mb-2">
+              Process <span className="text-indigo-600">Submissions</span>
+            </h1>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+              <span className="text-indigo-400">{assignment.subjectCode}</span>
+              <span className="text-gray-200">/</span>
+              {assignment.title}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <button
+            className="flex items-center gap-3 px-6 py-3 bg-emerald-50 text-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all duration-500 shadow-xl shadow-emerald-500/5 group"
+            onClick={handleExportMarksheet}
+          >
+            <FileSpreadsheet
+              size={16}
+              className="group-hover:scale-110 transition-transform"
+            />
+            Export Marksheet
+          </button>
+          <button
+            className="flex items-center gap-3 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all duration-500 shadow-xl shadow-indigo-500/5 group"
+            onClick={() => setIsSheetOpen(true)}
+          >
+            <FileText
+              size={16}
+              className="group-hover:scale-110 transition-transform"
+            />
+            Instructions
+          </button>
+        </div>
+      </div>
+
+      <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <DialogContent className="sm:max-w-4xl h-[80vh] flex flex-col border-none p-0 overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem]">
+          <DialogHeader className="p-8 border-b border-gray-100">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100">
+                <FileText size={24} />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-black text-gray-900 tracking-tight uppercase">
+                  {assignment.title}
+                </DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
                   {assignment.subjectCode} · {assignment.subjectName} · Due:{" "}
                   {assignment.dueDate}
-                </span>
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2 border rounded-md overflow-hidden bg-gray-50">
-                {assignment.assignmentSheetUrl ? (
-                  <iframe
-                    src={assignment.assignmentSheetUrl}
-                    className="w-full h-full border-0"
-                    title={assignment.assignmentSheetName ?? "Assignment sheet"}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-sm text-gray-500 px-4 text-center">
-                    Assignment sheet preview is not available.
-                  </div>
-                )}
+                </DialogDescription>
               </div>
-              <div className="border rounded-md bg-white p-3 md:p-4 text-sm text-gray-700 space-y-2">
-                <h3 className="text-sm font-semibold text-gray-900">
-                  Instructions
-                </h3>
-                <p>
-                  Students should build a basic calculator that supports +, -,
-                  *, / and clear.
-                </p>
-                {assignment.description && (
-                  <p className="text-xs text-gray-600">
-                    {assignment.description}
-                  </p>
-                )}
+            </div>
+          </DialogHeader>
+          <div className="flex-1 p-8 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="md:col-span-2 space-y-6">
+                <div className="bg-gray-50/50 border border-gray-100 rounded-[2rem] overflow-hidden aspect-[4/3] relative">
+                  {assignment.assignmentSheetUrl ? (
+                    <iframe
+                      src={assignment.assignmentSheetUrl}
+                      className="w-full h-full border-0"
+                      title={
+                        assignment.assignmentSheetName ?? "Assignment sheet"
+                      }
+                    />
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center text-gray-400">
+                      <FileSpreadsheet size={48} className="opacity-20" />
+                      <p className="text-xs font-bold uppercase tracking-widest">
+                        Preview Unavailable
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-4">
+                    Instructions
+                  </h3>
+                  <div className="bg-indigo-50/30 border border-indigo-50 rounded-[1.5rem] p-6 text-sm text-gray-600 leading-relaxed italic">
+                    {assignment.description ||
+                      "No specific instructions provided."}
+                  </div>
+                </div>
                 {assignment.assignmentSheetUrl && (
                   <a
                     href={assignment.assignmentSheetUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center text-xs font-medium text-emerald-700 hover:text-emerald-800"
+                    className="flex items-center justify-center gap-3 w-full py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all duration-300 group"
                   >
-                    <FileText className="w-3 h-3 mr-1" />
-                    Open PDF in new tab
+                    <FileText
+                      size={16}
+                      className="group-hover:scale-110 transition-transform"
+                    />
+                    Open Source PDF
                   </a>
                 )}
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Header Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="flex items-center gap-4">
+      {/* Filters Overlay */}
+      <div className="flex flex-wrap items-center gap-3 p-2 bg-gray-50/50 rounded-[2rem] border border-gray-100 w-fit">
+        {(
+          [
+            {
+              id: "submitted",
+              label: "Submitted",
+              count: stats.submitted,
+              icon: Clock,
+              color: "amber",
+            },
+            {
+              id: "not_submitted",
+              label: "Missing",
+              count: stats.notSubmitted,
+              icon: X,
+              color: "gray",
+            },
+            {
+              id: "marked",
+              label: "Graded",
+              count: stats.marked,
+              icon: CheckCircle2,
+              color: "emerald",
+            },
+            {
+              id: "resubmission",
+              label: "Resubmits",
+              count: assignment.submissions.filter((s) => s.canResubmit).length,
+              icon: RotateCcw,
+              color: "purple",
+            },
+          ] as const
+        ).map((f) => {
+          const IconComponent = f.icon;
+          const isActive = filter === f.id;
+          return (
             <button
-              onClick={() => router.push("/dashboard/lecturer")}
-              className="p-3 bg-gray-50 border border-gray-100 rounded-2xl text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all"
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`flex items-center gap-3 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 scale-100 active:scale-95 ${
+                isActive
+                  ? "bg-indigo-600 text-white shadow-xl shadow-indigo-100 scale-[1.05]"
+                  : "text-gray-400 hover:text-indigo-600 hover:bg-white/80"
+              }`}
             >
-              <ArrowLeft size={18} />
+              <IconComponent
+                size={14}
+                className={isActive ? "text-white" : `text-${f.color}-400`}
+              />
+              {f.label}
+              <span
+                className={`ml-1 px-1.5 py-0.5 rounded-md text-[8px] ${
+                  isActive
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-100 text-gray-400"
+                }`}
+              >
+                {f.count}
+              </span>
             </button>
-            <div className="w-14 h-14 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl shadow-indigo-100 ring-4 ring-indigo-50">
-              <FileText size={28} />
-            </div>
+          );
+        })}
+      </div>
+
+      {/* Main layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start min-h-[700px]">
+        {/* Left column: Submissions list */}
+        <div className="lg:col-span-1 bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full max-h-[750px] animate-in fade-in slide-in-from-left-8 duration-1000 delay-300">
+          <div className="p-6 border-b border-gray-50 bg-gray-50/30 flex items-center justify-between">
             <div>
-              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">
-                {assignment.title}
-              </h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
-                {assignment.subjectCode} · {assignment.subjectName} · Due:{" "}
-                {assignment.dueDate}
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">
+                Student List
+              </h2>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                {filteredSubmissions.length} Entries
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-              onClick={handleExportMarksheet}
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              Export Marksheet
-            </button>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          {(
-            [
-              {
-                id: "submitted",
-                label: "Submitted",
-                count: stats.submitted,
-                icon: Clock,
-                iconColor: "text-amber-600",
-              },
-              {
-                id: "not_submitted",
-                label: "Not submitted",
-                count: stats.notSubmitted,
-                icon: X,
-                iconColor: "text-gray-500",
-              },
-              {
-                id: "marked",
-                label: "Marked",
-                count: stats.marked,
-                icon: CheckCircle2,
-                iconColor: "text-green-600",
-              },
-              {
-                id: "resubmission",
-                label: "Resubmission",
-                count: assignment.submissions.filter((s) => s.canResubmit)
-                  .length,
-                icon: RotateCcw,
-                iconColor: "text-purple-600",
-              },
-            ] as const
-          ).map((f) => {
-            const IconComponent = f.icon;
-            return (
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+            {filteredSubmissions.map((s) => (
               <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-[11px] font-black uppercase tracking-widest transition-all ${
-                  filter === f.id
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100"
-                    : "bg-white text-gray-500 border-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100"
+                key={s.id}
+                onClick={() => {
+                  setSelectedSubmissionId(s.id);
+                  if (window.innerWidth < 1024) {
+                    setIsMobileMarkingModalOpen(true);
+                  }
+                }}
+                className={`w-full text-left p-4 rounded-2xl flex flex-col gap-2 transition-all duration-300 group ${
+                  selectedSubmissionId === s.id
+                    ? "bg-indigo-600 text-white shadow-xl shadow-indigo-100"
+                    : "bg-white border border-gray-50 hover:border-indigo-100 hover:bg-indigo-50/30"
                 }`}
               >
-                <IconComponent
-                  size={12}
-                  className={filter === f.id ? "text-white" : f.iconColor}
-                />
-                {f.label} ({f.count})
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Main layout */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-start">
-          {/* Left column: assignment card + submissions list */}
-          <div className="flex flex-col space-y-3 lg:col-span-1">
-            <div
-              className="bg-white rounded-[2rem] shadow-sm border border-gray-100 px-5 py-4 space-y-1 cursor-pointer hover:shadow-md hover:border-indigo-100 transition-all"
-              role="button"
-              tabIndex={0}
-              onClick={() => setIsSheetOpen(true)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setIsSheetOpen(true);
-                }
-              }}
-            >
-              <div className="space-y-0.5">
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">
-                  Assignment Sheet
-                </h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                  Click to view PDF & instructions
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">
-                  Submissions
-                </h2>
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  {filteredSubmissions.length} shown
-                </span>
-              </div>
-              <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
-                {filteredSubmissions.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      setSelectedSubmissionId(s.id);
-                      if (window.innerWidth < 1024) {
-                        setIsMobileMarkingModalOpen(true);
-                      }
-                    }}
-                    className={`w-full text-left px-5 py-3 flex flex-col gap-1 hover:bg-indigo-50/50 transition-colors ${
-                      selectedSubmissionId === s.id
-                        ? "bg-indigo-50"
-                        : "bg-white"
-                    }`}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-black truncate ${selectedSubmissionId === s.id ? "text-white" : "text-gray-900"}`}
+                    >
+                      {s.studentName}
+                    </p>
+                    <p
+                      className={`text-[10px] font-bold uppercase tracking-widest ${selectedSubmissionId === s.id ? "text-indigo-200" : "text-gray-400"}`}
+                    >
+                      ID: {s.studentId}
+                    </p>
+                  </div>
+                  {s.marks != null && (
+                    <div
+                      className={`px-2 py-1 rounded-lg text-[10px] font-black ${selectedSubmissionId === s.id ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-600"}`}
+                    >
+                      {s.marks}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span
+                    className={`text-[9px] font-bold uppercase tracking-widest ${selectedSubmissionId === s.id ? "text-indigo-100" : "text-gray-500"}`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {s.studentName}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          ID: {s.studentId}
-                        </p>
-                      </div>
-                      <span
-                        className={`text-[10px] px-2 py-1 rounded-full border font-semibold uppercase tracking-wide ${getStatusBadgeClasses(s.status)}`}
-                      >
-                        {s.status.replace("_", " ")}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-gray-500 mt-1">
-                      <span>
-                        {s.submittedAt
-                          ? `Submitted: ${s.submittedAt}`
-                          : "Not submitted"}
-                      </span>
-                      {s.grade && <span>Grade: {s.grade}</span>}
-                    </div>
-                    {s.canResubmit && (
-                      <div className="mt-0.5 text-[10px] text-amber-600">
-                        Resubmission allowed
-                      </div>
-                    )}
-                  </button>
-                ))}
-                {filteredSubmissions.length === 0 && (
-                  <div className="px-4 py-6 text-center text-sm text-gray-500">
-                    No students in this filter.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Marking panel - hidden on mobile, visible on md+ */}
-          <div className="hidden md:block bg-white rounded-[2rem] shadow-sm border border-gray-100 md:col-span-2 lg:col-span-3">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2">
-              <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
-                <h2 className="text-sm font-semibold text-gray-900 truncate">
-                  {selectedSubmission
-                    ? `Marking: ${selectedSubmission.studentName}`
-                    : "Select a student to begin"}
-                </h2>
-              </div>
-
-              {/* Mobile submission selector (hidden on md+) */}
-              {selectedSubmission && (
-                <select
-                  value={selectedSubmissionId || ""}
-                  onChange={(e) => {
-                    setSelectedSubmissionId(e.target.value);
-                    setIsMobileMarkingModalOpen(true);
-                  }}
-                  className="md:hidden text-xs px-2 py-1 border border-gray-300 rounded bg-white"
-                >
-                  {filteredSubmissions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.studentName} ({s.status.replace("_", " ")})
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {selectedSubmission && selectedSubmission.status === "marked" && (
-                <span className="inline-flex items-center gap-1 text-xs text-green-600 whitespace-nowrap">
-                  <CheckCircle2 size={14} /> Marked
-                </span>
-              )}
-            </div>
-            {selectedSubmission ? (
-              filter === "not_submitted" ? (
-                <div className="p-4 space-y-4">
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-                    {/* Not submitted view: info only, no extensions */}
-                    <div className="xl:col-span-2 space-y-3">
-                      <div className="border border-gray-200 rounded-lg shadow-sm p-4 bg-white space-y-2 text-xs text-gray-700">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                          No submission from this student
-                        </h3>
-                        <p>
-                          This student has not submitted this assignment yet.
-                          Deadline extensions are managed by the administrator
-                          and are not available in the lecturer portal.
-                        </p>
-                      </div>
-
-                      <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-0.5">
-                        <p className="font-semibold text-gray-900 text-sm">
-                          {selectedSubmission.studentName}
-                        </p>
-                        <p>ID: {selectedSubmission.studentId}</p>
-                        <p>
-                          Status: {selectedSubmission.status.replace("_", " ")}
-                        </p>
-                        {selectedSubmission.submittedAt && (
-                          <p>Submitted at: {selectedSubmission.submittedAt}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-gray-500 pt-1 border-t border-dashed border-gray-100 mt-2">
-                    This page currently stores data in memory only. Later, you
-                    can connect it to PocketBase to persist submissions and
-                    grading data.
-                  </p>
+                    {s.submittedAt ? "Submitted" : "Missing"}
+                  </span>
+                  {s.grade && (
+                    <span
+                      className={`text-[10px] font-black ${selectedSubmissionId === s.id ? "text-white" : "text-indigo-600"}`}
+                    >
+                      Grade {s.grade}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <div className="p-4 space-y-4">
-                  {/* Preview + grading layout */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-                    {/* Large preview on the left */}
-                    <div className="md:col-span-2 lg:col-span-2">
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden h-[350px] sm:h-[450px] md:h-[500px] lg:h-[600px] flex flex-col">
-                        <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between text-xs text-gray-600 bg-gray-50">
-                          <div className="truncate">
-                            <span className="font-semibold mr-1">
-                              Submission preview
-                            </span>
-                            {selectedSubmission.filePlaceholder && (
-                              <span className="truncate">
-                                ({selectedSubmission.filePlaceholder})
-                              </span>
-                            )}
-                          </div>
-                          {selectedSubmission.fileUrl && (
-                            <a
-                              href={selectedSubmission.fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[11px] font-medium text-blue-600 hover:text-blue-700"
-                            >
-                              Open in new tab
-                            </a>
-                          )}
-                        </div>
-                        <div className="flex-1 bg-white">
-                          {selectedSubmission.fileUrl ? (
-                            <iframe
-                              src={selectedSubmission.fileUrl}
-                              className="w-full h-full border-0"
-                              title={`${selectedSubmission.studentName} submission preview`}
-                            />
-                          ) : selectedSubmission.filePlaceholder ? (
-                            <div className="h-full flex flex-col items-center justify-center px-4 text-xs text-gray-500 text-center">
-                              <p className="mb-1">
-                                Live preview will appear here once file URLs are
-                                connected.
-                              </p>
-                              <p className="font-semibold">
-                                File: {selectedSubmission.filePlaceholder}
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="h-full flex items-center justify-center px-4 text-xs text-gray-500 text-center">
-                              No file uploaded for this student.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Grading panel and feedback on the right */}
-                    <div className="md:col-span-2 lg:col-span-1 space-y-3">
-                      <div className="border border-gray-200 rounded-lg shadow-sm p-4 bg-white space-y-3">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                          Grade Submission
-                        </h3>
-                        <div className="space-y-2">
-                          <label className="block text-xs font-semibold text-gray-700">
-                            Grade (out of {assignment.maxMarks})
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={assignment.maxMarks}
-                            value={marksInput}
-                            onChange={(event) => {
-                              const raw = event.target.value;
-                              if (raw === "") {
-                                setMarksInput("");
-                                setGradeInput("");
-                                return;
-                              }
-
-                              let numeric = Number(raw);
-                              if (!Number.isFinite(numeric)) {
-                                return;
-                              }
-
-                              if (numeric < 0) numeric = 0;
-                              if (numeric > assignment.maxMarks)
-                                numeric = assignment.maxMarks;
-
-                              setMarksInput(String(numeric));
-                              if (selectedSubmission) {
-                                const auto = getEffectiveGrade(
-                                  numeric,
-                                  assignment,
-                                  selectedSubmission,
-                                );
-                                setGradeInput(auto);
-                              }
-                            }}
-                            placeholder={`e.g. 0 - ${assignment.maxMarks}`}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                          <div className="mt-1 flex items-center justify-between text-xs sm:text-sm text-gray-700">
-                            <div>
-                              <span className="font-semibold mr-1">
-                                Grade %:
-                              </span>
-                              <span className="text-base sm:text-lg font-semibold text-gray-900">
-                                {gradePercentageLabel}
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <span className="font-semibold mr-1">
-                                Letter:
-                              </span>
-                              <span className="text-base sm:text-lg font-semibold text-gray-900">
-                                {gradeInput || "—"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setMarksInput(
-                                selectedSubmission.marks != null
-                                  ? String(selectedSubmission.marks)
-                                  : "",
-                              );
-                              setGradeInput(selectedSubmission.grade ?? "");
-                              setFeedbackInput(
-                                selectedSubmission.feedback ?? "",
-                              );
-                            }}
-                            className="w-full sm:w-auto"
-                          >
-                            Reset
-                          </Button>
-                          <Button
-                            size="sm"
-                            disabled={!hasValidMarks}
-                            onClick={() =>
-                              handleSave(gradeInput, feedbackInput)
-                            }
-                            className="w-full sm:w-auto"
-                          >
-                            Save Grade
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Feedback on the right */}
-                      <div className="bg-white border border-gray-200 rounded-lg p-3 md:p-4 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="block text-xs font-semibold text-gray-700">
-                            Feedback
-                          </label>
-                        </div>
-                        <textarea
-                          value={feedbackInput}
-                          onChange={(event) =>
-                            setFeedbackInput(event.target.value)
-                          }
-                          rows={4}
-                          placeholder="Provide feedback to the student..."
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      {/* Student meta below feedback */}
-                      <div className="hidden sm:block bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-0.5">
-                        <p className="font-semibold text-gray-900 text-sm">
-                          {selectedSubmission.studentName}
-                        </p>
-                        <p>ID: {selectedSubmission.studentId}</p>
-                        <p>
-                          Status: {selectedSubmission.status.replace("_", " ")}
-                        </p>
-                        {selectedSubmission.submittedAt && (
-                          <p>Submitted at: {selectedSubmission.submittedAt}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-gray-500 pt-1 border-t border-dashed border-gray-100 mt-2">
-                    This page currently stores marks, feedback and resubmission
-                    flags in memory only. Later, you can connect it to
-                    PocketBase to persist grading and resubmission data.
-                  </p>
-                </div>
-              )
-            ) : (
-              <div className="p-6 text-center text-sm text-gray-500">
-                Select a student from the list on the left to start marking.
+              </button>
+            ))}
+            {filteredSubmissions.length === 0 && (
+              <div className="flex flex-col items-center justify-center p-12 text-center opacity-40">
+                <FileSpreadsheet size={32} className="text-gray-300 mb-4" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  No results found
+                </p>
               </div>
             )}
           </div>
         </div>
+
+        {/* Right Panel: Marking Area */}
+        <div className="lg:col-span-3 min-h-[600px] animate-in fade-in slide-in-from-right-8 duration-1000 delay-500">
+          {selectedSubmission ? (
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full max-h-[750px]">
+              {/* Submission Header info */}
+              <div className="p-8 border-b border-gray-50 bg-gray-50/20 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 bg-white border-4 border-white shadow-xl shadow-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl overflow-hidden ring-1 ring-gray-100">
+                    {selectedSubmission.studentName.charAt(0)}
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">
+                      {selectedSubmission.studentName}
+                    </h2>
+                    <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      <span>Lancer ID: {selectedSubmission.studentId}</span>
+                      <div className="w-1 h-1 rounded-full bg-gray-200" />
+                      <span
+                        className={
+                          selectedSubmission.status === "marked"
+                            ? "text-emerald-500"
+                            : "text-amber-500"
+                        }
+                      >
+                        {selectedSubmission.status.replace("_", " ")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedSubmission.status === "marked" && (
+                  <div className="px-6 py-3 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/5 ring-1 ring-emerald-100 animate-in zoom-in-95 duration-500">
+                    <CheckCircle2 size={16} />
+                    Grading Complete
+                  </div>
+                )}
+              </div>
+
+              {/* View Content or Placeholder if not submitted */}
+              <div className="flex-1 overflow-hidden p-8 flex flex-col md:flex-row gap-8">
+                {/* File Preview */}
+                <div className="flex-1 min-h-[400px] bg-gray-50/50 border border-gray-100 overflow-hidden relative group">
+                  {selectedSubmission.fileUrl ? (
+                    <iframe
+                      src={selectedSubmission.fileUrl}
+                      className="w-full h-full border-0"
+                      title="Preview"
+                    />
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center gap-6 p-12 text-center">
+                      <div className="w-20 h-20 rounded-[1.5rem] bg-indigo-50 flex items-center justify-center text-indigo-200 animate-pulse">
+                        <FileText size={40} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-gray-900 uppercase tracking-widest mb-2">
+                          {selectedSubmission.status === "not_submitted"
+                            ? "No Submission"
+                            : "Preview Pending"}
+                        </p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-loose max-w-[200px]">
+                          {selectedSubmission.status === "not_submitted"
+                            ? "This student has not uploaded any file for this assignment."
+                            : "File found but preview URL is not correctly formatted yet."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {selectedSubmission.fileUrl && (
+                    <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                      <a
+                        href={selectedSubmission.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-white/90 backdrop-blur rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-900 shadow-xl"
+                      >
+                        Open in Full Screen
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Grading Panel */}
+                {selectedSubmission.status !== "not_submitted" && (
+                  <div className="w-full md:w-[320px] lg:w-[380px] flex flex-col gap-6">
+                    <div className="p-8 bg-indigo-600 rounded-[2rem] text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
+                      <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+                      <div className="relative space-y-6">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">
+                            Assignment Score
+                          </p>
+                          <div className="flex items-baseline gap-2">
+                            <input
+                              type="text"
+                              value={marksInput}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === "" || /^\d+$/.test(val)) {
+                                  const num = Number(val);
+                                  if (num <= (assignment?.maxMarks ?? 0)) {
+                                    setMarksInput(val);
+                                    const autoGrade = getEffectiveGrade(
+                                      num,
+                                      assignment,
+                                      selectedSubmission,
+                                    );
+                                    setGradeInput(autoGrade);
+                                  }
+                                }
+                              }}
+                              className="w-20 bg-white/10 border-2 border-white/20 rounded-2xl px-3 py-2 text-3xl font-black text-center focus:outline-none focus:border-white focus:bg-white/20 transition-all"
+                              placeholder="0"
+                            />
+                            <span className="text-xl font-bold opacity-40">
+                              / {assignment.maxMarks}
+                            </span>
+                            <span className="ml-auto text-4xl font-black">
+                              {gradeInput || "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="h-px bg-white/10 w-full" />
+
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-4">
+                            Feedback & Insights
+                          </p>
+                          <textarea
+                            value={feedbackInput}
+                            onChange={(e) => setFeedbackInput(e.target.value)}
+                            placeholder="Write a private note to the student..."
+                            className="w-full bg-white/10 border-2 border-white/20 rounded-2xl p-4 text-xs font-bold placeholder:text-indigo-300 focus:outline-none focus:border-white focus:bg-white/20 transition-all min-h-[160px] resize-none"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => handleSave(gradeInput, feedbackInput)}
+                          disabled={!hasValidMarks}
+                          className="w-full py-5 bg-white text-indigo-600 rounded-2xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-black/10 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100"
+                        >
+                          {selectedSubmission.status === "marked"
+                            ? "Update Evaluation"
+                            : "Post Evaluation"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full p-12 text-center opacity-60 bg-white/50 border-2 border-dashed border-gray-100 rounded-[3rem]">
+              <div className="w-24 h-24 rounded-[2.5rem] bg-indigo-50 flex items-center justify-center text-indigo-200 mb-8 animate-bounce duration-[3000ms]">
+                <FileText size={48} />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2 uppercase">
+                Select a <span className="text-indigo-600">Student</span>
+              </h3>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] max-w-[200px] leading-loose">
+                Choose a submission from the list to begin marking and providing
+                feedback.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Mobile Marking Modal */}
       <ModernModal
         open={isMobileMarkingModalOpen}
         onOpenChange={setIsMobileMarkingModalOpen}
-        title={
-          selectedSubmission
-            ? `Marking: ${selectedSubmission.studentName}`
-            : "Mark Submission"
-        }
-        subtitle={
-          selectedSubmission
-            ? `ID: ${selectedSubmission.studentId} • Status: ${selectedSubmission.status.replace("_", " ")}`
-            : ""
-        }
+        title="Grade Submission"
+        subtitle={selectedSubmission?.studentName || "Grading"}
         avatarChar={selectedSubmission?.studentName.charAt(0)}
       >
-        {selectedSubmission &&
-          filter !== "not_submitted" &&
-          selectedSubmission.fileUrl && (
-            <div className="mb-4 -mx-6 px-6">
-              <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden h-[280px] flex flex-col">
-                <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between text-xs text-gray-600 bg-gray-50">
-                  <span className="font-semibold">Preview</span>
-                  {selectedSubmission.fileUrl && (
-                    <a
-                      href={selectedSubmission.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] font-medium text-blue-600 hover:text-blue-700"
-                    >
-                      Open
-                    </a>
-                  )}
-                </div>
-                <div className="flex-1 bg-white">
-                  <iframe
-                    src={selectedSubmission.fileUrl}
-                    className="w-full h-full border-0"
-                    title={`${selectedSubmission.studentName} submission preview`}
+        <div className="p-6 space-y-6">
+          {/* Mobile grading simplified form */}
+          {selectedSubmission?.status !== "not_submitted" ? (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  Assignment Score
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="text"
+                    value={marksInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || /^\d+$/.test(val)) {
+                        const num = Number(val);
+                        if (num <= (assignment?.maxMarks ?? 0)) {
+                          setMarksInput(val);
+                          if (selectedSubmission) {
+                            const autoGrade = getEffectiveGrade(
+                              num,
+                              assignment,
+                              selectedSubmission,
+                            );
+                            setGradeInput(autoGrade);
+                          }
+                        }
+                      }
+                    }}
+                    className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 font-black text-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    placeholder="0"
                   />
+                  <div className="flex flex-col items-end">
+                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">
+                      Max Score
+                    </span>
+                    <span className="text-gray-900 font-black">
+                      / {assignment.maxMarks}
+                    </span>
+                  </div>
                 </div>
               </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Feedback
+                  </label>
+                  <span className="text-xs font-black text-indigo-600">
+                    Grade: {gradeInput || "—"}
+                  </span>
+                </div>
+                <textarea
+                  value={feedbackInput}
+                  onChange={(e) => setFeedbackInput(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-sm font-bold min-h-[120px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  placeholder="Write feedback..."
+                />
+              </div>
+              <button
+                onClick={() => {
+                  handleSave(gradeInput, feedbackInput);
+                  setIsMobileMarkingModalOpen(false);
+                }}
+                disabled={!hasValidMarks}
+                className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black text-[12px] uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {selectedSubmission?.status === "marked"
+                  ? "Update Evaluation"
+                  : "Post Evaluation"}
+              </button>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                No submission to grade
+              </p>
             </div>
           )}
-
-        <div className="space-y-3">
-          {/* Grading Section */}
-          <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-            <h3 className="text-sm font-semibold text-gray-900">Grade</h3>
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Marks (out of {assignment?.maxMarks})
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={assignment?.maxMarks}
-                value={marksInput}
-                onChange={(event) => {
-                  const raw = event.target.value;
-                  if (raw === "") {
-                    setMarksInput("");
-                    setGradeInput("");
-                    return;
-                  }
-
-                  let numeric = Number(raw);
-                  if (!Number.isFinite(numeric)) {
-                    return;
-                  }
-
-                  if (numeric < 0) numeric = 0;
-                  if (numeric > (assignment?.maxMarks ?? 0))
-                    numeric = assignment?.maxMarks ?? 0;
-
-                  setMarksInput(String(numeric));
-                  if (selectedSubmission && assignment) {
-                    const auto = getEffectiveGrade(
-                      numeric,
-                      assignment,
-                      selectedSubmission,
-                    );
-                    setGradeInput(auto);
-                  }
-                }}
-                placeholder={`e.g. 0 - ${assignment?.maxMarks}`}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mt-2 flex items-center justify-between text-xs text-gray-700">
-              <div>
-                <span className="font-semibold">Grade %:</span>
-                <span className="ml-1 text-sm font-semibold text-gray-900">
-                  {gradePercentageLabel}
-                </span>
-              </div>
-              <div>
-                <span className="font-semibold">Letter:</span>
-                <span className="ml-1 text-sm font-semibold text-gray-900">
-                  {gradeInput || "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Feedback Section */}
-          <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-            <label className="block text-xs font-semibold text-gray-700">
-              Feedback
-            </label>
-            <textarea
-              value={feedbackInput}
-              onChange={(event) => setFeedbackInput(event.target.value)}
-              rows={4}
-              placeholder="Provide feedback to the student..."
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setMarksInput(
-                  selectedSubmission?.marks != null
-                    ? String(selectedSubmission.marks)
-                    : "",
-                );
-                setGradeInput(selectedSubmission?.grade ?? "");
-                setFeedbackInput(selectedSubmission?.feedback ?? "");
-              }}
-              className="flex-1"
-            >
-              Reset
-            </Button>
-            <Button
-              size="sm"
-              disabled={!hasValidMarks}
-              onClick={() => {
-                handleSave(gradeInput, feedbackInput);
-                setIsMobileMarkingModalOpen(false);
-              }}
-              className="flex-1"
-            >
-              Save & Close
-            </Button>
-          </div>
         </div>
       </ModernModal>
     </div>
