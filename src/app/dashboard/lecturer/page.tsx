@@ -192,25 +192,8 @@ function DateTimeStatCard() {
 }
 
 export default function LecturerDashboard() {
-  const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<MockUser | null>(mockUser);
-  const [activeTab, setActiveTab] = useState("Dashboard");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleTabChange = (newTab: string) => {
-    setActiveTab(newTab);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("lecturerActiveTab", newTab);
-    }
-  };
-
-  useEffect(() => {
-    const savedTab = localStorage.getItem("lecturerActiveTab");
-    if (savedTab && savedTab !== activeTab) {
-      setActiveTab(savedTab);
-    }
-  }, []);
 
   const stats = {
     totalIntakes: mockIntakes.length,
@@ -268,22 +251,9 @@ export default function LecturerDashboard() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
-            Loading Dashboard...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   if (!user || user.role !== "lecturer" || user.accountStatus === "disabled") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
           <div className="w-20 h-20 bg-red-50 rounded-[2rem] flex items-center justify-center text-red-500 mx-auto mb-6">
             <ShieldX size={40} />
@@ -305,235 +275,89 @@ export default function LecturerDashboard() {
     );
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "Dashboard":
-        return (
-          <>
-            {/* Page Header Card */}
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
-                  <Layout size={40} />
+  return (
+    <>
+      {/* Page Header Card */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex items-center gap-6">
+          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+            <Layout size={40} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+              Lecturer <span className="text-indigo-600">Dashboard</span>
+            </h1>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+              <TrendingUp size={14} className="text-indigo-400" />
+              Welcome back, {user.name.split(" ")[0]}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <DateTimeStatCard />
+        </div>
+      </div>
+
+      {/* Stats Carousel */}
+      <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <StatsCarousel stats={statsData} />
+      </div>
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+        {/* Upcoming Classes */}
+        <div className="lg:col-span-7 xl:col-span-8">
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02] flex flex-col h-full">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <Video size={24} />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                    Lecturer <span className="text-indigo-600">Dashboard</span>
-                  </h1>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
-                    <TrendingUp size={14} className="text-indigo-400" />
-                    Welcome back, {user.name.split(" ")[0]}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <DateTimeStatCard />
-                <button
-                  className="lg:hidden p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
-                  onClick={() => setIsSidebarOpen(true)}
-                >
-                  <Menu size={24} />
-                </button>
-              </div>
-            </div>
-
-            {/* Stats Carousel */}
-            <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <StatsCarousel stats={statsData} />
-            </div>
-
-            {/* Main Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-              {/* Upcoming Classes */}
-              <div className="lg:col-span-7 xl:col-span-8">
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02] flex flex-col h-full">
-                  <div className="flex justify-between items-center mb-8">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                        <Video size={24} />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
-                          Upcoming{" "}
-                          <span className="text-indigo-600">Classes</span>
-                        </h3>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
-                          Your scheduled sessions
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="px-6 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                    >
-                      View All
-                    </button>
-                  </div>
-
-                  <div className="flex-1 overflow-hidden">
-                    <UpcomingClasses classes={mockUpcomingClasses} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column */}
-              <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6">
-                {/* Recent Activity */}
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
-                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-4">
-                    Recent <span className="text-indigo-600">Activity</span>
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                    Upcoming <span className="text-indigo-600">Classes</span>
                   </h3>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
-                    Activity feed will appear here.
-                  </p>
-                </div>
-
-                {/* Announcements */}
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
-                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-4">
-                    <span className="text-indigo-600">Announcements</span>
-                  </h3>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
-                    Important announcements will appear here.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </>
-        );
-
-      case "Intakes":
-        return (
-          <>
-            {/* Page Header Card */}
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
-                  <GraduationCap size={40} />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                    My <span className="text-indigo-600">Intakes</span>
-                  </h1>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
-                    <TrendingUp size={14} className="text-indigo-400" />
-                    Assigned Academic Terms
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
+                    Your scheduled sessions
                   </p>
                 </div>
               </div>
               <button
-                className="lg:hidden p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
-                onClick={() => setIsSidebarOpen(true)}
+                onClick={() => setIsModalOpen(true)}
+                className="px-6 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
               >
-                <Menu size={24} />
+                View All
               </button>
             </div>
-            <IntakesTree intakes={mockIntakes} />
-          </>
-        );
 
-      case "Assignments":
-        return (
-          <>
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
-                  <FileEdit size={40} />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                    Assignment <span className="text-indigo-600">Hub</span>
-                  </h1>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
-                    <TrendingUp size={14} className="text-indigo-400" />
-                    Grading & Submission Management
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-16 text-center">
-              <div className="w-20 h-20 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-200 mx-auto mb-6">
-                <FileEdit size={40} />
-              </div>
-              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
-                Coming Soon
-              </h3>
-              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
-                Assignments page is under development
-              </p>
-            </div>
-          </>
-        );
-
-      case "Materials":
-        return (
-          <>
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
-                  <BookOpen size={40} />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                    Study <span className="text-indigo-600">Materials</span>
-                  </h1>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
-                    <TrendingUp size={14} className="text-indigo-400" />
-                    Course Resources & Files
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-16 text-center">
-              <div className="w-20 h-20 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-200 mx-auto mb-6">
-                <BookOpen size={40} />
-              </div>
-              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
-                Coming Soon
-              </h3>
-              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
-                Materials page is under development
-              </p>
-            </div>
-          </>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex font-sans">
-      <Sidebar
-        lecturerName={user.name}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-      />
-
-      {/* Main Content Area */}
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden transition-all duration-300">
-        <main className="p-4 md:p-6 lg:p-8 flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
-          {/* Mobile Header */}
-          <div className="lg:hidden flex items-center justify-between mb-6">
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500"
-            >
-              <Menu size={24} />
-            </button>
-            <h1 className="text-xl font-black text-gray-900 tracking-tighter uppercase">
-              Academix
-            </h1>
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-              <Layout size={20} />
+            <div className="flex-1 overflow-hidden">
+              <UpcomingClasses classes={mockUpcomingClasses} />
             </div>
           </div>
+        </div>
 
-          {renderContent()}
-        </main>
+        {/* Right Column */}
+        <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6">
+          {/* Recent Activity */}
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-4">
+              Recent <span className="text-indigo-600">Activity</span>
+            </h3>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
+              Activity feed will appear here.
+            </p>
+          </div>
+
+          {/* Announcements */}
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 hover:shadow-xl transition-all duration-500 ring-1 ring-gray-950/[0.02]">
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-4">
+              <span className="text-indigo-600">Announcements</span>
+            </h3>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
+              Important announcements will appear here.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* All Schedules Modal */}
@@ -544,6 +368,6 @@ export default function LecturerDashboard() {
           classes={mockUpcomingClasses}
         />
       )}
-    </div>
+    </>
   );
 }

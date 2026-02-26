@@ -9,13 +9,14 @@ import {
   ChevronRight,
   Clock,
   Timer,
-  CheckCircle2,
+  FileEdit,
   Youtube,
   Video,
   Film,
   Download,
   Ban,
   ArrowLeft,
+  Layout,
 } from "lucide-react";
 import {
   Dialog,
@@ -307,93 +308,150 @@ function SubjectDetailsView({
   };
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full flex flex-col overflow-hidden bg-white/50 backdrop-blur-xl animate-in fade-in slide-in-from-right-8 duration-700">
       {/* Header */}
-      <div className="border-b border-gray-200 p-4 bg-white">
+      <div className="relative overflow-hidden border-b border-gray-100 p-8 bg-white/40 backdrop-blur-md">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-3 text-sm font-semibold"
+          className="group/back flex items-center gap-2 text-gray-400 hover:text-indigo-600 mb-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300"
         >
-          <ArrowLeft size={16} />
+          <div className="w-8 h-8 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center group-hover/back:bg-indigo-600 group-hover/back:text-white group-hover/back:scale-110 transition-all duration-300">
+            <ArrowLeft size={14} strokeWidth={3} />
+          </div>
           Back to Intake
         </button>
-        <h2 className="text-lg font-semibold text-gray-900">
-          {subject.code} - {subject.name}
-        </h2>
-        <p className="text-sm text-gray-600 mt-1">
-          {intakeCode} → {courseCode}
+        <div className="flex items-center gap-4 mb-2">
+          <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_purple]" />
+          <h2 className="text-3xl font-black text-gray-900 tracking-tighter leading-none">
+            {subject.code}{" "}
+            <span className="text-indigo-600">{subject.name}</span>
+          </h2>
+        </div>
+        <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.25em] mt-3 flex items-center gap-2">
+          <span className="text-indigo-400">{intakeCode}</span>
+          <span className="text-gray-200">/</span>
+          <span className="text-gray-500">{courseCode}</span>
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 bg-gray-50">
-        <div className="flex">
+      <div className="px-8 py-4 bg-gray-50/50 border-b border-gray-100">
+        <div className="flex items-center p-1.5 bg-white rounded-2xl border border-gray-100 shadow-sm w-fit">
           <button
             onClick={() => setActiveTab("assignments")}
-            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-3 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${
               activeTab === "assignments"
-                ? "border-blue-500 text-blue-600 bg-white"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                ? "bg-indigo-600 text-white shadow-xl shadow-indigo-100 scale-[1.02]"
+                : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
             }`}
           >
-            Assignments ({assignments.length})
+            <FileEdit size={14} />
+            Assignments
+            <span
+              className={`ml-1 px-1.5 py-0.5 rounded-md text-[8px] ${
+                activeTab === "assignments"
+                  ? "bg-white/20 text-white"
+                  : "bg-gray-100 text-gray-400"
+              }`}
+            >
+              {assignments.length}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("materials")}
-            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-3 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${
               activeTab === "materials"
-                ? "border-blue-500 text-blue-600 bg-white"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                ? "bg-indigo-600 text-white shadow-xl shadow-indigo-100 scale-[1.02]"
+                : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
             }`}
           >
-            Materials ({materials.length})
+            <BookOpen size={14} />
+            Materials
+            <span
+              className={`ml-1 px-1.5 py-0.5 rounded-md text-[8px] ${
+                activeTab === "materials"
+                  ? "bg-white/20 text-white"
+                  : "bg-gray-100 text-gray-400"
+              }`}
+            >
+              {materials.length}
+            </span>
           </button>
         </div>
       </div>
 
       {/* Tab Content */}
-      <div className="p-4">
+      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
         {activeTab === "assignments" && (
-          <div>
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             {assignments.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg">
-                <p>No assignments for this subject</p>
+              <div className="flex flex-col items-center justify-center p-16 text-center bg-gray-50/50 rounded-[2.5rem] border border-dashed border-gray-200">
+                <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-50 flex items-center justify-center text-indigo-200 mb-4">
+                  <FileEdit size={32} />
+                </div>
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest leading-loose">
+                  No assignments posted for this subject
+                </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {assignments.map((assignment) => (
                   <div
                     key={assignment.id}
-                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    className="group/assign relative overflow-hidden bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 active:scale-[0.98] border-b-4 border-b-indigo-500/10"
                   >
-                    <h4 className="font-semibold text-sm text-gray-800 mb-2">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover/assign:bg-indigo-600 group-hover/assign:text-white transition-all duration-500 shadow-sm">
+                        <FileEdit size={24} />
+                      </div>
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 rounded-full border border-amber-100">
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">
+                          Active
+                        </span>
+                      </div>
+                    </div>
+
+                    <h4 className="font-black text-lg text-gray-900 tracking-tight mb-2 group-hover/assign:text-indigo-600 transition-colors leading-tight">
                       {assignment.title}
                     </h4>
-                    <div className="flex items-center gap-4 text-xs text-gray-600 mb-3">
-                      <span className="flex items-center gap-1">
-                        <Timer size={12} />
-                        Due: {assignment.dueDate}
-                      </span>
+
+                    <div className="flex flex-wrap items-center gap-4 mb-6">
+                      <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gray-50 rounded-xl text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                        <Timer size={12} className="text-indigo-400" />
+                        Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-xs mb-3">
-                      <span className="text-orange-600 font-semibold flex items-center gap-1">
-                        <Clock size={12} />
-                        Pending: {assignment.pendingCount}
-                      </span>
-                      <span className="text-green-600 font-semibold flex items-center gap-1">
-                        <CheckCircle2 size={12} />
-                        Marked: {assignment.markedCount}
-                      </span>
+
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      <div className="p-3 bg-red-50/50 rounded-2xl border border-red-100/50">
+                        <p className="text-[8px] font-black text-red-500 uppercase tracking-widest mb-1">
+                          Pending
+                        </p>
+                        <p className="text-xl font-black text-red-600 leading-none">
+                          {assignment.pendingCount}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
+                        <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">
+                          Marked
+                        </p>
+                        <p className="text-xl font-black text-emerald-600 leading-none">
+                          {assignment.markedCount}
+                        </p>
+                      </div>
                     </div>
+
                     <button
-                      className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition"
+                      className="w-full py-4 bg-gray-900 group-hover/assign:bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-500 shadow-xl shadow-gray-200 group-hover/assign:shadow-indigo-200 flex items-center justify-center gap-2 hover:translate-y-[-2px] active:translate-y-[1px]"
                       onClick={() =>
                         router.push(
                           `/dashboard/lecturer/assignments/${assignment.id}`,
                         )
                       }
                     >
-                      Mark Submissions
+                      Process Submissions
+                      <ChevronRight size={14} strokeWidth={3} />
                     </button>
                   </div>
                 ))}
@@ -403,32 +461,52 @@ function SubjectDetailsView({
         )}
 
         {activeTab === "materials" && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-base font-semibold text-gray-800">
-                Materials overview
-              </h3>
+          <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Materials Header Actions */}
+            <div className="flex items-center justify-between p-6 bg-indigo-50/50 rounded-3xl border border-indigo-100/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100">
+                  <BookOpen size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-900 tracking-tight leading-tight">
+                    Resource <span className="text-indigo-600">Inventory</span>
+                  </h3>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                    Manage and share subject resources
+                  </p>
+                </div>
+              </div>
               <Button
-                size="sm"
-                className="shadow-sm"
+                size="lg"
+                className="bg-gray-900 hover:bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-gray-200 transition-all duration-500 px-8"
                 onClick={() => setIsAddMaterialOpen(true)}
               >
-                + Add material
+                + NEW MATERIAL
               </Button>
+
               <ModernModal
                 open={isAddMaterialOpen}
                 onOpenChange={setIsAddMaterialOpen}
-                title="Add material"
-                subtitle="Create a new study or video material for this subject."
+                title="Publish Material"
+                subtitle="Share new resources with your students instantly."
                 avatarChar="+"
               >
                 <form onSubmit={handleAddMaterial} className="space-y-5">
-                  <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4 space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Basic details
-                    </p>
+                  <div className="rounded-[2rem] border border-gray-100 bg-gray-50/60 p-6 space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        Material Identification
+                      </p>
+                    </div>
                     <div className="space-y-2">
-                      <Label htmlFor="material-title">Title</Label>
+                      <Label
+                        htmlFor="material-title"
+                        className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
+                      >
+                        Title
+                      </Label>
                       <Input
                         id="material-title"
                         value={newMaterialTitle}
@@ -436,33 +514,47 @@ function SubjectDetailsView({
                           setNewMaterialTitle(event.target.value)
                         }
                         required
+                        className="rounded-2xl border-gray-100 focus:ring-indigo-500 h-12"
                         placeholder="e.g. Week 1 Lecture Notes"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="material-description">Description</Label>
+                      <Label
+                        htmlFor="material-description"
+                        className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
+                      >
+                        Context / Description
+                      </Label>
                       <textarea
                         id="material-description"
-                        className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input min-h-[80px] w-full min-w-0 rounded-md border bg-white px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                        className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-gray-100 min-h-[100px] w-full min-w-0 rounded-2xl border bg-white px-4 py-3 text-sm shadow-xs transition-all outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                         value={newMaterialDescription}
                         onChange={(event) =>
                           setNewMaterialDescription(event.target.value)
                         }
-                        placeholder="Optional short summary for students"
+                        placeholder="Provide a short overview for students..."
                       />
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-gray-100 bg-white p-4 space-y-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Type & attachment
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-[2rem] border border-gray-100 bg-white p-6 space-y-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        Content Asset
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="material-type">Type</Label>
+                        <Label
+                          htmlFor="material-type"
+                          className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
+                        >
+                          Media Format
+                        </Label>
                         <select
                           id="material-type"
-                          className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                          className="border-gray-100 h-12 w-full rounded-2xl border bg-transparent px-4 text-sm shadow-xs outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L5%205L9%201%22%20stroke%3D%22%2394A3B8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:10px_6px] bg-[right_1rem_center] bg-no-repeat"
                           value={newMaterialType}
                           onChange={(event) =>
                             setNewMaterialType(
@@ -470,94 +562,117 @@ function SubjectDetailsView({
                             )
                           }
                         >
-                          <option value="document">Document</option>
-                          <option value="youtube-link">YouTube link</option>
-                          <option value="video-link">Video link</option>
-                          <option value="video-upload">Video upload</option>
+                          <option value="document">PDF / Document</option>
+                          <option value="youtube-link">YouTube Stream</option>
+                          <option value="video-link">External Video</option>
+                          <option value="video-upload">
+                            Direct Video Upload
+                          </option>
                         </select>
-                        <p className="text-[11px] text-gray-500">
-                          Choose how students will access this material.
-                        </p>
                       </div>
 
                       {(newMaterialType === "youtube-link" ||
                         newMaterialType === "video-link") && (
-                        <div className="space-y-2">
-                          <Label htmlFor="material-url">Video URL</Label>
+                        <div className="space-y-2 animate-in slide-in-from-right-4 duration-500">
+                          <Label
+                            htmlFor="material-url"
+                            className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
+                          >
+                            Source URL
+                          </Label>
                           <Input
                             id="material-url"
                             value={newMaterialUrl}
                             onChange={(event) =>
                               setNewMaterialUrl(event.target.value)
                             }
-                            placeholder="https://youtu.be/..."
+                            className="rounded-2xl border-gray-100 h-12"
+                            placeholder="https://..."
                           />
-                          <p className="text-[11px] text-gray-500">
-                            Paste a public YouTube or video link.
-                          </p>
                         </div>
                       )}
 
                       {(newMaterialType === "document" ||
                         newMaterialType === "video-upload") && (
-                        <div className="space-y-2 sm:col-span-1">
-                          <Label htmlFor="material-file">Attach file</Label>
-                          <input
-                            id="material-file"
-                            type="file"
-                            accept={
-                              newMaterialType === "document"
-                                ? ".pdf,.doc,.docx,.ppt,.pptx,.txt"
-                                : "video/*"
-                            }
-                            onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              setNewMaterialFileName(file ? file.name : "");
-                            }}
-                            className="block w-full text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                          />
-                          {newMaterialFileName && (
-                            <p className="text-[11px] text-gray-500">
-                              Selected: {newMaterialFileName}
-                            </p>
-                          )}
+                        <div className="space-y-2 animate-in slide-in-from-right-4 duration-500">
+                          <Label
+                            htmlFor="material-file"
+                            className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
+                          >
+                            Upload File
+                          </Label>
+                          <div className="relative">
+                            <input
+                              id="material-file"
+                              type="file"
+                              accept={
+                                newMaterialType === "document"
+                                  ? ".pdf,.doc,.docx,.ppt,.pptx,.txt"
+                                  : "video/*"
+                              }
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                setNewMaterialFileName(file ? file.name : "");
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            />
+                            <div className="h-12 border-2 border-dashed border-gray-100 rounded-2xl flex items-center px-4 bg-gray-50/50 group-hover:bg-indigo-50 transition-colors">
+                              <Download
+                                size={16}
+                                className="text-gray-400 mr-3"
+                              />
+                              <span className="text-xs text-gray-500 font-bold truncate">
+                                {newMaterialFileName || "Select file from disk"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        id="material-can-download"
-                        type="checkbox"
-                        checked={newMaterialCanDownload}
-                        onChange={(event) =>
-                          setNewMaterialCanDownload(event.target.checked)
-                        }
-                        className="h-4 w-4 rounded border-input text-primary focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                      />
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-2">
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-6 w-11 cursor-pointer">
+                        <input
+                          id="material-can-download"
+                          type="checkbox"
+                          checked={newMaterialCanDownload}
+                          onChange={(event) =>
+                            setNewMaterialCanDownload(event.target.checked)
+                          }
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </div>
                       <Label
                         htmlFor="material-can-download"
-                        className="m-0 text-sm"
+                        className="m-0 text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer"
                       >
-                        Allow download
+                        Enable Student Downloads
                       </Label>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4 w-full sm:w-auto">
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
+                        className="flex-1 sm:flex-none text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 rounded-2xl"
                         onClick={() => setIsAddMaterialOpen(false)}
                       >
-                        Cancel
+                        BACK
                       </Button>
-                      <Button type="submit">Save material</Button>
+                      <Button
+                        type="submit"
+                        className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-10 h-14 text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100"
+                      >
+                        PUBLISH ASSET
+                      </Button>
                     </div>
                   </div>
                 </form>
               </ModernModal>
             </div>
+
             {previewMaterial && (
               <ModernModal
                 open={isPreviewOpen}
@@ -568,41 +683,51 @@ function SubjectDetailsView({
                   }
                 }}
                 title={previewMaterial.title}
-                subtitle={
-                  previewMaterial.description ||
-                  "Preview of the selected material."
-                }
+                subtitle={previewMaterial.description || "Asset Preview"}
                 avatarChar={previewMaterial.title.charAt(0)}
               >
                 <>
-                  <div className="space-y-4 mt-2">
-                    <div className="text-xs text-gray-500">
-                      <p>
-                        Type:{" "}
-                        <span className="font-semibold">
-                          {previewMaterial.type}
-                        </span>
-                      </p>
-                      <p>
-                        Created on:{" "}
-                        {new Date(
-                          previewMaterial.createdAt,
-                        ).toLocaleDateString()}
-                      </p>
+                  <div className="space-y-6 mt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                          Media Type
+                        </p>
+                        <p className="text-xs font-black text-gray-900 uppercase tracking-widest">
+                          {previewMaterial.type.replace("-", " ")}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                          Created
+                        </p>
+                        <p className="text-xs font-black text-gray-900 uppercase tracking-widest">
+                          {new Date(
+                            previewMaterial.createdAt,
+                          ).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
 
                     {previewMaterial.type === "document" && (
-                      <div className="border-2 border-gray-200 rounded-lg p-6 bg-gray-50 text-center">
-                        <p className="text-gray-800 font-semibold mb-2">
+                      <div className="border-2 border-gray-100 rounded-[2.5rem] p-12 bg-white flex flex-col items-center text-center shadow-2xl shadow-gray-100/50 border-dashed">
+                        <div className="w-20 h-20 rounded-[2rem] bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6">
+                          <FileText size={40} />
+                        </div>
+                        <h4 className="text-lg font-black text-gray-900 mb-2">
                           {previewMaterial.filePlaceholder ||
-                            "Attached document"}
-                        </p>
-                        <p className="text-sm text-gray-500 mb-4">
-                          Document preview is not available in this view.
+                            "Electronic Document"}
+                        </h4>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-8">
+                          Preview restricted to view-only mode
                         </p>
                         {previewMaterial.canDownload && (
-                          <Button type="button" size="sm">
-                            Download (placeholder)
+                          <Button
+                            type="button"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.25rem] px-8 py-6 h-12 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20"
+                          >
+                            <Download size={16} className="mr-2" />
+                            Download Original
                           </Button>
                         )}
                       </div>
@@ -611,10 +736,10 @@ function SubjectDetailsView({
                     {(previewMaterial.type === "youtube-link" ||
                       previewMaterial.type === "video-link" ||
                       previewMaterial.type === "video-upload") && (
-                      <div className="space-y-3">
+                      <div className="relative group overflow-hidden rounded-[2.5rem] bg-black shadow-2xl shadow-indigo-500/10">
                         {previewMaterial.type === "youtube-link" &&
                           previewMaterial.videoUrl && (
-                            <div className="relative w-full pb-[56.25%] bg-black rounded-lg overflow-hidden">
+                            <div className="relative w-full pb-[56.25%] overflow-hidden">
                               {getYouTubeVideoId(previewMaterial.videoUrl) ? (
                                 <iframe
                                   className="absolute top-0 left-0 w-full h-full"
@@ -625,8 +750,8 @@ function SubjectDetailsView({
                                   allowFullScreen
                                 ></iframe>
                               ) : (
-                                <div className="flex items-center justify-center h-40 text-sm text-gray-200">
-                                  Invalid YouTube URL
+                                <div className="flex items-center justify-center h-48 text-xs font-black text-white/50 uppercase tracking-widest">
+                                  Invalid Stream Source
                                 </div>
                               )}
                             </div>
@@ -634,10 +759,10 @@ function SubjectDetailsView({
 
                         {(previewMaterial.type === "video-link" ||
                           previewMaterial.type === "video-upload") && (
-                          <div className="relative w-full bg-black rounded-lg overflow-hidden">
+                          <div className="relative w-full overflow-hidden">
                             {previewMaterial.videoUrl ? (
                               <video
-                                className="w-full"
+                                className="w-full h-full block"
                                 controls
                                 controlsList="nodownload"
                                 src={previewMaterial.videoUrl}
@@ -645,8 +770,8 @@ function SubjectDetailsView({
                                 Your browser does not support the video tag.
                               </video>
                             ) : (
-                              <div className="flex items-center justify-center h-40 text-sm text-gray-200">
-                                No video URL available
+                              <div className="flex items-center justify-center h-48 text-xs font-black text-white/50 uppercase tracking-widest">
+                                Source Media Unavailable
                               </div>
                             )}
                           </div>
@@ -654,201 +779,190 @@ function SubjectDetailsView({
                       </div>
                     )}
                   </div>
-                  <DialogFooter>
+                  <DialogFooter className="mt-8">
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
+                      className="text-[10px] font-black uppercase tracking-widest w-full py-6 rounded-2xl"
                       onClick={() => {
                         setIsPreviewOpen(false);
                         setPreviewMaterial(null);
                       }}
                     >
-                      Close
+                      EXIT PREVIEW
                     </Button>
                   </DialogFooter>
                 </>
               </ModernModal>
             )}
-            {/* Study Materials Section */}
-            <div>
-              <h3 className="text-base font-semibold text-gray-800 mb-3">
-                Study Materials ({studyMaterials.length})
-              </h3>
-              {studyMaterials.length === 0 ? (
-                <div className="text-center py-6 text-gray-500 text-sm bg-gray-50 rounded-lg">
-                  <p>No study materials for this subject</p>
+
+            {/* Materials Sections */}
+            <div className="grid grid-cols-1 gap-12">
+              {/* Study Materials Section */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_emerald]" />
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.25em]">
+                    Study Materials ({studyMaterials.length})
+                  </h3>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {studyMaterials.map((material) => (
-                    <div
-                      key={material.id}
-                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => openPreview(material)}
-                    >
-                      <div className="flex items-start gap-3 mb-3">
-                        {getTypeIcon(material.type)}
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-sm text-gray-800">
-                            {material.title}
-                          </h4>
-                          <p className="text-xs text-gray-600 mt-1">
-                            {material.description}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(material.createdAt).toLocaleDateString()}
-                          </p>
+                {studyMaterials.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-12 text-center bg-gray-50/50 rounded-[2.5rem] border border-dashed border-gray-200">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      Empty Repository
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {studyMaterials.map((material) => (
+                      <div
+                        key={material.id}
+                        className="group/material relative overflow-hidden bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-500 cursor-pointer active:scale-[0.98]"
+                        onClick={() => openPreview(material)}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 group-hover/material:bg-emerald-600 group-hover/material:text-white transition-all duration-500 shadow-sm flex items-center justify-center">
+                            {getTypeIcon(material.type)}
+                          </div>
+                          <div className="flex gap-2 opacity-0 group-hover/material:opacity-100 transition-all duration-500 translate-y-[-10px] group-hover/material:translate-y-0">
+                            <button
+                              className="p-2 bg-yellow-50 text-yellow-600 rounded-xl hover:bg-yellow-500 hover:text-white transition-all shadow-sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                console.log("Edit material:", material.id);
+                              }}
+                            >
+                              <FileEdit size={14} />
+                            </button>
+                            <button
+                              className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                console.log("Delete material:", material.id);
+                              }}
+                            >
+                              <Ban size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <h4 className="font-black text-sm text-gray-900 truncate tracking-tight mb-2 group-hover/material:text-emerald-600 transition-colors">
+                          {material.title}
+                        </h4>
+                        <p className="text-[10px] font-bold text-gray-400 line-clamp-2 leading-relaxed mb-6">
+                          {material.description}
+                        </p>
+
+                        <div className="flex items-center justify-between mt-auto pt-6 border-t border-gray-50">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border transition-all duration-500 ${
+                                material.visible
+                                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                  : "bg-gray-50 text-gray-400 border-gray-100"
+                              }`}
+                            ></span>
+                            <div className="w-1 h-1 rounded-full bg-gray-200" />
+                            <span className="text-[8px] font-black text-gray-300 uppercase tracking-[0.2em]">
+                              {new Date(
+                                material.createdAt,
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {material.canDownload && (
+                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                              <Download size={12} />
+                            </div>
+                          )}
                         </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs px-2 py-1 rounded border font-semibold ${
-                              material.visible
-                                ? "bg-green-100 text-green-700 border-green-300"
-                                : "bg-gray-100 text-gray-700 border-gray-300"
-                            }`}
-                          >
-                            {material.visible ? "Visible" : "Hidden"}
-                          </span>
-                          <button
-                            className={`px-2 py-1 text-xs rounded font-semibold transition flex items-center gap-1 ${
-                              material.canDownload
-                                ? "bg-blue-100 text-blue-700 border border-blue-300"
-                                : "bg-gray-100 text-gray-700 border border-gray-300"
-                            }`}
-                          >
-                            {material.canDownload ? (
-                              <>
-                                <Download size={12} />
-                                Download
-                              </>
-                            ) : (
-                              <>
-                                <Ban size={12} />
-                                No Download
-                              </>
-                            )}
-                          </button>
+              {/* Video Materials Section */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_purple]" />
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.25em]">
+                    Video Materials ({videoMaterials.length})
+                  </h3>
+                </div>
+                {videoMaterials.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-12 text-center bg-gray-50/50 rounded-[2.5rem] border border-dashed border-gray-200">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      No streams recorded
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {videoMaterials.map((material) => (
+                      <div
+                        key={material.id}
+                        className="group/video relative overflow-hidden bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 cursor-pointer active:scale-[0.98]"
+                        onClick={() => openPreview(material)}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 group-hover/video:bg-purple-600 group-hover/video:text-white transition-all duration-500 shadow-sm flex items-center justify-center">
+                            {getTypeIcon(material.type)}
+                          </div>
+                          <div className="flex gap-2 opacity-0 group-hover/video:opacity-100 transition-all duration-500 translate-y-[-10px] group-hover/video:translate-y-0">
+                            <button
+                              className="p-2 bg-yellow-50 text-yellow-600 rounded-xl hover:bg-yellow-500 hover:text-white transition-all shadow-sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                console.log("Edit material:", material.id);
+                              }}
+                            >
+                              <FileEdit size={14} />
+                            </button>
+                            <button
+                              className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                console.log("Delete material:", material.id);
+                              }}
+                            >
+                              <Ban size={14} />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex gap-2">
-                          <button
-                            className="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded font-semibold hover:bg-yellow-200 transition"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              console.log("Edit material:", material.id);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="px-3 py-1 text-xs bg-red-100 text-red-700 border border-red-300 rounded font-semibold hover:bg-red-200 transition"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              console.log("Delete material:", material.id);
-                            }}
-                          >
-                            Delete
-                          </button>
+                        <h4 className="font-black text-sm text-gray-900 truncate tracking-tight mb-2 group-hover/video:text-purple-600 transition-colors">
+                          {material.title}
+                        </h4>
+                        <p className="text-[10px] font-bold text-gray-400 line-clamp-2 leading-relaxed mb-6">
+                          {material.description}
+                        </p>
+
+                        <div className="flex items-center justify-between mt-auto pt-6 border-t border-gray-50">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border transition-all duration-500 ${
+                                material.visible
+                                  ? "bg-purple-50 text-purple-600 border-purple-100"
+                                  : "bg-gray-50 text-gray-400 border-gray-100"
+                              }`}
+                            ></span>
+                            <div className="w-1 h-1 rounded-full bg-gray-200" />
+                            <span className="text-[8px] font-black text-gray-300 uppercase tracking-[0.2em]">
+                              {new Date(
+                                material.createdAt,
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {material.canDownload && (
+                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                              <Download size={12} />
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Video Materials Section */}
-            <div>
-              <h3 className="text-base font-semibold text-gray-800 mb-3">
-                Video Materials ({videoMaterials.length})
-              </h3>
-              {videoMaterials.length === 0 ? (
-                <div className="text-center py-6 text-gray-500 text-sm bg-gray-50 rounded-lg">
-                  <p>No video materials for this subject</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {videoMaterials.map((material) => (
-                    <div
-                      key={material.id}
-                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => openPreview(material)}
-                    >
-                      <div className="flex items-start gap-3 mb-3">
-                        {getTypeIcon(material.type)}
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-sm text-gray-800">
-                            {material.title}
-                          </h4>
-                          <p className="text-xs text-gray-600 mt-1">
-                            {material.description}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(material.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs px-2 py-1 rounded border font-semibold ${
-                              material.visible
-                                ? "bg-green-100 text-green-700 border-green-300"
-                                : "bg-gray-100 text-gray-700 border-gray-300"
-                            }`}
-                          >
-                            {material.visible ? "Visible" : "Hidden"}
-                          </span>
-                          <button
-                            className={`px-2 py-1 text-xs rounded font-semibold transition flex items-center gap-1 ${
-                              material.canDownload
-                                ? "bg-blue-100 text-blue-700 border border-blue-300"
-                                : "bg-gray-100 text-gray-700 border border-gray-300"
-                            }`}
-                          >
-                            {material.canDownload ? (
-                              <>
-                                <Download size={12} />
-                                Download
-                              </>
-                            ) : (
-                              <>
-                                <Ban size={12} />
-                                No Download
-                              </>
-                            )}
-                          </button>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            className="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded font-semibold hover:bg-yellow-200 transition"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              console.log("Edit material:", material.id);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="px-3 py-1 text-xs bg-red-100 text-red-700 border border-red-300 rounded font-semibold hover:bg-red-200 transition"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              console.log("Delete material:", material.id);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -859,9 +973,7 @@ function SubjectDetailsView({
 
 export default function IntakesTree({ intakes }: IntakesTreeProps) {
   const [selectedIntake, setSelectedIntake] = useState<string | null>(null);
-  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(
-    new Set(),
-  );
+  const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedCourseCode, setSelectedCourseCode] = useState("");
   const [selectedIntakeCode, setSelectedIntakeCode] = useState("");
@@ -872,25 +984,11 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     intakeId: string | null,
     subjectId: string | null = null,
   ) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(
-        "lecturerIntakesSelection",
-        JSON.stringify({ intakeId, subjectId }),
-      );
-    } catch {
-      // ignore storage errors
-    }
+    // Persistence disabled as per user request
   };
 
   const toggleCourse = (courseId: string) => {
-    const newExpanded = new Set(expandedCourses);
-    if (newExpanded.has(courseId)) {
-      newExpanded.delete(courseId);
-    } else {
-      newExpanded.add(courseId);
-    }
-    setExpandedCourses(newExpanded);
+    setExpandedCourse((prev) => (prev === courseId ? null : courseId));
   };
 
   const handleSubjectClick = (
@@ -928,179 +1026,223 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     (intake) => intake.id === selectedIntake,
   );
 
-  // Restore last selected intake/subject when the component mounts
-  React.useEffect(() => {
-    if (selectionRestoredRef.current) return;
-    if (typeof window === "undefined") return;
-
-    selectionRestoredRef.current = true;
-
-    try {
-      const raw = window.localStorage.getItem("lecturerIntakesSelection");
-      if (!raw) return;
-
-      const parsed = JSON.parse(raw) as {
-        intakeId?: string | null;
-        subjectId?: string | null;
-      };
-
-      if (!parsed.intakeId) return;
-
-      const intake = assignedIntakes.find((i) => i.id === parsed.intakeId);
-      if (!intake) return;
-
-      setSelectedIntake(intake.id);
-
-      if (parsed.subjectId) {
-        const courseWithSubject = intake.courses.find((course) =>
-          course.subjects.some((subject) => subject.id === parsed.subjectId),
-        );
-
-        if (courseWithSubject) {
-          const subject = courseWithSubject.subjects.find(
-            (s) => s.id === parsed.subjectId,
-          );
-
-          if (subject) {
-            setSelectedSubject(subject);
-            setSelectedCourseCode(courseWithSubject.code);
-            setSelectedIntakeCode(intake.code);
-            setExpandedCourses(new Set([courseWithSubject.id]));
-          }
-        }
-      }
-    } catch {
-      // ignore parse errors
-    }
-  }, [assignedIntakes]);
+  // Persistence disabled as per user request
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 lg:h-[600px]">
+    <div className="flex flex-col lg:flex-row gap-8 lg:h-[750px] animate-in fade-in slide-in-from-bottom-8 duration-1000">
       {/* Left Panel - Intakes List */}
       <div
-        className={`bg-white rounded-lg shadow-sm border border-gray-200 w-full lg:w-80 ${
-          selectedSubject ? "hidden lg:block" : ""
+        className={`bg-white/70 backdrop-blur-xl rounded-[2.5rem] shadow-2xl shadow-indigo-500/5 border border-white/20 w-full lg:w-96 flex flex-col overflow-hidden transition-all duration-500 ${
+          selectedSubject ? "hidden lg:flex" : "flex"
         }`}
       >
-        <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-          <h2 className="font-semibold text-gray-800">Your Intakes</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            {assignedIntakes.length} active intakes
+        <div className="p-8 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            <h2 className="font-black text-xs text-gray-400 uppercase tracking-widest">
+              Academic Terms
+            </h2>
+          </div>
+          <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+            Your <span className="text-indigo-600">Intakes</span>
+          </h3>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-3">
+            {assignedIntakes.length} ACTIVE ENROLLMENTS
           </p>
         </div>
 
-        <div className="overflow-y-auto h-[calc(100%-80px)]">
+        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
           {assignedIntakes.length === 0 ? (
-            <div className="p-4 text-center text-gray-500 text-sm">
-              No assigned intakes found
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-gray-50/50 rounded-[2rem] border border-dashed border-gray-200">
+              <CalendarDays size={32} className="text-gray-300 mb-4" />
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                No assigned intakes found
+              </p>
             </div>
           ) : (
-            <div className="space-y-2 p-3">
-              {assignedIntakes.map((intake) => (
-                <button
-                  key={intake.id}
-                  onClick={() => {
-                    setSelectedIntake(intake.id);
-                    setSelectedSubject(null);
-                    setSelectedCourseCode("");
-                    setSelectedIntakeCode("");
-                    persistSelection(intake.id, null);
-                  }}
-                  className={`w-full text-left p-3 rounded-lg border transition-all ${
-                    selectedIntake === intake.id
-                      ? "bg-blue-50 border-blue-200 shadow-sm"
-                      : "bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <CalendarDays
-                      size={18}
-                      className={
+            assignedIntakes.map((intake) => (
+              <button
+                key={intake.id}
+                onClick={() => {
+                  setSelectedIntake(intake.id);
+                  setSelectedSubject(null);
+                  setSelectedCourseCode("");
+                  setSelectedIntakeCode("");
+                  persistSelection(intake.id, null);
+                }}
+                className={`group relative w-full text-left p-5 rounded-[1.8rem] transition-all duration-500 border ${
+                  selectedIntake === intake.id
+                    ? "bg-indigo-600 border-indigo-600 shadow-2xl shadow-indigo-200 text-white translate-x-1"
+                    : "bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 text-gray-900"
+                }`}
+              >
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+                      selectedIntake === intake.id
+                        ? "bg-white/20 text-white rotate-6"
+                        : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"
+                    }`}
+                  >
+                    <CalendarDays size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`font-black text-[10px] uppercase tracking-[0.2em] mb-1 ${
                         selectedIntake === intake.id
-                          ? "text-blue-600"
-                          : "text-gray-500"
-                      }
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm text-gray-800">
-                        {intake.code}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        {intake.name}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {intake.courses.length} course
-                        {intake.courses.length !== 1 ? "s" : ""}
-                      </p>
+                          ? "text-indigo-100"
+                          : "text-indigo-600"
+                      }`}
+                    >
+                      {intake.code}
+                    </p>
+                    <p className="font-bold text-sm truncate leading-tight">
+                      {intake.name}
+                    </p>
+                    <div
+                      className={`flex items-center gap-2 mt-3 p-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-fit ${
+                        selectedIntake === intake.id
+                          ? "bg-white/10 text-white"
+                          : "bg-gray-50 text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-600"
+                      }`}
+                    >
+                      <Book size={12} />
+                      {intake.courses.length} course
+                      {intake.courses.length !== 1 ? "s" : ""}
                     </div>
                   </div>
-                </button>
-              ))}
-            </div>
+                </div>
+                {selectedIntake === intake.id && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-full animate-pulse" />
+                )}
+              </button>
+            ))
           )}
         </div>
       </div>
 
       {/* Right Panel - Intake Details or Subject Details */}
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 mt-4 lg:mt-0">
+      <div className="flex-1 bg-white/70 backdrop-blur-xl rounded-[2.5rem] shadow-2xl shadow-indigo-500/5 border border-white/20 flex flex-col overflow-hidden min-h-[500px]">
         {currentIntake && !selectedSubject ? (
-          <div className="h-full overflow-y-auto">
-            <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-              <h2 className="font-semibold text-gray-800">
-                {currentIntake.code} - Course Details
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {currentIntake.name} • {currentIntake.startDate} to{" "}
-                {currentIntake.endDate}
-              </p>
+          <div className="h-full flex flex-col overflow-hidden">
+            <div className="p-8 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <h2 className="font-black text-xs text-gray-400 uppercase tracking-widest leading-none">
+                  Intake Details
+                </h2>
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">
+                {currentIntake.code}{" "}
+                <span className="text-indigo-600">Term</span>
+              </h3>
+              <div className="flex flex-wrap items-center gap-6 mt-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <Clock size={14} />
+                  </div>
+                  {new Date(currentIntake.startDate).toLocaleDateString(
+                    "en-GB",
+                    {
+                      day: "numeric",
+                      month: "short",
+                    },
+                  )}
+                  <span className="mx-1 text-gray-300">→</span>
+                  {new Date(currentIntake.endDate).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <BookOpen size={14} />
+                  </div>
+                  {currentIntake.courses.length} Assigned Courses
+                </div>
+              </div>
             </div>
 
-            <div className="p-4">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
               {currentIntake.courses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 text-sm">
-                  <p>No assigned courses in this intake</p>
+                <div className="h-full flex flex-col items-center justify-center p-12 text-center bg-gray-50/50 rounded-[2.5rem] border border-dashed border-gray-200">
+                  <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-50 flex items-center justify-center text-indigo-300 mb-4">
+                    <BookOpen size={32} />
+                  </div>
+                  <p className="text-sm font-black text-gray-400 uppercase tracking-widest leading-loose">
+                    No assigned courses in this intake
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-6">
                   {currentIntake.courses.map((course) => (
                     <div
                       key={course.id}
-                      className="border border-gray-200 rounded-lg bg-white"
+                      className="group/course overflow-hidden rounded-[2rem] border border-gray-100 bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-1"
                     >
                       <button
                         onClick={() => toggleCourse(course.id)}
-                        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition rounded-lg"
+                        className={`w-full p-6 flex items-center justify-between transition-all duration-500 rounded-[2rem] ${
+                          expandedCourse === course.id
+                            ? "bg-indigo-50/80 shadow-inner"
+                            : "hover:bg-gray-50/50"
+                        }`}
                       >
-                        <div className="flex items-center gap-3">
-                          {course.subjects.length > 0 ? (
-                            <BookOpen size={18} className="text-green-600" />
-                          ) : (
-                            <Book size={18} className="text-gray-400" />
-                          )}
+                        <div className="flex items-center gap-5">
+                          <div
+                            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+                              expandedCourse === course.id
+                                ? "bg-indigo-600 text-white shadow-xl shadow-indigo-200 scale-110"
+                                : "bg-indigo-50 text-indigo-600 group-hover/course:bg-indigo-100"
+                            }`}
+                          >
+                            {course.subjects.length > 0 ? (
+                              <BookOpen size={24} />
+                            ) : (
+                              <Book size={24} />
+                            )}
+                          </div>
                           <div className="text-left">
-                            <p className="font-medium text-sm text-gray-800">
-                              {course.code} - {course.name}
+                            <p className="font-black text-[10px] text-indigo-600 uppercase tracking-[0.2em] mb-1">
+                              {course.code}
                             </p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              {course.subjects.length} subject
-                              {course.subjects.length !== 1 ? "s" : ""}
+                            <p className="font-black text-lg text-gray-900 tracking-tight leading-none group-hover/course:text-indigo-600 transition-colors">
+                              {course.name}
                             </p>
+                            <div className="flex items-center gap-3 mt-3">
+                              <span className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[9px] font-black text-gray-400 uppercase tracking-widest shadow-sm">
+                                {course.subjects.length} Assigned Subject
+                                {course.subjects.length !== 1 ? "s" : ""}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <span className="text-gray-500">
-                          {expandedCourses.has(course.id) ? "▼" : "▶"}
-                        </span>
+                        <div
+                          className={`w-10 h-10 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center transition-all duration-500 ${
+                            expandedCourse === course.id
+                              ? "rotate-180 bg-indigo-600 border-indigo-600 text-white"
+                              : "text-gray-400"
+                          }`}
+                        >
+                          {expandedCourse === course.id ? (
+                            <ChevronRight size={18} className="rotate-90" />
+                          ) : (
+                            <ChevronRight size={18} />
+                          )}
+                        </div>
                       </button>
 
                       {/* Subjects under Course */}
-                      {expandedCourses.has(course.id) && (
-                        <div className="bg-gray-50">
+                      {expandedCourse === course.id && (
+                        <div className="p-6 pt-2 bg-gradient-to-b from-indigo-50/30 to-white animate-in slide-in-from-top-4 duration-500 rounded-b-[2rem]">
                           {course.subjects.length === 0 ? (
-                            <div className="p-4 text-gray-500 text-sm text-center">
-                              No assigned subjects in this course
+                            <div className="p-8 text-center bg-white/50 rounded-[1.5rem] border border-dashed border-gray-200">
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-loose">
+                                No assigned subjects in this course
+                              </p>
                             </div>
                           ) : (
-                            <div className="space-y-2 p-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               {course.subjects.map((subject) => (
                                 <button
                                   key={subject.id}
@@ -1112,21 +1254,22 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
                                       currentIntake.id,
                                     )
                                   }
-                                  className="w-full flex items-center gap-3 p-3 bg-white rounded-lg border border-purple-200 hover:border-purple-300 hover:bg-purple-50 transition cursor-pointer"
+                                  className="group/subject flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-purple-200 hover:shadow-xl hover:shadow-purple-500/5 transition-all duration-500 text-left active:scale-[0.98]"
                                 >
-                                  <FileText
-                                    size={16}
-                                    className="text-purple-600"
-                                  />
-                                  <div className="flex-1 text-left">
-                                    <p className="font-medium text-sm text-gray-800">
-                                      {subject.code} - {subject.name}
+                                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover/subject:bg-purple-600 group-hover/subject:text-white transition-all duration-500 shadow-sm">
+                                    <FileText size={18} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-black text-[9px] text-purple-600 uppercase tracking-widest mb-0.5">
+                                      {subject.code}
+                                    </p>
+                                    <p className="font-bold text-xs text-gray-900 truncate leading-tight group-hover/subject:text-purple-600 transition-colors">
+                                      {subject.name}
                                     </p>
                                   </div>
-                                  <ChevronRight
-                                    size={14}
-                                    className="text-gray-400"
-                                  />
+                                  <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-gray-300 group-hover/subject:bg-purple-50 group-hover/subject:text-purple-600 transition-all duration-500">
+                                    <ChevronRight size={14} />
+                                  </div>
                                 </button>
                               ))}
                             </div>
@@ -1147,8 +1290,17 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
             onBack={handleBackToIntake}
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            <p>Select an intake to view details</p>
+          <div className="flex flex-col items-center justify-center h-full p-12 text-center opacity-60">
+            <div className="w-24 h-24 rounded-[2.5rem] bg-indigo-50 flex items-center justify-center text-indigo-200 mb-8 animate-bounce duration-[3000ms]">
+              <Layout size={48} />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2 uppercase">
+              Select an <span className="text-indigo-600">Intake</span>
+            </h3>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] max-w-[200px] leading-loose">
+              Choose an enrollment from the left panel to manage subjects and
+              materials.
+            </p>
           </div>
         )}
       </div>

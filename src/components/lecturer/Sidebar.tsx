@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
@@ -14,8 +15,6 @@ import {
 
 interface SidebarProps {
   lecturerName: string;
-  activeTab: string;
-  onTabChange: (tab: string) => void;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
 }
@@ -69,18 +68,29 @@ function ProfileDropdown({
 
 export default function Sidebar({
   lecturerName,
-  activeTab,
-  onTabChange,
   isSidebarOpen,
   setIsSidebarOpen,
 }: SidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const menuItems = [
-    { id: "Dashboard", icon: Home, label: "DASHBOARD" },
-    { id: "Intakes", icon: GraduationCap, label: "INTAKES" },
-    { id: "Assignments", icon: FileEdit, label: "ASSIGNMENTS" },
-    { id: "Materials", icon: FolderOpen, label: "MATERIALS" },
+    { href: "/dashboard/lecturer", icon: Home, label: "DASHBOARD" },
+    {
+      href: "/dashboard/lecturer/intakes",
+      icon: GraduationCap,
+      label: "INTAKES",
+    },
+    {
+      href: "/dashboard/lecturer/assignments",
+      icon: FileEdit,
+      label: "ASSIGNMENTS",
+    },
+    {
+      href: "/dashboard/lecturer/materials",
+      icon: FolderOpen,
+      label: "MATERIALS",
+    },
   ];
 
   const handleLogout = () => {
@@ -130,15 +140,17 @@ export default function Sidebar({
           <ul className="space-y-1.5">
             {menuItems.map((item) => {
               const IconComponent = item.icon;
-              const isActive = activeTab === item.id;
+              const currentPath = pathname || "";
+              const isActive =
+                item.href === "/dashboard/lecturer"
+                  ? currentPath === "/dashboard/lecturer"
+                  : currentPath.startsWith(item.href);
 
               return (
-                <li key={item.id}>
-                  <button
-                    onClick={() => {
-                      onTabChange(item.id);
-                      setIsSidebarOpen(false);
-                    }}
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    onClick={() => setIsSidebarOpen(false)}
                     className={`w-full flex items-center gap-3 px-5 py-4 rounded-[1.25rem] transition-all duration-300 group ${
                       isActive
                         ? "bg-indigo-600 text-white shadow-xl shadow-indigo-100"
@@ -158,7 +170,7 @@ export default function Sidebar({
                     {isActive && (
                       <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                     )}
-                  </button>
+                  </Link>
                 </li>
               );
             })}

@@ -388,7 +388,7 @@ export default function AssignmentMarkingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-4 md:px-8 md:py-6 pt-6 relative lg:ml-64">
+    <div className="min-h-screen bg-gray-50 px-4 py-4 md:px-8 md:py-6 pt-6 relative">
       <div className="max-w-6xl mx-auto space-y-4">
         <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <DialogContent className="sm:max-w-4xl h-[80vh] flex flex-col">
