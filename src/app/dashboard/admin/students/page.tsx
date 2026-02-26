@@ -21,10 +21,13 @@ import {
   Layers,
   ChevronRight,
   MoreHorizontal,
+  PlusCircle,
+  BookOpen,
 } from "lucide-react";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import { Badge } from "@/components/ui/badge";
+import { RegisterStudentModal } from "@/components/admin/RegisterStudentModal";
 
 interface Student {
   id: string;
@@ -44,6 +47,12 @@ export default function StudentManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Registration & Enrollment Modal State
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [enrollTarget, setEnrollTarget] = useState<
+    { id: string; name: string; email: string } | undefined
+  >(undefined);
 
   useEffect(() => {
     fetchStudents();
@@ -125,7 +134,13 @@ export default function StudentManagement() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-xs tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2 uppercase">
+            <button
+              onClick={() => {
+                setEnrollTarget(undefined);
+                setIsRegisterModalOpen(true);
+              }}
+              className="px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-xs tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2 uppercase"
+            >
               <UserPlus size={18} />
               ADD NEW STUDENT
             </button>
@@ -285,6 +300,22 @@ export default function StudentManagement() {
                     </td>
                     <td className="px-10 py-6">
                       <div className="flex items-center justify-end gap-2 pr-4 opacity-40 group-hover/row:opacity-100 transition-opacity duration-300">
+                        <button
+                          onClick={() => {
+                            setEnrollTarget({
+                              id: student.id,
+                              name: student.name,
+                              email: student.email,
+                            });
+                            setIsRegisterModalOpen(true);
+                          }}
+                          className="p-3 bg-white border border-gray-100 rounded-xl text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm flex items-center gap-2 px-4 group/enroll"
+                        >
+                          <PlusCircle size={16} />
+                          <span className="text-[10px] font-black uppercase tracking-widest hidden group-hover/enroll:block transition-all">
+                            Enroll
+                          </span>
+                        </button>
                         <button className="p-3 bg-white border border-gray-100 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
                           <Edit size={16} />
                         </button>
@@ -293,9 +324,6 @@ export default function StudentManagement() {
                           className="p-3 bg-white border border-gray-100 rounded-xl text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm"
                         >
                           <Trash2 size={16} />
-                        </button>
-                        <button className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:bg-gray-900 hover:text-white transition-all shadow-sm">
-                          <MoreHorizontal size={16} />
                         </button>
                       </div>
                     </td>
@@ -320,6 +348,13 @@ export default function StudentManagement() {
           )}
         </div>
       </main>
+
+      <RegisterStudentModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSuccess={() => fetchStudents()}
+        enrollOnly={enrollTarget}
+      />
     </div>
   );
 }
