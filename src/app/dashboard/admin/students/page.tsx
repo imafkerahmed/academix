@@ -31,6 +31,8 @@ import { RegisterStudentModal } from "@/components/admin/RegisterStudentModal";
 
 interface Student {
   id: string;
+  userId: string;
+  avatar: string;
   name: string;
   email: string;
   mobile: string;
@@ -39,7 +41,115 @@ interface Student {
   accountStatus: string;
   academicStatus: string;
   created: string;
+  expand?: {
+    "enrollments(student)"?: Array<{
+      expand?: {
+        course_intake_fee?: {
+          expand?: {
+            course_intake?: {
+              expand?: {
+                course?: {
+                  name: string;
+                  code: string;
+                };
+              };
+            };
+          };
+        };
+      };
+    }>;
+  };
 }
+
+const MOCK_STUDENTS: Student[] = [
+  {
+    id: "mock1",
+    userId: "ACDX100001",
+    avatar: "",
+    name: "Mohamed Afker",
+    email: "afker@example.com",
+    mobile: "0771234567",
+    city: "Colombo",
+    role: "student",
+    accountStatus: "active",
+    academicStatus: "enrolled",
+    created: new Date().toISOString(),
+    expand: {
+      "enrollments(student)": [
+        {
+          expand: {
+            course_intake_fee: {
+              expand: {
+                course_intake: {
+                  expand: {
+                    course: { name: "Fullstack Web Development", code: "FSW" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+  },
+  {
+    id: "mock2",
+    userId: "ACDX100002",
+    avatar: "",
+    name: "Sarah Jenkins",
+    email: "sarah.j@example.com",
+    mobile: "0719876543",
+    city: "Negambo",
+    role: "student",
+    accountStatus: "active",
+    academicStatus: "pending",
+    created: new Date(Date.now() - 86400000).toISOString(),
+    expand: {},
+  },
+  {
+    id: "mock3",
+    userId: "ACDX100003",
+    avatar: "",
+    name: "David Miller",
+    email: "miller.d@example.com",
+    mobile: "0755554433",
+    city: "Kandy",
+    role: "student",
+    accountStatus: "disabled",
+    academicStatus: "enrolled",
+    created: new Date(Date.now() - 172800000).toISOString(),
+    expand: {
+      "enrollments(student)": [
+        {
+          expand: {
+            course_intake_fee: {
+              expand: {
+                course_intake: {
+                  expand: {
+                    course: { name: "UI/UX Graphic Design", code: "GDV" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        {
+          expand: {
+            course_intake_fee: {
+              expand: {
+                course_intake: {
+                  expand: {
+                    course: { name: "Advanced Python", code: "PYT" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+  },
+];
 
 export default function StudentManagement() {
   const router = useRouter();
@@ -50,6 +160,11 @@ export default function StudentManagement() {
   const [academicFilter, setAcademicFilter] = useState<string>("all");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const perPage = 10;
+  const [totalItems, setTotalItems] = useState(0);
+
   // Registration & Enrollment Modal State
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [enrollTarget, setEnrollTarget] = useState<
@@ -57,23 +172,49 @@ export default function StudentManagement() {
   >(undefined);
 
   useEffect(() => {
-    fetchStudents();
-  }, [router]);
+    fetchStudents(currentPage);
+  }, [router, currentPage, statusFilter, academicFilter, searchQuery]);
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (page = 1) => {
     try {
-      const records = await pb
-        .collection("users")
-        .getFullList({
-          filter: 'role = "student"',
-          sort: "-created",
-        })
-        .catch(() => []);
+      setLoading(true);
+      const result = await pb.collection("users").getList(page, perPage, {
+        filter: `role = "student" ${
+          statusFilter !== "all" ? ` && accountStatus = "${statusFilter}"` : ""
+        } ${
+          academicFilter !== "all"
+            ? ` && academicStatus = "${academicFilter}"`
+            : ""
+        } ${
+          searchQuery
+            ? ` && (name ~ "${searchQuery}" || email ~ "${searchQuery}" || userId ~ "${searchQuery}")`
+            : ""
+        }`,
+        sort: "-created",
+        expand: "enrollments(student).course_intake_fee.course_intake.course",
+      });
 
-      setStudents((records as any) || []);
+      // Merge real records with mock data only if we are on page 1 and no search
+      const realRecords = (result.items as any) || [];
+      if (
+        page === 1 &&
+        !searchQuery &&
+        statusFilter === "all" &&
+        academicFilter === "all"
+      ) {
+        setStudents([...realRecords, ...MOCK_STUDENTS]);
+      } else {
+        setStudents(realRecords);
+      }
+
+      setTotalPages(result.totalPages);
+      setTotalItems(result.totalItems);
       setLoading(false);
     } catch (error) {
-      setStudents([]);
+      console.warn("PocketBase fetch failed, using mock data only.");
+      setStudents(MOCK_STUDENTS);
+      setTotalPages(1);
+      setTotalItems(MOCK_STUDENTS.length);
       setLoading(false);
     }
   };
@@ -94,16 +235,22 @@ export default function StudentManagement() {
     }
   };
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || student.accountStatus === statusFilter;
-    const matchesAcademic =
-      academicFilter === "all" || student.academicStatus === academicFilter;
-    return matchesSearch && matchesStatus && matchesAcademic;
-  });
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilterChange = (status: string) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleAcademicFilterChange = (filter: string) => {
+    setAcademicFilter(filter);
+    setCurrentPage(1);
+  };
+
+  const filteredStudents = students; // We filter server-side now
 
   if (loading) {
     return (
@@ -196,7 +343,7 @@ export default function StudentManagement() {
         <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <AdminActionBar
             searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            onSearchChange={handleSearchChange}
             searchPlaceholder="Search by name, email or reg ID..."
             action={
               <div className="flex items-center gap-2">
@@ -204,7 +351,7 @@ export default function StudentManagement() {
                   <Filter size={14} className="text-gray-400" />
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={(e) => handleStatusFilterChange(e.target.value)}
                     className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-400 focus:outline-none focus:ring-0 cursor-pointer"
                   >
                     <option value="all">ALL STUDENTS</option>
@@ -216,7 +363,7 @@ export default function StudentManagement() {
                   <BookOpen size={14} className="text-gray-400" />
                   <select
                     value={academicFilter}
-                    onChange={(e) => setAcademicFilter(e.target.value)}
+                    onChange={(e) => handleAcademicFilterChange(e.target.value)}
                     className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-400 focus:outline-none focus:ring-0 cursor-pointer"
                   >
                     <option value="all">ACADEMIC STATUS</option>
@@ -236,22 +383,16 @@ export default function StudentManagement() {
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-50">
                   <th className="px-10 py-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Identity
+                    UserID
                   </th>
                   <th className="px-10 py-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Contact & Reach
+                    Student Name
                   </th>
                   <th className="px-10 py-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Location
+                    Enrolled Courses
                   </th>
                   <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Account status
-                  </th>
-                  <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Academic status
-                  </th>
-                  <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Enrolled
+                    Status
                   </th>
                   <th className="px-10 py-6 text-right text-[10px] font-black uppercase tracking-widest text-gray-400">
                     Actions
@@ -265,97 +406,91 @@ export default function StudentManagement() {
                     className="group/row hover:bg-indigo-50/30 transition-all duration-300"
                   >
                     <td className="px-10 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all duration-300 scale-100 group-hover/row:scale-110">
-                          {student.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-black text-gray-900 group-hover/row:text-indigo-600 transition-colors uppercase tracking-tight">
-                            {student.name}
-                          </span>
-                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
-                            REG-{student.id.slice(0, 6).toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-10 py-6">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center text-xs font-bold text-gray-600">
-                          <Mail size={12} className="mr-2 text-indigo-400" />
-                          {student.email}
-                        </div>
-                        <div className="flex items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                          <Phone size={10} className="mr-2 text-gray-300" />
-                          {student.mobile}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-10 py-6">
-                      <div className="flex items-center text-xs font-black text-gray-400 uppercase tracking-widest">
-                        <MapPin size={14} className="mr-2 text-indigo-300" />
-                        {student.city}
-                      </div>
-                    </td>
-                    <td className="px-10 py-6 text-center">
-                      <Badge
-                        className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-none shadow-sm ${
-                          student.accountStatus === "active"
-                            ? "bg-green-500 text-white"
-                            : "bg-red-500 text-white"
-                        }`}
-                      >
-                        {student.accountStatus}
-                      </Badge>
-                    </td>
-                    <td className="px-10 py-6 text-center">
-                      <Badge
-                        className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-none shadow-sm ${
-                          student.academicStatus === "enrolled"
-                            ? "bg-indigo-500 text-white"
-                            : "bg-orange-500 text-white"
-                        }`}
-                      >
-                        {student.academicStatus || "enrolled"}
-                      </Badge>
-                    </td>
-                    <td className="px-10 py-6 text-center">
-                      <span className="text-sm font-black text-gray-400 italic">
-                        {new Date(student.created).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                      <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl tracking-widest shadow-sm border border-indigo-100/50">
+                        {student.userId ||
+                          `REG-${student.id.slice(0, 6).toUpperCase()}`}
                       </span>
                     </td>
                     <td className="px-10 py-6">
-                      <div className="flex items-center justify-end gap-2 pr-4 opacity-40 group-hover/row:opacity-100 transition-opacity duration-300">
-                        <button
-                          onClick={() => {
-                            setEnrollTarget({
-                              id: student.id,
-                              name: student.name,
-                              email: student.email,
-                            });
-                            setIsRegisterModalOpen(true);
-                          }}
-                          className="p-3 bg-white border border-gray-100 rounded-xl text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm flex items-center gap-2 px-4 group/enroll"
-                        >
-                          <PlusCircle size={16} />
-                          <span className="text-[10px] font-black uppercase tracking-widest hidden group-hover/enroll:block transition-all">
-                            Enroll
-                          </span>
-                        </button>
-                        <button className="p-3 bg-white border border-gray-100 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteStudent(student.id)}
-                          className="p-3 bg-white border border-gray-100 rounded-xl text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                      <div className="flex items-center gap-4">
+                        {student.avatar ? (
+                          <div className="h-12 w-12 rounded-2xl overflow-hidden shadow-sm border-2 border-white ring-4 ring-indigo-50/50 grayscale group-hover/row:grayscale-0 transition-all duration-300">
+                            <img
+                              src={pb.files.getUrl(
+                                student as any,
+                                student.avatar,
+                              )}
+                              alt={student.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-sm shadow-sm border-2 border-white ring-4 ring-indigo-50/50 group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all duration-300">
+                            {student.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-sm font-black text-gray-900 group-hover/row:text-indigo-600 transition-colors uppercase tracking-tight">
+                          {student.name}
+                        </span>
                       </div>
+                    </td>
+                    <td className="px-10 py-6">
+                      <div className="flex flex-wrap gap-1.5 max-w-[250px]">
+                        {student.expand?.["enrollments(student)"]?.length ? (
+                          student.expand["enrollments(student)"].map(
+                            (enrollment, idx) => {
+                              const course =
+                                enrollment.expand?.course_intake_fee?.expand
+                                  ?.course_intake?.expand?.course;
+                              if (!course) return null;
+                              return (
+                                <Badge
+                                  key={idx}
+                                  className="bg-gray-50 text-gray-600 border border-gray-100 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all cursor-default"
+                                >
+                                  {course.name}
+                                </Badge>
+                              );
+                            },
+                          )
+                        ) : (
+                          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic leading-loose">
+                            No Active <br /> Enrollments
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-10 py-6 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Badge
+                          className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-[0.1em] border-none shadow-sm w-20 justify-center ${
+                            student.accountStatus === "active"
+                              ? "bg-emerald-500 text-white shadow-emerald-100"
+                              : "bg-rose-500 text-white shadow-rose-100"
+                          }`}
+                        >
+                          {student.accountStatus}
+                        </Badge>
+                        <Badge
+                          className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-[0.1em] border-none shadow-sm w-20 justify-center ${
+                            student.academicStatus === "enrolled"
+                              ? "bg-indigo-500 text-white shadow-indigo-100"
+                              : "bg-amber-500 text-white shadow-amber-100"
+                          }`}
+                        >
+                          {student.academicStatus || "pending"}
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="px-10 py-6 text-right">
+                      <button
+                        onClick={() =>
+                          router.push(`/dashboard/admin/students/${student.id}`)
+                        }
+                        className="p-3 bg-white border border-gray-100 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm group-hover/row:shadow-md active:scale-95"
+                      >
+                        <Edit size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -363,7 +498,53 @@ export default function StudentManagement() {
             </table>
           </div>
 
-          {filteredStudents.length === 0 && (
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-10 py-6 border-t border-gray-50 flex items-center justify-between bg-white">
+              <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Showing Page{" "}
+                <span className="text-indigo-600">{currentPage}</span> of{" "}
+                {totalPages} ({totalItems} records)
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
+                  className="px-4 py-2 rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {[...Array(totalPages)].map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentPage(i + 1)}
+                      className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${
+                        currentPage === i + 1
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                          : "text-gray-400 hover:bg-gray-50"
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                  className="px-4 py-2 rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
+          {students.length === 0 && !loading && (
             <div className="text-center py-24 bg-gray-50/30">
               <div className="w-20 h-20 bg-gray-100 rounded-[2rem] flex items-center justify-center text-gray-300 mx-auto mb-6">
                 <Search size={40} />
