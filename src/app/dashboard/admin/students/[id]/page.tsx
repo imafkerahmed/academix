@@ -28,6 +28,7 @@ import {
   ExternalLink,
   Upload,
   Archive,
+  Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,6 +38,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { EnrollCourseModal } from "@/components/admin/EnrollCourseModal";
 
 interface Document {
   id: string;
@@ -61,6 +63,11 @@ interface StudentDetails {
   dob?: string;
   gender?: string;
   idNumber?: string;
+  callingName?: string;
+  guardianName?: string;
+  guardianRelation?: string;
+  guardianPhone?: string;
+  address?: string;
   expand?: {
     "enrollments(student)"?: Enrollment[];
   };
@@ -176,9 +183,412 @@ function CertificateStatusControl({
 
         <button
           onClick={() => setIsOpen(false)}
-          className="w-full mt-6 py-4 rounded-2xl bg-gray-900 text-white font-black text-[10px] tracking-widest shadow-xl shadow-gray-200 hover:bg-indigo-600 transition-all uppercase active:scale-95"
+          className="w-full mt-6 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
         >
           {status === "ISSUED" ? "Save & Upload" : "Save Status"}
+        </button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function UpdateProfileControl() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setAvatarFile(file);
+      setAvatarPreview(URL.createObjectURL(file));
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <button className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase flex items-center gap-2">
+          <Edit size={14} /> Update Profile
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl p-8 rounded-[2.5rem] border-none shadow-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="mb-6">
+          <DialogTitle className="text-2xl font-black uppercase tracking-tight text-gray-900">
+            Update Student Profile
+          </DialogTitle>
+          <p className="text-xs font-bold text-gray-400">
+            Modify the basic information of the student below.
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          <div className="space-y-4 pt-4 border-t border-gray-100">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+              <User size={12} className="text-indigo-400" /> Student Avatar
+            </label>
+            <div className="flex items-center gap-6">
+              <div className="relative group">
+                <div className="w-24 h-24 rounded-3xl bg-indigo-50 border-2 border-dashed border-indigo-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-indigo-400">
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt="Avatar Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="text-indigo-300" size={32} />
+                  )}
+                </div>
+                {avatarPreview && (
+                  <button
+                    onClick={() => {
+                      setAvatarFile(null);
+                      setAvatarPreview(null);
+                    }}
+                    className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-all border-2 border-white"
+                  >
+                    <XCircle size={14} />
+                  </button>
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                <label className="cursor-pointer group flex items-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all shadow-md hover:shadow-indigo-200/50 w-fit">
+                  <Upload size={18} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    {avatarFile ? "Change Image" : "Upload Photo"}
+                  </span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                  />
+                </label>
+                <p className="text-[10px] font-bold text-gray-400 ml-1">
+                  JPG, PNG or GIF. Max 5MB.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <User size={12} className="text-indigo-400" /> Full Name
+              </label>
+              <input
+                type="text"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                defaultValue="Mohamed Afker"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <User size={12} className="text-indigo-400" /> Calling Name
+              </label>
+              <input
+                type="text"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                defaultValue="Afker"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <Phone size={12} className="text-indigo-400" /> WhatsApp Number
+              </label>
+              <input
+                type="text"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                defaultValue="0771234567"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <Mail size={12} className="text-indigo-400" /> Email Address
+              </label>
+              <input
+                type="email"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                defaultValue="afker@example.com"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <MapPin size={12} className="text-indigo-400" /> Home Address
+              </label>
+              <input
+                type="text"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                defaultValue="123 Galle Road, Colombo 03"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <User size={12} className="text-indigo-400" /> Gender
+              </label>
+              <select className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-[10px] font-black uppercase tracking-widest text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all appearance-none cursor-pointer">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <Calendar size={12} className="text-indigo-400" /> Date of Birth
+              </label>
+              <input
+                type="date"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                defaultValue="1998-05-15"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <ShieldCheck size={12} className="text-indigo-400" /> ID /
+                Passport Number
+              </label>
+              <input
+                type="text"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                defaultValue="981360123V"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-6 pt-4 border-t border-gray-100">
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <Users size={12} className="text-indigo-400" /> Guardian
+              Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  Guardian Name
+                </label>
+                <input
+                  type="text"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                  defaultValue="Mr. Kamal Perera"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  Relationship
+                </label>
+                <select className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-[10px] font-black uppercase tracking-widest text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all appearance-none cursor-pointer">
+                  <option value="father">Father</option>
+                  <option value="mother">Mother</option>
+                  <option value="guardian">Other Guardian</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  Guardian Contact
+                </label>
+                <input
+                  type="text"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                  defaultValue="0719876543"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-4 mt-8 pt-6 border-t border-gray-100">
+          <button
+            onClick={() => setIsOpen(false)}
+            className="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-600 font-black text-[10px] tracking-widest hover:bg-gray-200 transition-all uppercase active:scale-95"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
+          >
+            Save Changes
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RecordPaymentControl() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <button className="px-6 py-3 rounded-xl bg-white border border-gray-100 text-indigo-600 font-black text-[10px] tracking-widest shadow-sm hover:shadow-md transition-all uppercase flex items-center gap-2">
+          <Plus size={14} /> Record Payment
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md p-8 rounded-[2.5rem] border-none shadow-2xl">
+        <DialogHeader className="mb-6">
+          <DialogTitle className="text-2xl font-black uppercase tracking-tight text-gray-900">
+            Record New Payment
+          </DialogTitle>
+          <p className="text-xs font-bold text-gray-400">
+            Log a manual transaction for this student.
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+              Select Enrolled Course
+            </label>
+            <select className="w-full bg-gray-50 border-none rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all cursor-pointer">
+              <option value="c1">Fullstack Web Development</option>
+              <option value="c2">UI/UX Graphic Design</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+              Amount Paid (LKR)
+            </label>
+            <input
+              type="number"
+              placeholder="Enter amount..."
+              className="w-full bg-gray-50 border-none rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+              Payment Date
+            </label>
+            <input
+              type="date"
+              className="w-full bg-gray-50 border-none rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+              defaultValue={new Date().toISOString().split("T")[0]}
+            />
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">
+              Upload Payment Proof (Slip / Receipt)
+            </h4>
+            <div className="w-full border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50 transition-colors group">
+              <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-indigo-500 mb-3 group-hover:scale-110 transition-transform">
+                <Upload size={16} />
+              </div>
+              <p className="text-[10px] font-bold text-gray-700">
+                Attach Bank Slip
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsOpen(false)}
+          className="w-full mt-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
+        >
+          Confirm Payment Log
+        </button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function UploadDocumentControl({ documentName }: { documentName: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <button className="w-full py-3.5 rounded-2xl border border-gray-100 flex items-center justify-center gap-2 text-gray-500 hover:bg-gray-50 hover:text-indigo-600 transition-colors uppercase text-[9px] font-black tracking-widest shadow-sm">
+          <Upload size={14} /> Update File
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md p-8 rounded-[2.5rem] border-none shadow-2xl">
+        <DialogHeader className="mb-6">
+          <DialogTitle className="text-xl font-black uppercase tracking-tight text-gray-900 text-center">
+            Upload Document
+          </DialogTitle>
+          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 text-center mt-2 bg-indigo-50 py-2 rounded-xl">
+            {documentName}
+          </p>
+        </DialogHeader>
+
+        <div className="w-full border-2 border-dashed border-gray-200 bg-gray-50 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group">
+          <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-500 mb-4 group-hover:scale-110 transition-transform">
+            <Upload size={24} />
+          </div>
+          <p className="text-sm font-bold text-gray-700 mb-1">
+            Click to browse your files
+          </p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+            Supports PDF, JPG, PNG (Max 10MB)
+          </p>
+        </div>
+
+        <button
+          onClick={() => setIsOpen(false)}
+          className="w-full mt-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
+        >
+          Upload & Verify Document
+        </button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PaymentPreviewControl({ payment }: { payment: any }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <button className="w-8 h-8 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 transition-colors shadow-sm">
+          <ExternalLink size={14} />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md p-8 rounded-[2.5rem] border-none shadow-2xl">
+        <DialogHeader className="mb-8 border-b border-gray-100 pb-6 flex flex-col items-center">
+          <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center mb-4">
+            <CheckCircle size={32} />
+          </div>
+          <DialogTitle className="text-2xl font-black uppercase tracking-tight text-gray-900 text-center">
+            Payment Verified
+          </DialogTitle>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">
+            {payment.id}
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-4 mb-8">
+          <div className="flex justify-between items-center py-3 border-b border-gray-50">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Course
+            </span>
+            <span className="text-xs font-bold text-gray-900">
+              {payment.courseName}
+            </span>
+          </div>
+          <div className="flex justify-between items-center py-3 border-b border-gray-50">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Data & Time
+            </span>
+            <span className="text-xs font-bold text-gray-900">
+              {payment.date}
+            </span>
+          </div>
+          <div className="flex justify-between items-center py-3 border-b border-gray-50">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Amount Paid
+            </span>
+            <span className="text-lg font-black text-indigo-600">
+              LKR {payment.amount.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsOpen(false)}
+          className="w-full py-4 rounded-2xl bg-indigo-50 text-indigo-600 font-black text-[10px] tracking-widest hover:bg-indigo-600 hover:text-white transition-all uppercase active:scale-95 flex items-center justify-center gap-2"
+        >
+          <Archive size={16} /> Download PDF Receipt
         </button>
       </DialogContent>
     </Dialog>
@@ -195,6 +605,9 @@ export default function StudentDetail() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [financeFilter, setFinanceFilter] = useState("all");
+
+  // Enrollment Modal state
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
 
   useEffect(() => {
     if (studentId) {
@@ -466,9 +879,14 @@ export default function StudentDetail() {
             ]}
           />
           <div className="flex items-center gap-3">
-            {activeTab === "payments" && (
-              <button className="px-6 py-3 rounded-xl bg-white border border-gray-100 text-indigo-600 font-black text-[10px] tracking-widest shadow-sm hover:shadow-md transition-all uppercase flex items-center gap-2">
-                <Plus size={14} /> Record Payment
+            {activeTab === "payments" && <RecordPaymentControl />}
+
+            {activeTab === "academic" && (
+              <button
+                onClick={() => setIsEnrollModalOpen(true)}
+                className="px-6 py-3 rounded-xl bg-white border border-gray-100 text-indigo-600 font-black text-[10px] tracking-widest shadow-sm hover:shadow-md transition-all uppercase flex items-center gap-2"
+              >
+                <Plus size={14} /> Enroll Course
               </button>
             )}
 
@@ -492,9 +910,7 @@ export default function StudentDetail() {
               </button>
             )}
 
-            <button className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase flex items-center gap-2">
-              <Edit size={14} /> Update Profile
-            </button>
+            <UpdateProfileControl />
           </div>
         </div>
 
@@ -515,9 +931,6 @@ export default function StudentDetail() {
                   {student.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-500 rounded-2xl border-4 border-white flex items-center justify-center text-white shadow-lg">
-                <CheckCircle size={18} />
-              </div>
             </div>
 
             <div className="flex-1 space-y-4">
@@ -530,9 +943,6 @@ export default function StudentDetail() {
                     {student.userId}
                   </Badge>
                 </div>
-                <p className="text-gray-400 text-sm font-medium mt-1 uppercase tracking-tight flex items-center gap-2">
-                  <Mail size={14} className="text-indigo-400" /> {student.email}
-                </p>
               </div>
 
               <div className="flex grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
@@ -619,19 +1029,14 @@ export default function StudentDetail() {
                   {[
                     { label: "Full Name", value: student.name, icon: User },
                     {
-                      label: "Personal Email",
-                      value: student.email,
-                      icon: Mail,
+                      label: "Calling Name",
+                      value: student.callingName || "Not Provided",
+                      icon: User,
                     },
                     {
-                      label: "Mobile Contact",
-                      value: student.mobile,
-                      icon: Phone,
-                    },
-                    {
-                      label: "Current City",
-                      value: student.city,
-                      icon: MapPin,
+                      label: "Gender",
+                      value: student.gender || "Not Provided",
+                      icon: User,
                     },
                     {
                       label: "Date of Birth",
@@ -639,19 +1044,39 @@ export default function StudentDetail() {
                       icon: Calendar,
                     },
                     {
-                      label: "Gender Identity",
-                      value: student.gender || "Not Provided",
-                      icon: User,
-                    },
-                    {
                       label: "ID Card / Passport",
                       value: student.idNumber || "Not Provided",
                       icon: ShieldCheck,
                     },
                     {
-                      label: "Academic Advisor",
-                      value: student.academicAdvisor || "Not Assigned",
-                      icon: ShieldCheck,
+                      label: "Personal Email",
+                      value: student.email,
+                      icon: Mail,
+                    },
+                    {
+                      label: "WhatsApp Number",
+                      value: student.mobile,
+                      icon: Phone,
+                    },
+                    {
+                      label: "Home Address",
+                      value: student.address || student.city,
+                      icon: MapPin,
+                    },
+                    {
+                      label: "Guardian Name",
+                      value: student.guardianName || "Not Provided",
+                      icon: Users,
+                    },
+                    {
+                      label: "Relationship",
+                      value: student.guardianRelation || "Not Provided",
+                      icon: Users,
+                    },
+                    {
+                      label: "Guardian Contact",
+                      value: student.guardianPhone || "Not Provided",
+                      icon: Phone,
                     },
                   ].map((field, idx) => (
                     <div key={idx} className="space-y-1.5 group">
@@ -926,9 +1351,7 @@ export default function StudentDetail() {
                           : "-"}
                       </p>
 
-                      <button className="w-full py-3.5 rounded-2xl border border-gray-100 flex items-center justify-center gap-2 text-gray-500 hover:bg-gray-50 hover:text-indigo-600 transition-colors uppercase text-[9px] font-black tracking-widest shadow-sm">
-                        <Upload size={14} /> Update File
-                      </button>
+                      <UploadDocumentControl documentName={docDef.label} />
                     </div>
                   );
                 })}
@@ -938,6 +1361,19 @@ export default function StudentDetail() {
           {/* End of tab content */}
         </div>
       </main>
+
+      {student && (
+        <EnrollCourseModal
+          isOpen={isEnrollModalOpen}
+          onClose={() => setIsEnrollModalOpen(false)}
+          onSuccess={() => {
+            // Refetch student data here manually if needed, or simply let the state update
+            setIsEnrollModalOpen(false);
+            window.location.reload();
+          }}
+          studentId={student.id}
+        />
+      )}
     </div>
   );
 }
