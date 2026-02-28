@@ -37,6 +37,7 @@ interface Student {
   city: string;
   role: string;
   accountStatus: string;
+  academicStatus: string;
   created: string;
 }
 
@@ -46,6 +47,7 @@ export default function StudentManagement() {
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [academicFilter, setAcademicFilter] = useState<string>("all");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Registration & Enrollment Modal State
@@ -98,7 +100,9 @@ export default function StudentManagement() {
       student.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
       statusFilter === "all" || student.accountStatus === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesAcademic =
+      academicFilter === "all" || student.academicStatus === academicFilter;
+    return matchesSearch && matchesStatus && matchesAcademic;
   });
 
   if (loading) {
@@ -208,6 +212,18 @@ export default function StudentManagement() {
                     <option value="disabled">DISABLED</option>
                   </select>
                 </div>
+                <div className="hidden md:flex items-center bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 gap-3 transition-all focus-within:ring-2 focus-within:ring-indigo-500/10">
+                  <BookOpen size={14} className="text-gray-400" />
+                  <select
+                    value={academicFilter}
+                    onChange={(e) => setAcademicFilter(e.target.value)}
+                    className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-400 focus:outline-none focus:ring-0 cursor-pointer"
+                  >
+                    <option value="all">ACADEMIC STATUS</option>
+                    <option value="enrolled">ENROLLED</option>
+                    <option value="pending">PENDING</option>
+                  </select>
+                </div>
               </div>
             }
           />
@@ -230,6 +246,9 @@ export default function StudentManagement() {
                   </th>
                   <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
                     Account status
+                  </th>
+                  <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Academic status
                   </th>
                   <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
                     Enrolled
@@ -287,6 +306,17 @@ export default function StudentManagement() {
                         }`}
                       >
                         {student.accountStatus}
+                      </Badge>
+                    </td>
+                    <td className="px-10 py-6 text-center">
+                      <Badge
+                        className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-none shadow-sm ${
+                          student.academicStatus === "enrolled"
+                            ? "bg-indigo-500 text-white"
+                            : "bg-orange-500 text-white"
+                        }`}
+                      >
+                        {student.academicStatus || "enrolled"}
                       </Badge>
                     </td>
                     <td className="px-10 py-6 text-center">
