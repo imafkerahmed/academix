@@ -280,7 +280,7 @@ export default function StudentManagement() {
               </h1>
               <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
                 <Layers size={14} className="text-indigo-400" />
-                Centralized Enrollment Management
+                Student and Enrollment Management
               </p>
             </div>
           </div>

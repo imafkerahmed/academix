@@ -164,7 +164,7 @@ export default function IntakeCourseManagement() {
               </h1>
               <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
                 <BookOpen size={14} className="text-indigo-400" />
-                Academic Term & Lifecycle Management
+                Academic Intake and Course Management
               </p>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function IntakeCourseManagement() {
               <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 {[
                   { id: "active", label: "ACTIVE & UPCOMING" },
-                  { id: "completed", label: "HISTORICAL ARCHIVE" },
+                  { id: "completed", label: "COMPLETED" },
                 ].map((t) => (
                   <button
                     key={t.id}

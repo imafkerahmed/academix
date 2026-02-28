@@ -416,6 +416,15 @@ function UpdateProfileControl() {
 
 function RecordPaymentControl() {
   const [isOpen, setIsOpen] = useState(false);
+  const todayFormatted = new Date().toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  // Placeholder: in a real scenario, fetch outstanding installment for this month
+  const outstandingAmount = 25000;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -427,56 +436,54 @@ function RecordPaymentControl() {
       <DialogContent className="max-w-md p-8 rounded-[2.5rem] border-none shadow-2xl">
         <DialogHeader className="mb-6">
           <DialogTitle className="text-2xl font-black uppercase tracking-tight text-gray-900">
-            Record New Payment
+            Record Payment
           </DialogTitle>
           <p className="text-xs font-bold text-gray-400">
-            Log a manual transaction for this student.
+            Attach bank slip to log this month's payment.
           </p>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-              Select Enrolled Course
-            </label>
-            <select className="w-full bg-gray-50 border-none rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all cursor-pointer">
-              <option value="c1">Fullstack Web Development</option>
-              <option value="c2">UI/UX Graphic Design</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-              Amount Paid (LKR)
-            </label>
-            <input
-              type="number"
-              placeholder="Enter amount..."
-              className="w-full bg-gray-50 border-none rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-              Payment Date
-            </label>
-            <input
-              type="date"
-              className="w-full bg-gray-50 border-none rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-              defaultValue={new Date().toISOString().split("T")[0]}
-            />
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">
-              Upload Payment Proof (Slip / Receipt)
-            </h4>
-            <div className="w-full border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50 transition-colors group">
-              <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-indigo-500 mb-3 group-hover:scale-110 transition-transform">
-                <Upload size={16} />
-              </div>
-              <p className="text-[10px] font-bold text-gray-700">
-                Attach Bank Slip
+        <div className="space-y-5">
+          {/* Outstanding Amount Card */}
+          <div className="p-5 bg-indigo-50 border-2 border-indigo-100 rounded-3xl flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400 mb-1">
+                Outstanding This Month
+              </p>
+              <p className="text-3xl font-black text-indigo-700">
+                LKR {outstandingAmount.toLocaleString()}
               </p>
             </div>
+            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-500 shadow-md">
+              <CreditCard size={24} />
+            </div>
+          </div>
+
+          {/* Date (read-only, always today) */}
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+            <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+              Payment Date
+            </p>
+            <p className="text-xs font-black text-gray-900">{todayFormatted}</p>
+          </div>
+
+          {/* Slip Upload */}
+          <div className="space-y-3 pt-2">
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Attach Bank Slip / Receipt
+            </h4>
+            <label className="w-full border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50 hover:border-indigo-400 transition-all group">
+              <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-500 mb-3 group-hover:scale-110 transition-transform">
+                <Upload size={20} />
+              </div>
+              <p className="text-xs font-bold text-gray-700 mb-1">
+                Click to upload slip
+              </p>
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                JPG, PNG or PDF — Max 10MB
+              </p>
+              <input type="file" className="hidden" accept="image/*,.pdf" />
+            </label>
           </div>
         </div>
 
@@ -1078,6 +1085,11 @@ export default function StudentDetail() {
                       value: student.guardianPhone || "Not Provided",
                       icon: Phone,
                     },
+                    {
+                      label: "Academic Advisor",
+                      value: student.academicAdvisor || "Not Assigned",
+                      icon: Users,
+                    },
                   ].map((field, idx) => (
                     <div key={idx} className="space-y-1.5 group">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -1143,7 +1155,7 @@ export default function StudentDetail() {
                                   {course?.name || "Unknown Course"}
                                 </h4>
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
-                                  CODE: {course?.code || "N/A"}
+                                  REG NO: {course?.code || "N/A"}
                                 </p>
                               </div>
                             </div>
