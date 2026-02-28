@@ -55,19 +55,21 @@ interface StudentDetails {
   name: string;
   email: string;
   mobile: string;
+  whatsapp?: string;
   city: string;
+  address?: string;
   role: string;
   accountStatus: string;
   academicStatus: string;
   created: string;
-  dob?: string;
+  dateOfBirth?: string;
   gender?: string;
-  idNumber?: string;
-  callingName?: string;
+  IdentificationDocument?: string;
+  nameinitials?: string;
+  countryCode?: string;
   guardianName?: string;
-  guardianRelation?: string;
-  guardianPhone?: string;
-  address?: string;
+  guardianRelationship?: string;
+  guardianContact?: string;
   expand?: {
     "enrollments(student)"?: Enrollment[];
   };
@@ -78,17 +80,16 @@ interface StudentDetails {
 interface Enrollment {
   id: string;
   created: string;
+  registration_number?: string;
+  installment_amount?: number;
+  payment_option?: string;
   expand?: {
-    course_intake_fee?: {
+    course_intake?: {
       expand?: {
-        course_intake?: {
-          expand?: {
-            course?: {
-              id: string;
-              name: string;
-              code: string;
-            };
-          };
+        course?: {
+          id: string;
+          name: string;
+          code: string;
         };
       };
     };
@@ -618,222 +619,15 @@ export default function StudentDetail() {
 
   useEffect(() => {
     if (studentId) {
-      if (studentId.startsWith("mock")) {
-        handleMockData(studentId);
-      } else {
-        fetchStudentDetails();
-      }
+      fetchStudentDetails();
     }
   }, [studentId]);
-
-  const handleMockData = (id: string) => {
-    const mocks: Record<string, StudentDetails> = {
-      mock1: {
-        id: "mock1",
-        userId: "ACDX100001",
-        avatar: "",
-        name: "Mohamed Afker",
-        email: "afker@example.com",
-        mobile: "0771234567",
-        city: "Colombo",
-        role: "student",
-        accountStatus: "active",
-        academicStatus: "enrolled",
-        created: new Date().toISOString(),
-        dob: "1998-05-15",
-        gender: "Male",
-        idNumber: "981234567V",
-        academicAdvisor: "Mr. Samantha Perera",
-        documents: [
-          {
-            id: "doc1",
-            name: "NIC Document",
-            category: "nic",
-            status: "verified",
-            date: "2024-01-12T00:00:00.000Z",
-          },
-          {
-            id: "doc2",
-            name: "O/L Transcript",
-            category: "ol",
-            status: "verified",
-            date: "2024-01-12T00:00:00.000Z",
-          },
-          {
-            id: "doc3",
-            name: "A/L Transcript",
-            category: "al",
-            status: "pending",
-            date: "2024-02-20T00:00:00.000Z",
-          },
-        ],
-        expand: {
-          "enrollments(student)": [
-            {
-              id: "enr1",
-              created: new Date().toISOString(),
-              expand: {
-                course_intake_fee: {
-                  expand: {
-                    course_intake: {
-                      expand: {
-                        course: {
-                          id: "c1",
-                          name: "Fullstack Web Development",
-                          code: "FSW",
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-      mock2: {
-        id: "mock2",
-        userId: "ACDX100002",
-        avatar: "",
-        name: "Sarah Jenkins",
-        email: "sarah.j@example.com",
-        mobile: "0719876543",
-        city: "Negambo",
-        role: "student",
-        accountStatus: "active",
-        academicStatus: "pending",
-        created: new Date(Date.now() - 86400000).toISOString(),
-        dob: "2000-11-20",
-        gender: "Female",
-        idNumber: "200023456789",
-        academicAdvisor: "Mrs. Priyanthi Gunawardane",
-        documents: [
-          {
-            id: "doc4",
-            name: "NIC",
-            category: "nic",
-            status: "verified",
-            date: "2024-02-15T00:00:00.000Z",
-          },
-        ],
-        expand: { "enrollments(student)": [] },
-      },
-      mock3: {
-        id: "mock3",
-        userId: "ACDX100003",
-        avatar: "",
-        name: "David Miller",
-        email: "miller.d@example.com",
-        mobile: "0755554433",
-        city: "Kandy",
-        role: "student",
-        accountStatus: "disabled",
-        academicStatus: "enrolled",
-        created: new Date(Date.now() - 172800000).toISOString(),
-        dob: "1995-02-10",
-        gender: "Male",
-        idNumber: "951234567V",
-        academicAdvisor: "Mr. Samantha Perera",
-        documents: [
-          {
-            id: "doc5",
-            name: "NIC",
-            category: "nic",
-            status: "verified",
-            date: "2023-10-05T00:00:00.000Z",
-          },
-        ],
-        expand: {
-          "enrollments(student)": [
-            {
-              id: "enr2",
-              created: new Date().toISOString(),
-              expand: {
-                course_intake_fee: {
-                  expand: {
-                    course_intake: {
-                      expand: {
-                        course: {
-                          id: "c2",
-                          name: "UI/UX Graphic Design",
-                          code: "GDV",
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            {
-              id: "enr3",
-              created: new Date().toISOString(),
-              expand: {
-                course_intake_fee: {
-                  expand: {
-                    course_intake: {
-                      expand: {
-                        course: {
-                          id: "c3",
-                          name: "Advanced Python",
-                          code: "PYT",
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-    };
-
-    setStudent(mocks[id] || mocks["mock1"]);
-
-    // Add some mock payments for mock1 and mock3
-    if (id === "mock1") {
-      setPayments([
-        {
-          id: "p1",
-          reference_Id: "TXN100001",
-          date_paid: new Date().toISOString(),
-          amount: 50000,
-          payment_type: "Full Payment",
-          verified: true,
-          expand: { course: { name: "Fullstack Web Development" } },
-        },
-      ]);
-    } else if (id === "mock3") {
-      setPayments([
-        {
-          id: "p2",
-          reference_Id: "TXN100002",
-          date_paid: new Date().toISOString(),
-          amount: 25000,
-          payment_type: "Installment",
-          verified: true,
-          expand: { course: { name: "UI/UX Graphic Design" } },
-        },
-        {
-          id: "p3",
-          reference_Id: "TXN100003",
-          date_paid: new Date().toISOString(),
-          amount: 15000,
-          payment_type: "Registration",
-          verified: true,
-          expand: { course: { name: "Advanced Python" } },
-        },
-      ]);
-    }
-
-    setLoading(false);
-  };
 
   const fetchStudentDetails = async () => {
     try {
       setLoading(true);
       const record = await pb.collection("users").getOne(studentId, {
-        expand: "enrollments(student).course_intake_fee.course_intake.course",
+        expand: "enrollments(student).course_intake.course",
       });
 
       const paymentRecords = await pb.collection("payments").getFullList({
@@ -1036,8 +830,8 @@ export default function StudentDetail() {
                   {[
                     { label: "Full Name", value: student.name, icon: User },
                     {
-                      label: "Calling Name",
-                      value: student.callingName || "Not Provided",
+                      label: "Name with Initials",
+                      value: student.nameinitials || "Not Provided",
                       icon: User,
                     },
                     {
@@ -1047,12 +841,12 @@ export default function StudentDetail() {
                     },
                     {
                       label: "Date of Birth",
-                      value: student.dob || "Not Provided",
+                      value: student.dateOfBirth || "Not Provided",
                       icon: Calendar,
                     },
                     {
                       label: "ID Card / Passport",
-                      value: student.idNumber || "Not Provided",
+                      value: student.IdentificationDocument || "Not Provided",
                       icon: ShieldCheck,
                     },
                     {
@@ -1077,12 +871,12 @@ export default function StudentDetail() {
                     },
                     {
                       label: "Relationship",
-                      value: student.guardianRelation || "Not Provided",
+                      value: student.guardianRelationship || "Not Provided",
                       icon: Users,
                     },
                     {
                       label: "Guardian Contact",
-                      value: student.guardianPhone || "Not Provided",
+                      value: student.guardianContact || "Not Provided",
                       icon: Phone,
                     },
                     {
@@ -1139,8 +933,7 @@ export default function StudentDetail() {
                     student.expand["enrollments(student)"].map(
                       (enrollment, idx) => {
                         const course =
-                          enrollment.expand?.course_intake_fee?.expand
-                            ?.course_intake?.expand?.course;
+                          enrollment.expand?.course_intake?.expand?.course;
                         return (
                           <div
                             key={idx}
@@ -1155,7 +948,8 @@ export default function StudentDetail() {
                                   {course?.name || "Unknown Course"}
                                 </h4>
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
-                                  REG NO: {course?.code || "N/A"}
+                                  REG NO:{" "}
+                                  {enrollment.registration_number || "N/A"}
                                 </p>
                               </div>
                             </div>

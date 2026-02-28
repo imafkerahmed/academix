@@ -44,15 +44,11 @@ interface Student {
   expand?: {
     "enrollments(student)"?: Array<{
       expand?: {
-        course_intake_fee?: {
+        course_intake?: {
           expand?: {
-            course_intake?: {
-              expand?: {
-                course?: {
-                  name: string;
-                  code: string;
-                };
-              };
+            course?: {
+              name: string;
+              code: string;
             };
           };
         };
@@ -60,96 +56,6 @@ interface Student {
     }>;
   };
 }
-
-const MOCK_STUDENTS: Student[] = [
-  {
-    id: "mock1",
-    userId: "ACDX100001",
-    avatar: "",
-    name: "Mohamed Afker",
-    email: "afker@example.com",
-    mobile: "0771234567",
-    city: "Colombo",
-    role: "student",
-    accountStatus: "active",
-    academicStatus: "enrolled",
-    created: new Date().toISOString(),
-    expand: {
-      "enrollments(student)": [
-        {
-          expand: {
-            course_intake_fee: {
-              expand: {
-                course_intake: {
-                  expand: {
-                    course: { name: "Fullstack Web Development", code: "FSW" },
-                  },
-                },
-              },
-            },
-          },
-        },
-      ],
-    },
-  },
-  {
-    id: "mock2",
-    userId: "ACDX100002",
-    avatar: "",
-    name: "Sarah Jenkins",
-    email: "sarah.j@example.com",
-    mobile: "0719876543",
-    city: "Negambo",
-    role: "student",
-    accountStatus: "active",
-    academicStatus: "pending",
-    created: new Date(Date.now() - 86400000).toISOString(),
-    expand: {},
-  },
-  {
-    id: "mock3",
-    userId: "ACDX100003",
-    avatar: "",
-    name: "David Miller",
-    email: "miller.d@example.com",
-    mobile: "0755554433",
-    city: "Kandy",
-    role: "student",
-    accountStatus: "disabled",
-    academicStatus: "enrolled",
-    created: new Date(Date.now() - 172800000).toISOString(),
-    expand: {
-      "enrollments(student)": [
-        {
-          expand: {
-            course_intake_fee: {
-              expand: {
-                course_intake: {
-                  expand: {
-                    course: { name: "UI/UX Graphic Design", code: "GDV" },
-                  },
-                },
-              },
-            },
-          },
-        },
-        {
-          expand: {
-            course_intake_fee: {
-              expand: {
-                course_intake: {
-                  expand: {
-                    course: { name: "Advanced Python", code: "PYT" },
-                  },
-                },
-              },
-            },
-          },
-        },
-      ],
-    },
-  },
-];
 
 export default function StudentManagement() {
   const router = useRouter();
@@ -191,30 +97,18 @@ export default function StudentManagement() {
             : ""
         }`,
         sort: "-created",
-        expand: "enrollments(student).course_intake_fee.course_intake.course",
+        expand: "enrollments(student).course_intake.course",
       });
 
-      // Merge real records with mock data only if we are on page 1 and no search
-      const realRecords = (result.items as any) || [];
-      if (
-        page === 1 &&
-        !searchQuery &&
-        statusFilter === "all" &&
-        academicFilter === "all"
-      ) {
-        setStudents([...realRecords, ...MOCK_STUDENTS]);
-      } else {
-        setStudents(realRecords);
-      }
-
+      setStudents(result.items as any);
       setTotalPages(result.totalPages);
       setTotalItems(result.totalItems);
       setLoading(false);
     } catch (error) {
-      console.warn("PocketBase fetch failed, using mock data only.");
-      setStudents(MOCK_STUDENTS);
+      console.error("Failed to fetch students:", error);
+      setStudents([]);
       setTotalPages(1);
-      setTotalItems(MOCK_STUDENTS.length);
+      setTotalItems(0);
       setLoading(false);
     }
   };
@@ -440,8 +334,8 @@ export default function StudentManagement() {
                           student.expand["enrollments(student)"].map(
                             (enrollment, idx) => {
                               const course =
-                                enrollment.expand?.course_intake_fee?.expand
-                                  ?.course_intake?.expand?.course;
+                                enrollment.expand?.course_intake?.expand
+                                  ?.course;
                               if (!course) return null;
                               return (
                                 <Badge

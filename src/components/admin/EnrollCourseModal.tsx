@@ -19,19 +19,14 @@ interface Intake {
   name: string;
 }
 
-interface CourseIntakeFee {
+interface CourseIntake {
   id: string;
-  course_intake: string;
-  course_fee: number;
-  registration_fee: number;
-  duration: number;
+  intake: string;
+  course_fee?: number;
+  registration_fee?: number;
+  duration?: number;
   expand?: {
-    course_intake: {
-      id: string;
-      expand?: {
-        course: { id: string; name: string; code: string };
-      };
-    };
+    course?: { id: string; name: string; code: string };
   };
 }
 
@@ -46,22 +41,22 @@ export function EnrollCourseModal({
 
   // Data arrays
   const [intakes, setIntakes] = useState<Intake[]>([]);
-  const [courseIntakes, setCourseIntakes] = useState<CourseIntakeFee[]>([]);
+  const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);
 
   // Selected State
   const [selectedIntakeId, setSelectedIntakeId] = useState("");
-  const [selectedCourseFeeId, setSelectedCourseFeeId] = useState("");
-  const [paymentType, setPaymentType] = useState<
-    "full" | "installment" | "upfront_installment"
-  >("full");
+  const [selectedCourseIntakeId, setSelectedCourseIntakeId] = useState("");
+  const [paymentOption, setPaymentOption] = useState<
+    "full_payment" | "installments_only" | "upfront_installments"
+  >("full_payment");
 
   // Fetch intakes on open
   useEffect(() => {
     if (isOpen) {
       fetchIntakes();
       setSelectedIntakeId("");
-      setSelectedCourseFeeId("");
-      setPaymentType("full");
+      setSelectedCourseIntakeId("");
+      setPaymentOption("full_payment");
     }
   }, [isOpen]);
 
@@ -90,10 +85,10 @@ export function EnrollCourseModal({
     setFetchingData(true);
     try {
       const records = await pb
-        .collection("course_intake_fees")
-        .getFullList<CourseIntakeFee>({
-          filter: `course_intake.intake = "${intakeId}"`,
-          expand: "course_intake.course",
+        .collection("course_intakes")
+        .getFullList<CourseIntake>({
+          filter: `intake = "${intakeId}"`,
+          expand: "course",
         });
       setCourseIntakes(records);
     } catch (error) {
@@ -105,28 +100,21 @@ export function EnrollCourseModal({
   };
 
   const handleSubmit = async () => {
-    if (!selectedCourseFeeId) {
+    if (!selectedCourseIntakeId) {
       toast.error("Please select a course to enroll.");
       return;
     }
 
     setLoading(true);
     try {
-      const selectedFee = courseIntakes.find(
-        (f) => f.id === selectedCourseFeeId,
-      );
-
-      if (!selectedFee) {
-        throw new Error("Invalid course selection.");
-      }
-
-      // Create new Enrollment
+      // Create new Enrollment directly using course_intake
       await pb.collection("enrollments").create({
         student: studentId,
-        course_intake_fee: selectedCourseFeeId,
-        course_intake: selectedFee.course_intake,
-        payment_type: paymentType,
-        verified: false, // Default pending enrollment state
+        course_intake: selectedCourseIntakeId,
+        payment_option: paymentOption,
+        enrollment_date: new Date().toISOString(),
+        enrollement_status: "enrolled",
+        certificate_status: "pending",
       });
 
       toast.success("Enrolled successfully!");
@@ -158,7 +146,7 @@ export function EnrollCourseModal({
             value={selectedIntakeId}
             onChange={(e) => {
               setSelectedIntakeId(e.target.value);
-              setSelectedCourseFeeId(""); // Reset course on intake change
+              setSelectedCourseIntakeId(""); // Reset course on intake change
             }}
             className="w-full bg-white border-2 border-indigo-50 rounded-xl p-4 text-xs font-bold text-gray-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer outline-none"
           >
@@ -198,13 +186,13 @@ export function EnrollCourseModal({
               </div>
             ) : (
               courseIntakes.map((c) => {
-                const courseInfo = c.expand?.course_intake?.expand?.course;
-                const isSelected = selectedCourseFeeId === c.id;
+                const courseInfo = c.expand?.course;
+                const isSelected = selectedCourseIntakeId === c.id;
 
                 return (
                   <div
                     key={c.id}
-                    onClick={() => setSelectedCourseFeeId(c.id)}
+                    onClick={() => setSelectedCourseIntakeId(c.id)}
                     className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex justify-between items-center ${
                       isSelected
                         ? "bg-indigo-50 border-indigo-500 shadow-md shadow-indigo-100"
@@ -220,7 +208,7 @@ export function EnrollCourseModal({
                       <p
                         className={`text-[10px] font-bold tracking-widest uppercase mt-1 ${isSelected ? "text-indigo-500" : "text-gray-400"}`}
                       >
-                        {courseInfo?.code || "N/A"} • {c.duration} Months
+                        {courseInfo?.code || "N/A"} • {c.duration || "—"} Months
                       </p>
                     </div>
                     <div className="text-right">
@@ -232,7 +220,9 @@ export function EnrollCourseModal({
                       <p
                         className={`text-xs font-black ${isSelected ? "text-indigo-600" : "text-gray-900"}`}
                       >
-                        LKR {c.course_fee.toLocaleString()}
+                        {c.course_fee
+                          ? `LKR ${c.course_fee.toLocaleString()}`
+                          : "See Advisor"}
                       </p>
                     </div>
                   </div>
@@ -243,7 +233,7 @@ export function EnrollCourseModal({
         </div>
 
         {/* Step 3: Payment Type */}
-        {selectedCourseFeeId && (
+        {selectedCourseIntakeId && (
           <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">
               <CreditCard size={12} className="text-indigo-400" />
@@ -251,15 +241,15 @@ export function EnrollCourseModal({
             </label>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { id: "full", label: "Full Payment" },
-                { id: "installment", label: "Installments" },
-                { id: "upfront_installment", label: "Upfront Installment" },
+                { id: "full_payment", label: "Full Payment" },
+                { id: "installments_only", label: "Installments" },
+                { id: "upfront_installments", label: "Upfront Installment" },
               ].map((type) => (
                 <button
                   key={type.id}
-                  onClick={() => setPaymentType(type.id as any)}
+                  onClick={() => setPaymentOption(type.id as any)}
                   className={`p-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all ${
-                    paymentType === type.id
+                    paymentOption === type.id
                       ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200"
                       : "bg-white border-gray-100 text-gray-500 hover:border-indigo-200 hover:text-indigo-600"
                   }`}
@@ -282,7 +272,7 @@ export function EnrollCourseModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={loading || !selectedCourseFeeId}
+            disabled={loading || !selectedCourseIntakeId}
             className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
