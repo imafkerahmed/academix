@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -39,11 +39,15 @@ export default function LoginPage() {
     setLoginError("");
 
     try {
-      // Authenticate with PocketBase
+      // Authenticate with PocketBase using userId
+      console.log("Attempting login with userId:", userId);
+      console.log("Password length:", password.length);
+
       const authData = await pb
         .collection("users")
-        .authWithPassword(email, password);
+        .authWithPassword(userId, password);
 
+      console.log("Login successful, user data:", authData.record);
       // Get user role
       const role = authData.record.role;
 
@@ -64,8 +68,13 @@ export default function LoginPage() {
           router.push("/dashboard");
       }
     } catch (error: any) {
-      setLoginError(error.message || "Invalid email or password");
-      toast.error(error.message || "Invalid email or password");
+      console.error("Login error:", error);
+      console.error("Error data:", error?.data);
+      console.error("Error response:", error?.response);
+      const errorMsg =
+        error?.data?.message || error.message || "Invalid user ID or password";
+      setLoginError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -112,13 +121,13 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                Email Address
+                User ID
               </label>
               <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="Enter your User ID"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
                 className="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 text-gray-900 text-sm font-medium focus:outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50 transition-all placeholder:text-gray-300"
                 required
                 disabled={loading}

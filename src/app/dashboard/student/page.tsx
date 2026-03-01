@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -13,6 +14,7 @@ import {
   Bell,
   Info,
   X as CloseIcon,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import StatsCarousel from "@/components/admin/StatsCarousel";
@@ -20,41 +22,8 @@ import AdminStatsCard from "@/components/admin/AdminStatsCard";
 import StudentProfile from "@/components/student-profile";
 import Section5Schedules from "@/components/Schedules";
 import Calendar from "@/components/Calendar";
-
-const courses = [
-  {
-    id: "1",
-    name: "Mathematics 101",
-    registrationNumber: "REG-2024-001",
-    description: "Intro to Algebra and Calculus",
-    courseStatus: "Ongoing",
-    certificateStatus: "Not Issued",
-  },
-  {
-    id: "2",
-    name: "Physics 201",
-    registrationNumber: "REG-2024-002",
-    description: "Mechanics and Thermodynamics",
-    courseStatus: "Completed",
-    certificateStatus: "Issued",
-  },
-  {
-    id: "3",
-    name: "History 101",
-    registrationNumber: "REG-2024-003",
-    description: "World History Overview",
-    courseStatus: "Ongoing",
-    certificateStatus: "Not Issued",
-  },
-  {
-    id: "4",
-    name: "Computer Science 101",
-    registrationNumber: "REG-2024-004",
-    description: "Programming Basics",
-    courseStatus: "Completed",
-    certificateStatus: "Issued",
-  },
-];
+import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 interface Announcement {
   id: string;
@@ -70,41 +39,61 @@ interface Announcement {
   };
 }
 
-const mockAnnouncements: Announcement[] = [
-  {
-    id: "ann-1",
-    title: "Exam Schedule Released",
-    content:
-      "The final exam schedule for the January 2024 intake is now available in the academic portal. Please ensure you check your respective subject codes and timings carefully to avoid any confusion. All exams will be held in the main campus hall unless stated otherwise in the detailed breakdown found in the student handbook.",
-    category: "Academic",
-    timestamp: "30m ago",
-    isRead: false,
-    imageUrl:
-      "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&auto=format&fit=crop&q=60",
-    link: { url: "#", label: "View Schedule" },
-  },
-  {
-    id: "ann-2",
-    title: "System Maintenance",
-    content:
-      "The portal will be down for maintenance this Sunday from 2:00 AM to 4:00 AM. During this time, you will not be able to access your courses, submit assignments, or view your schedule. We apologize for any inconvenience caused by this necessary upgrade to our core infrastructure.",
-    category: "Urgent",
-    timestamp: "2h ago",
-    isRead: false,
-  },
-  {
-    id: "ann-3",
-    title: "Guest Lecture: AI Trends",
-    content:
-      "Join us for a session on the future of AI in software development this Friday. Our guest speaker, Dr. Elena Rostova, will be sharing insights into how large language models are reshaping the landscape of development. This is a must-attend for all final year students.",
-    category: "General",
-    timestamp: "1d ago",
-    isRead: true,
-    link: { url: "#", label: "Register Now" },
-  },
-];
-
 export default function StudentDashboard() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
+
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "student") {
+      router.push("/login");
+      return;
+    }
+
+    setUser(currentUser);
+    fetchStudentData(currentUser.id);
+  }, [router]);
+
+  const fetchStudentData = async (studentId: string) => {
+    try {
+      // Fetch enrollments for this student without expand to avoid permission issues
+      const enrollmentRecords = await pb
+        .collection("enrollments")
+        .getFullList({
+          filter: `student = "${studentId}"`,
+        })
+        .catch(() => []);
+
+      setEnrollments(enrollmentRecords);
+
+      // For now, show basic enrollment count
+      // Transform enrollments into basic format
+      const courseList = enrollmentRecords.map(
+        (enrollment: any, index: number) => ({
+          id: enrollment.id,
+          name: `Course ${index + 1}`,
+          registrationNumber: enrollment.id.substring(0, 15).toUpperCase(),
+          description: "",
+          courseStatus:
+            enrollment.status === "completed" ? "Completed" : "Ongoing",
+          certificateStatus: "Not Issued",
+        }),
+      );
+
+      setCourses(courseList);
+    } catch (error) {
+      console.error("Error fetching student data:", error);
+      // Don't show error toast, just use empty data
+      setCourses([]);
+      setEnrollments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const statsData = [
     {
       title: "Enrolled Courses",
@@ -141,8 +130,7 @@ export default function StudentDashboard() {
   ];
 
   const [isPortalOpen, setIsPortalOpen] = React.useState(false);
-  const [announcements, setAnnouncements] =
-    React.useState<Announcement[]>(mockAnnouncements);
+  const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
   const unreadCount = announcements.filter(
     (a: Announcement) => !a.isRead,
   ).length;
@@ -168,6 +156,23 @@ export default function StudentDashboard() {
   // State for expanded announcements
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
+          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+            Loading Dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   return (
     <>
       {/* Main Grid */}
@@ -179,13 +184,17 @@ export default function StudentDashboard() {
               My <span className="text-indigo-600">Profile</span>
             </h3>
             <StudentProfile
-              fullName="Mohammed Inayathullah Afker Ahmed"
-              studentId="REG-2024-XYZ"
+              fullName={user.name || "Student"}
+              studentId={user.userId || "N/A"}
               role="STUDENT"
-              avatarUrl="/profile-img.jpg"
-              accountStatus="Active"
-              advisorName="Dr. Sarah Johnson"
-              advisorEmail="sarah.johnson@academix.edu"
+              avatarUrl={
+                user.avatar
+                  ? pb.files.getUrl(user, user.avatar)
+                  : "/profile-img.jpg"
+              }
+              accountStatus={user.accountStatus || "Active"}
+              advisorName={user.academicAdvisor || "Not Assigned"}
+              advisorEmail="advisor@academix.edu"
               compact={true}
             />
           </div>

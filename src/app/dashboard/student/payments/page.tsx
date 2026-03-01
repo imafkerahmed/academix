@@ -1,39 +1,78 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import StudentPayment from "@/components/student-payment";
-import { CreditCard, TrendingUp, BookOpen, ArrowRight } from "lucide-react";
+import {
+  CreditCard,
+  TrendingUp,
+  BookOpen,
+  ArrowRight,
+  Loader2,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import pb from "@/lib/pocketbase";
 
 export default function StudentPaymentsPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = React.useState<string | null>(
     null,
   );
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
 
-  // Mock enrollment data - in a real app, this would come from an API/Context
-  const enrolledCourses = [
-    {
-      id: "1",
-      name: "Graphic Design",
-      icon: BookOpen,
-      color: "text-indigo-600",
-      bg: "bg-indigo-50",
-    },
-    {
-      id: "2",
-      name: "Web Development",
-      icon: TrendingUp,
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
-    },
-  ];
-
-  // Auto-select if only one course
-  React.useEffect(() => {
-    if (enrolledCourses.length === 1 && !selectedCourse) {
-      setSelectedCourse(enrolledCourses[0].name);
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "student") {
+      router.push("/login");
+      return;
     }
-  }, [enrolledCourses, selectedCourse]);
+
+    fetchEnrollments(currentUser.id);
+  }, [router]);
+
+  const fetchEnrollments = async (studentId: string) => {
+    try {
+      // Fetch enrollments for this student
+      const enrollmentRecords = await pb
+        .collection("enrollments")
+        .getFullList({
+          filter: `student = "${studentId}"`,
+        })
+        .catch(() => []);
+
+      // Transform enrollments into course format
+      const courseList = enrollmentRecords.map(
+        (enrollment: any, index: number) => ({
+          id: enrollment.id,
+          name: `Course ${index + 1}`,
+          icon: BookOpen,
+          color: "text-indigo-600",
+          bg: "bg-indigo-50",
+        }),
+      );
+
+      setEnrolledCourses(courseList);
+
+      // Auto-select if only one course
+      if (courseList.length === 1) {
+        setSelectedCourse(courseList[0].name);
+      }
+    } catch (error) {
+      console.error("Error fetching enrollments:", error);
+      setEnrolledCourses([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <AnimatePresence mode="wait">
@@ -223,56 +262,6 @@ export default function StudentPaymentsPage() {
                   >
                     Raise New Payment
                   </button>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
-                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-6">
-                  Upcoming Invoices
-                </h3>
-                <div className="space-y-6">
-                  {[
-                    {
-                      name: "Exam Fee",
-                      date: "Feb 28, 2026",
-                      amount: "$150.00",
-                      color: "text-amber-600",
-                      bg: "bg-amber-50",
-                      courseTag: selectedCourse,
-                    },
-                    {
-                      name: "Course Fee Refund",
-                      date: "Mar 15, 2026",
-                      amount: "$400.00",
-                      color: "text-indigo-600",
-                      bg: "bg-indigo-50",
-                      courseTag: selectedCourse,
-                    },
-                  ].map((inv, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between group cursor-pointer"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-10 h-10 rounded-xl ${inv.bg} flex items-center justify-center ${inv.color}`}
-                        >
-                          <CreditCard size={18} />
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-900 text-sm group-hover:text-indigo-600 transition-colors">
-                            {inv.name}
-                          </p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
-                            {inv.date}
-                          </p>
-                        </div>
-                      </div>
-                      <p className={`font-black text-sm ${inv.color}`}>
-                        {inv.amount}
-                      </p>
-                    </div>
-                  ))}
                 </div>
               </div>
             </motion.div>

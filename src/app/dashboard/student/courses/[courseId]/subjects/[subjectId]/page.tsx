@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -12,272 +12,16 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RouteLink } from "@/components/ui/route-link";
-import { ArrowLeft } from "lucide-react";
-
-// Mock data - will be replaced with actual API calls
-const subjectsData = {
-  "sub-1": {
-    id: "sub-1",
-    name: "Linear Algebra",
-    code: "MATH-101-A",
-    instructor: "Prof. Sarah Johnson",
-    instructorEmail: "sarah.johnson@academix.edu",
-    semester: "Semester 1",
-    courseId: "1",
-    courseName: "Mathematics 101",
-    progress: 100,
-    grade: "A",
-    credits: 3,
-    schedule: "Mon, Wed 10:00 AM - 11:30 AM",
-    room: "Building A, Room 305",
-    description:
-      "An introduction to linear algebra covering vector spaces, matrices, determinants, and linear transformations.",
-    attendance: {
-      present: 28,
-      total: 30,
-      percentage: 93.3,
-    },
-    assignments: [
-      {
-        id: "assign-1",
-        title: "Matrix Operations",
-        description:
-          "Complete the matrix operations problems. Show all your work and explain your reasoning. You must submit a PDF file with your solutions.",
-        rules:
-          "• All work must be shown\n• Submit as PDF only\n• No late submissions accepted\n• Collaboration is not allowed",
-        dueDate: "2024-02-15",
-        status: "Submitted",
-        grade: "95/100",
-        totalMarks: 100,
-        submittedDate: "2024-02-14T18:30:00",
-        assignmentFile: "matrix-operations-assignment.pdf",
-        assignmentSheet: "matrix-operations-assignment.pdf",
-        markingLecturer: "Prof. Sarah Johnson",
-        submittedFile: "john-doe-matrix-solutions.pdf",
-        feedback:
-          "Excellent work! Your solutions are clear and well-explained. Minor arithmetic error in question 3.",
-        isLate: false,
-        isClosed: true,
-        submissionHistory: [
-          {
-            submittedDate: "2024-02-14T18:30:00",
-            fileName: "john-doe-matrix-solutions.pdf",
-            version: 1,
-          },
-        ],
-      },
-      {
-        id: "assign-2",
-        title: "Vector Spaces",
-        description:
-          "Solve the vector space problems and prove the given theorems. Include diagrams where necessary.",
-        rules:
-          "• Provide formal proofs\n• Include diagrams for visual problems\n• Submit as PDF\n• Due by 11:59 PM",
-        dueDate: "2024-02-28",
-        status: "Submitted",
-        grade: "35/100",
-        totalMarks: 100,
-        submittedDate: "2024-02-27T20:15:00",
-        assignmentFile: "vector-spaces-assignment.pdf",
-        assignmentSheet: "vector-spaces-assignment.pdf",
-        markingLecturer: "Prof. Sarah Johnson",
-        submittedFile: "john-doe-vector-solutions.pdf",
-        feedback:
-          "Incomplete work. Missing several proofs and diagrams. Please review the requirements and resubmit.",
-        isLate: false,
-        isClosed: false,
-        submissionHistory: [
-          {
-            submittedDate: "2024-02-27T14:20:00",
-            fileName: "john-doe-vector-v1.pdf",
-            version: 1,
-          },
-          {
-            submittedDate: "2024-02-27T20:15:00",
-            fileName: "john-doe-vector-solutions.pdf",
-            version: 2,
-          },
-        ],
-      },
-      {
-        id: "assign-3",
-        title: "Eigenvalues and Eigenvectors",
-        description:
-          "Calculate eigenvalues and eigenvectors for the given matrices. Apply these concepts to real-world problems.",
-        rules:
-          "• Show step-by-step calculations\n• Include real-world applications\n• Maximum file size: 10MB\n• Allowed formats: PDF, DOCX",
-        dueDate: "2024-03-15",
-        unlockDate: "2024-03-01",
-        status: "Not Submitted",
-        grade: "-",
-        totalMarks: 100,
-        submittedDate: null,
-        assignmentFile: "eigenvalues-assignment.pdf",
-        assignmentSheet: "eigenvalues-assignment.pdf",
-        markingLecturer: "Prof. Sarah Johnson",
-        submittedFile: null,
-        feedback: null,
-        isLate: false,
-        isClosed: false,
-        submissionHistory: [],
-      },
-    ],
-    materials: [
-      {
-        id: "mat-1",
-        title: "Lecture Notes - Week 1",
-        type: "PDF",
-        uploadDate: "2024-01-15",
-        fileUrl: "/materials/lecture-notes-week1.pdf",
-        size: "2.5 MB",
-      },
-      {
-        id: "mat-2",
-        title: "Practice Problems Set 1",
-        type: "PDF",
-        uploadDate: "2024-01-20",
-        fileUrl: "/materials/practice-problems-1.pdf",
-        size: "1.8 MB",
-      },
-      {
-        id: "mat-3",
-        title: "Midterm Study Guide",
-        type: "PDF",
-        uploadDate: "2024-02-01",
-        fileUrl: "/materials/midterm-study-guide.pdf",
-        size: "3.2 MB",
-      },
-    ],
-    videos: [
-      {
-        id: "vid-1",
-        title: "Introduction to Linear Algebra",
-        duration: "45:30",
-        uploadDate: "2024-01-15",
-        thumbnail: "/video-thumb.jpg",
-        videoType: "youtube",
-        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        description: "A comprehensive introduction to linear algebra concepts.",
-      },
-      {
-        id: "vid-2",
-        title: "Matrix Operations Tutorial",
-        duration: "38:15",
-        uploadDate: "2024-01-22",
-        thumbnail: "/video-thumb.jpg",
-        videoType: "file",
-        videoUrl: "/videos/matrix-operations.mp4",
-        description: "Learn basic and advanced matrix operations.",
-      },
-      {
-        id: "vid-3",
-        title: "Solving Systems of Linear Equations",
-        duration: "52:40",
-        uploadDate: "2024-02-05",
-        thumbnail: "/video-thumb.jpg",
-        videoType: "youtube",
-        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        description: "Multiple methods for solving systems of equations.",
-      },
-    ],
-  },
-  "sub-3": {
-    id: "sub-3",
-    name: "Differential Equations",
-    code: "MATH-101-C",
-    instructor: "Prof. Emily Davis",
-    instructorEmail: "emily.davis@academix.edu",
-    semester: "Semester 2",
-    courseId: "1",
-    courseName: "Mathematics 101",
-    progress: 65,
-    grade: "In Progress",
-    credits: 3,
-    schedule: "Fri 9:00 AM - 12:00 PM",
-    room: "Building B, Room 210",
-    description:
-      "Study of differential equations including first and second order equations, systems of differential equations, and applications.",
-    attendance: {
-      present: 8,
-      total: 10,
-      percentage: 80.0,
-    },
-    assignments: [
-      {
-        id: "assign-4",
-        title: "First Order Differential Equations",
-        description:
-          "Solve the differential equations using various methods. Show complete solutions.",
-        rules:
-          "• Use appropriate solution methods\n• Verify your solutions\n• Submit by deadline\n• Late penalty: -10% per day",
-        dueDate: "2024-04-10",
-        status: "Submitted",
-        grade: "Pending",
-        totalMarks: 100,
-        submittedDate: "2024-04-09T15:20:00",
-        assignmentSheet: "first-order-de-assignment.pdf",
-        markingLecturer: "Prof. Emily Davis",
-        submittedFile: "john-doe-de-solutions.pdf",
-        feedback: null,
-        isLate: false,
-      },
-      {
-        id: "assign-5",
-        title: "Second Order Linear Equations",
-        description:
-          "Work through the second order linear differential equations problems.",
-        rules:
-          "• Show complete working\n• Include auxiliary equations\n• PDF format only\n• No extensions available",
-        dueDate: "2024-04-25",
-        status: "Not Submitted",
-        grade: "-",
-        totalMarks: 100,
-        submittedDate: null,
-        assignmentSheet: "second-order-assignment.pdf",
-        markingLecturer: "Prof. Emily Davis",
-        submittedFile: null,
-        feedback: null,
-        isLate: false,
-      },
-    ],
-    materials: [
-      {
-        id: "mat-4",
-        title: "Course Syllabus",
-        type: "PDF",
-        uploadDate: "2024-04-01",
-      },
-      {
-        id: "mat-5",
-        title: "Lecture Slides - Introduction",
-        type: "PDF",
-        uploadDate: "2024-04-05",
-      },
-    ],
-    videos: [
-      {
-        id: "vid-4",
-        title: "First Order Differential Equations Lecture",
-        duration: "1:05:20",
-        uploadDate: "2024-04-01",
-        thumbnail: "/video-thumb.jpg",
-      },
-      {
-        id: "vid-5",
-        title: "Solving Separable Equations",
-        duration: "42:10",
-        uploadDate: "2024-04-08",
-        thumbnail: "/video-thumb.jpg",
-      },
-    ],
-  },
-};
+import { ArrowLeft, Loader2 } from "lucide-react";
+import pb from "@/lib/pocketbase";
 
 export default function SubjectPage() {
   const params = useParams();
   const router = useRouter();
   const subjectId = params?.subjectId as string;
   const courseId = params?.courseId as string;
+  const [loading, setLoading] = useState(true);
+  const [subject, setSubject] = useState<any>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
@@ -297,6 +41,38 @@ export default function SubjectPage() {
   // Animation durations (ms)
   const OPEN_DURATION = 900;
   const CLOSE_DURATION = 1500;
+
+  // Check authentication and initialize subject
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "student") {
+      router.push("/login");
+      return;
+    }
+
+    // Set empty subject data - no real data available yet
+    setSubject({
+      id: subjectId,
+      name: "Subject",
+      code: subjectId.substring(0, 10).toUpperCase(),
+      instructor: "Instructor",
+      instructorEmail: "",
+      semester: "",
+      courseId: courseId,
+      courseName: "Course",
+      progress: 0,
+      grade: "-",
+      credits: 0,
+      schedule: "",
+      room: "",
+      description: "",
+      attendance: { present: 0, total: 0, percentage: 0 },
+      assignments: [],
+      materials: [],
+      videos: [],
+    });
+    setLoading(false);
+  }, [subjectId, courseId, router]);
 
   // Load disabled assignments from localStorage
   React.useEffect(() => {
@@ -513,7 +289,13 @@ export default function SubjectPage() {
     setShowNotifications(false);
   };
 
-  const subject = subjectsData[subjectId as keyof typeof subjectsData];
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   if (!subject) {
     return (
@@ -663,8 +445,8 @@ export default function SubjectPage() {
             {activeTab === 0 && (
               <div className="space-y-4">
                 {subject.assignments
-                  ?.filter((a) => !disabledAssignments.includes(a.id))
-                  .map((assignment) => (
+                  ?.filter((a: any) => !disabledAssignments.includes(a.id))
+                  .map((assignment: any) => (
                     <div
                       key={assignment.id}
                       onClick={() => {
@@ -756,7 +538,7 @@ export default function SubjectPage() {
                     </div>
                   ))}
                 {subject.assignments?.filter(
-                  (a) => !disabledAssignments.includes(a.id),
+                  (a: any) => !disabledAssignments.includes(a.id),
                 ).length === 0 && (
                   <div className="py-12 text-center text-gray-500 bg-white rounded-xl border border-dashed border-gray-200">
                     No active assignments for this subject.
@@ -768,7 +550,7 @@ export default function SubjectPage() {
             {/* Course Materials Tab */}
             {activeTab === 1 && (
               <div className="space-y-3">
-                {subject.materials.map((material) => (
+                {subject.materials.map((material: any) => (
                   <div
                     key={material.id}
                     onClick={() => {
@@ -829,7 +611,7 @@ export default function SubjectPage() {
             {/* Video Materials Tab */}
             {activeTab === 2 && (
               <div className="space-y-4">
-                {subject.videos.map((video) => (
+                {subject.videos.map((video: any) => (
                   <div
                     key={video.id}
                     onClick={() => {

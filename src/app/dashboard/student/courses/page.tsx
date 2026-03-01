@@ -1,47 +1,66 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import CourseList from "@/components/CourseList";
-import { BookOpen, TrendingUp } from "lucide-react";
+import { BookOpen, TrendingUp, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-
-// Mock data (should strictly come from API/Context in real app)
-const courses = [
-  {
-    id: "1",
-    name: "Mathematics 101",
-    registrationNumber: "REG-2024-001",
-    description: "Intro to Algebra and Calculus",
-    courseStatus: "Ongoing",
-    certificateStatus: "Not Issued",
-  },
-  {
-    id: "2",
-    name: "Physics 201",
-    registrationNumber: "REG-2024-002",
-    description: "Mechanics and Thermodynamics",
-    courseStatus: "Completed",
-    certificateStatus: "Issued",
-  },
-  {
-    id: "3",
-    name: "History 101",
-    registrationNumber: "REG-2024-003",
-    description: "World History Overview",
-    courseStatus: "Ongoing",
-    certificateStatus: "Not Issued",
-  },
-  {
-    id: "4",
-    name: "Computer Science 101",
-    registrationNumber: "REG-2024-004",
-    description: "Programming Basics",
-    courseStatus: "Completed",
-    certificateStatus: "Issued",
-  },
-];
+import pb from "@/lib/pocketbase";
 
 export default function CoursesPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState<any[]>([]);
+
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "student") {
+      router.push("/login");
+      return;
+    }
+
+    fetchCourses(currentUser.id);
+  }, [router]);
+
+  const fetchCourses = async (studentId: string) => {
+    try {
+      // Fetch enrollments for this student
+      const enrollmentRecords = await pb
+        .collection("enrollments")
+        .getFullList({
+          filter: `student = "${studentId}"`,
+        })
+        .catch(() => []);
+
+      // Transform enrollments into course format
+      const courseList = enrollmentRecords.map(
+        (enrollment: any, index: number) => ({
+          id: enrollment.id,
+          name: `Course ${index + 1}`,
+          registrationNumber: enrollment.id.substring(0, 15).toUpperCase(),
+          description: "",
+          courseStatus:
+            enrollment.status === "completed" ? "Completed" : "Ongoing",
+          certificateStatus: "Not Issued",
+        }),
+      );
+
+      setCourses(courseList);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      setCourses([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -86,7 +105,15 @@ export default function CoursesPage() {
         transition={{ delay: 0.4, duration: 0.6 }}
         className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 shadow-indigo-100/10"
       >
-        <CourseList courses={courses} />
+        {courses.length > 0 ? (
+          <CourseList courses={courses} />
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">
+              No courses found
+            </p>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

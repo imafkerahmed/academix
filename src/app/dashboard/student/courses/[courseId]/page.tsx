@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Card,
@@ -10,9 +10,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RouteLink } from "@/components/ui/route-link";
-
-// Mock data - will be replaced with actual API calls
-const coursesData = {
+import pb from "@/lib/pocketbase";
+import { Loader2 } from "lucide-react";
   "1": {
     id: "1",
     name: "Mathematics 101",
@@ -109,12 +108,13 @@ const coursesData = {
       },
     ],
   },
-};
 
 export default function CoursePage() {
   const params = useParams();
   const router = useRouter();
   const courseId = (params?.courseId as string) || "";
+  const [loading, setLoading] = useState(true);
+  const [course, setCourse] = useState<any>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
@@ -122,6 +122,42 @@ export default function CoursePage() {
   const [activeSemester, setActiveSemester] = useState(0);
   const [disabledSemesters, setDisabledSemesters] = useState<string[]>([]);
   const [disabledSubjects, setDisabledSubjects] = useState<string[]>([]);
+
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "student") {
+      router.push("/login");
+      return;
+    }
+
+    fetchCourseData();
+  }, [courseId, router]);
+
+  const fetchCourseData = async () => {
+    try {
+      // Fetch enrollment by ID
+      const enrollment = await pb.collection("enrollments").getOne(courseId).catch(() => null);
+      
+      if (enrollment) {
+        setCourse({
+          id: enrollment.id,
+          name: `Course ${courseId.substring(0, 8)}`,
+          registrationNumber: enrollment.id.substring(0, 15).toUpperCase(),
+          description: "",
+          courseStatus: enrollment.status === "completed" ? "Completed" : "Ongoing",
+          certificateStatus: "Not Issued",
+          intakeCode: "",
+          startDate: enrollment.created,
+          endDate: "",
+          semesters: [],
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching course:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load disabled states from localStorage
   React.useEffect(() => {
@@ -168,7 +204,13 @@ export default function CoursePage() {
     setShowNotifications(false);
   };
 
-  const course = coursesData[courseId as keyof typeof coursesData];
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   if (!course) {
     return (
@@ -178,10 +220,10 @@ export default function CoursePage() {
             Course Not Found
           </h1>
           <button
-            onClick={() => router.push("/dashboard/student")}
+            onClick={() => router.push("/dashboard/student/courses")}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            Back to Dashboard
+            Back to Courses
           </button>
         </div>
       </div>

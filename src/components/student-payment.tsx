@@ -96,47 +96,9 @@ export default function StudentPayment({
       border: "border-gray-100",
     };
 
-  const courseFees: CourseInfo[] = [
-    { courseName: "Graphic Design", totalFee: 3600, currency: "USD" },
-    { courseName: "Web Development", totalFee: 600, currency: "USD" },
-  ];
-
-  const mockDues: PaymentDue[] = [
-    {
-      amount: 1200,
-      currency: "USD",
-      dueDate: "2026-03-01",
-      description: "Term Payment",
-      course: "Graphic Design",
-    },
-    {
-      amount: 300,
-      currency: "USD",
-      dueDate: "2026-02-20",
-      description: "Project Fee",
-      course: "Web Development",
-    },
-  ];
-
-  const [history, setHistory] = useState<PaymentHistoryItem[]>([
-    {
-      id: "pmt-001",
-      date: "2026-01-15",
-      description: "Graphic Design (Installment 1)",
-      amount: 1200,
-      currency: "USD",
-      status: "Paid",
-      course: "Graphic Design",
-    },
-    {
-      id: "pmt-002",
-      date: "2026-02-10",
-      description: "Previous Tech Fee",
-      amount: 150,
-      currency: "USD",
-      status: "Paid",
-    },
-  ]);
+  const courseFees: CourseInfo[] = [];
+  const mockDues: PaymentDue[] = [];
+  const [history, setHistory] = useState<PaymentHistoryItem[]>([]);
 
   const courseOptions = useMemo(
     () => Array.from(new Set(courseFees.map((f) => f.courseName))),

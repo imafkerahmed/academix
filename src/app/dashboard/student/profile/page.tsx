@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   User,
   TrendingUp,
@@ -17,31 +18,72 @@ import {
   AlertCircle,
   FileText,
   X,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-// Mock data (would come from Auth/User context)
-const studentData = {
-  fullName: "Mohammed Inayathullah Afker Ahmed",
-  email: "afker@example.com",
-  mobile: "+94 77 123 4567",
-  dob: "1998-05-15",
-  nic: "981352467V",
-  studentId: "REG-2024-XYZ",
-  avatarUrl: "/profile-img.jpg",
-};
+import pb from "@/lib/pocketbase";
 
 export default function StudentProfilePage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [studentData, setStudentData] = useState<any>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "student") {
+      router.push("/login");
+      return;
+    }
+
+    setStudentData({
+      fullName: currentUser.name || "Student",
+      email: currentUser.email || "",
+      mobile: currentUser.mobile || "",
+      dob: currentUser.dateOfBirth || "",
+      nic: currentUser.IdentificationDocument || "",
+      studentId: currentUser.userId || "N/A",
+      avatarUrl: currentUser.avatar
+        ? pb.files.getUrl(currentUser, currentUser.avatar)
+        : "/profile-img.jpg",
+    });
+
+    // Fetch documents from database
+    fetchDocuments(currentUser.id);
+  }, [router]);
+
+  const fetchDocuments = async (studentId: string) => {
+    try {
+      const docs = await pb
+        .collection("documents")
+        .getFullList({
+          filter: `student = "${studentId}"`,
+          sort: "-created",
+        })
+        .catch(() => []);
+
+      setDocuments(docs);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      setDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
   };
 
   const handleUploadClick = (doc: any) => {
+    // Don't allow upload if document is already verified
+    if (doc.status === "Verified") {
+      return;
+    }
     setSelectedDoc(doc);
     setIsUploadModalOpen(true);
   };
@@ -67,6 +109,14 @@ export default function StudentProfilePage() {
       },
     },
   };
+
+  if (loading || !studentData) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -247,57 +297,56 @@ export default function StudentProfilePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {[
-            {
-              name: "NIC / Identification",
-              status: "Verified",
-              date: "Jan 12, 2024",
-            },
-            {
-              name: "OL Transcripts",
-              status: "Verified",
-              date: "Jan 12, 2024",
-            },
-            {
-              name: "AL Transcripts",
-              status: "Pending",
-              date: "Feb 20, 2024",
-            },
-            {
-              name: "Birth Certificate",
-              status: "Not Uploaded",
-              date: "-",
-            },
-          ].map((doc, idx) => (
-            <div
-              key={idx}
-              className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 hover:border-indigo-100 hover:bg-white transition-all duration-500 group flex flex-col items-center text-center"
-            >
-              <div className="flex items-center justify-between w-full mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-gray-400 group-hover:text-indigo-600 shadow-sm transition-all group-hover:shadow-lg">
-                  <FileText size={24} />
-                </div>
-                <Badge doc={doc} />
-              </div>
-              <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight mb-2">
-                {doc.name}
-              </h4>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">
-                Modified: {doc.date}
+          {documents.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
+                No documents uploaded yet
               </p>
-
-              <button
-                onClick={() => handleUploadClick(doc)}
-                className="w-full py-4 bg-white border border-gray-200 rounded-2xl text-[10px] font-black text-gray-500 uppercase tracking-widest hover:border-indigo-600 hover:text-indigo-600 transition-all flex items-center justify-center gap-3 group/upload hover:shadow-xl hover:shadow-indigo-50"
-              >
-                <Upload
-                  size={16}
-                  className="group-hover/upload:-translate-y-1 transition-transform"
-                />
-                Update File
-              </button>
             </div>
-          ))}
+          ) : (
+            documents.map((doc, idx) => (
+              <div
+                key={idx}
+                className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 hover:border-indigo-100 hover:bg-white transition-all duration-500 group flex flex-col items-center text-center"
+              >
+                <div className="flex items-center justify-between w-full mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-gray-400 group-hover:text-indigo-600 shadow-sm transition-all group-hover:shadow-lg">
+                    <FileText size={24} />
+                  </div>
+                  <Badge doc={doc} />
+                </div>
+                <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight mb-2">
+                  {doc.documentType || doc.name || "Document"}
+                </h4>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">
+                  Modified:{" "}
+                  {doc.updated
+                    ? new Date(doc.updated).toLocaleDateString()
+                    : "-"}
+                </p>
+
+                <button
+                  onClick={() => handleUploadClick(doc)}
+                  disabled={doc.status === "Verified"}
+                  className={`w-full py-4 bg-white border border-gray-200 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 group/upload ${
+                    doc.status === "Verified"
+                      ? "opacity-50 cursor-not-allowed text-gray-400"
+                      : "text-gray-500 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-xl hover:shadow-indigo-50"
+                  }`}
+                >
+                  <Upload
+                    size={16}
+                    className={
+                      doc.status !== "Verified"
+                        ? "group-hover/upload:-translate-y-1 transition-transform"
+                        : ""
+                    }
+                  />
+                  {doc.status === "Verified" ? "Verified" : "Update File"}
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </motion.div>
 

@@ -1,3 +1,4 @@
+// ...existing code...
 "use client";
 
 import { useEffect, useState } from "react";
@@ -29,6 +30,8 @@ import {
   Upload,
   Archive,
   Users,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -40,13 +43,179 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { EnrollCourseModal } from "@/components/admin/EnrollCourseModal";
+import { ModernModal } from "@/components/ui/modern-modal";
+function ResetPasswordControl({
+  studentId,
+  studentName,
+}: {
+  studentId: string;
+  studentName: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<string>("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleReset = async () => {
+    setFeedback("");
+    // Validate passwords before sending
+    const trimmedPassword = password.trim();
+    const trimmedConfirm = passwordConfirm.trim();
+
+    if (!trimmedPassword || !trimmedConfirm) {
+      setFeedback("Please enter and confirm the new password.");
+      toast.error("Please enter and confirm the new password.");
+      return;
+    }
+    if (trimmedPassword !== trimmedConfirm) {
+      setFeedback("Passwords do not match.");
+      toast.error("Passwords do not match.");
+      return;
+    }
+    if (trimmedPassword.length < 8) {
+      setFeedback("Password must be at least 8 characters.");
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    setSaving(true);
+    try {
+      // Use trimmed passwords that passed validation
+      const passwordData = {
+        studentId,
+        password: trimmedPassword,
+        passwordConfirm: trimmedConfirm,
+      };
+
+      const res = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // Ensure cookies are sent with the request
+        body: JSON.stringify(passwordData),
+      });
+
+      const data = await res.json();
+      console.log("Password reset response status:", res.status, "Data:", data);
+
+      if (!res.ok) {
+        const errorMsg =
+          typeof data.error === "string"
+            ? data.error
+            : data.error?.message || "Failed to reset password.";
+        throw new Error(errorMsg);
+      }
+
+      setFeedback("Password changed successfully.");
+      toast.success("Password changed successfully.");
+      setIsOpen(false);
+      // Clear passwords after successful reset
+      setPassword("");
+      setPasswordConfirm("");
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      const message = error?.message || "Failed to reset password.";
+      setFeedback(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setIsOpen(true)}
+        className="px-6 py-3 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 font-black text-[10px] tracking-widest shadow-sm hover:bg-indigo-600 hover:text-white transition-all uppercase flex items-center gap-2"
+      >
+        <ShieldCheck size={14} /> Reset Password
+      </button>
+      <ModernModal
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        title="Reset Password"
+        subtitle={`Set a new password for ${studentName}`}
+        avatarChar={studentName.charAt(0).toUpperCase()}
+        avatarColor="bg-indigo-600"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 pr-11 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+              placeholder="New Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={saving}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              disabled={saving}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          <div className="relative">
+            <input
+              type={showConfirm ? "text" : "password"}
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 pr-11 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+              placeholder="Confirm New Password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              disabled={saving}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm(!showConfirm)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              disabled={saving}
+            >
+              {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          <div className="flex gap-4 pt-2">
+            <button
+              onClick={() => setIsOpen(false)}
+              className="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-600 font-black text-[10px] tracking-widest hover:bg-gray-200 transition-all uppercase active:scale-95"
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReset}
+              className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
+              disabled={saving}
+            >
+              {saving ? "Resetting..." : "Reset Password"}
+            </button>
+          </div>
+          {feedback && (
+            <p className="text-[10px] font-black uppercase tracking-widest text-center text-rose-500">
+              {feedback}
+            </p>
+          )}
+        </div>
+      </ModernModal>
+    </>
+  );
+}
 
 interface Document {
   id: string;
-  name: string;
-  category: "nic" | "ol" | "al" | "birth" | "other";
-  status: "verified" | "pending" | "not_uploaded";
-  date?: string;
+  field: string; // relation to student (studentId)
+  document: string; // file field name
+  document_type:
+    | "nic"
+    | "ol_transcript"
+    | "al_transcript"
+    | "birth_certificate";
+  status_: "pending" | "verified" | "rejected";
+  remarks?: string;
+  created: string;
+  updated: string;
 }
 
 interface StudentDetails {
@@ -109,6 +278,13 @@ interface Payment {
     course?: { name: string };
   };
 }
+
+const DOCUMENT_TYPE_BY_CATEGORY: Record<string, Document["document_type"]> = {
+  nic: "nic",
+  ol: "ol_transcript",
+  al: "al_transcript",
+  birth: "birth_certificate",
+};
 
 function CertificateStatusControl({
   initialStatus = "PENDING",
@@ -654,8 +830,53 @@ function RecordPaymentControl() {
   );
 }
 
-function UploadDocumentControl({ documentName }: { documentName: string }) {
+function UploadDocumentControl({
+  documentName,
+  documentType,
+  studentId,
+  onUploaded,
+}: {
+  documentName: string;
+  documentType: "nic" | "ol" | "al" | "birth";
+  studentId: string;
+  onUploaded: () => Promise<void> | void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      toast.error("Please select a file to upload.");
+      return;
+    }
+
+    const docType = DOCUMENT_TYPE_BY_CATEGORY[documentType];
+    setUploading(true);
+
+    try {
+      const payload = new FormData();
+      payload.append("field", studentId);
+      payload.append("document", selectedFile);
+      payload.append("document_type", docType);
+      payload.append("status_", "verified");
+
+      await pb.collection("documents").create(payload);
+
+      toast.success("Document uploaded successfully.");
+      setSelectedFile(null);
+      setIsOpen(false);
+      await onUploaded();
+    } catch (error: any) {
+      if (isSuperuserOnlyError(error)) {
+        toast.error("You don't have permission to upload documents.");
+      } else {
+        toast.error(error?.message || "Failed to upload document.");
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -674,7 +895,7 @@ function UploadDocumentControl({ documentName }: { documentName: string }) {
           </p>
         </DialogHeader>
 
-        <div className="w-full border-2 border-dashed border-gray-200 bg-gray-50 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group">
+        <label className="w-full border-2 border-dashed border-gray-200 bg-gray-50 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group">
           <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-500 mb-4 group-hover:scale-110 transition-transform">
             <Upload size={24} />
           </div>
@@ -684,13 +905,26 @@ function UploadDocumentControl({ documentName }: { documentName: string }) {
           <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
             Supports PDF, JPG, PNG (Max 10MB)
           </p>
-        </div>
+          <input
+            type="file"
+            className="hidden"
+            accept=".pdf,image/*"
+            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+          />
+        </label>
+
+        {selectedFile && (
+          <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">
+            SELECTED: {selectedFile.name}
+          </p>
+        )}
 
         <button
-          onClick={() => setIsOpen(false)}
-          className="w-full mt-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
+          onClick={handleUpload}
+          disabled={uploading}
+          className="w-full mt-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95 disabled:opacity-50"
         >
-          Upload & Verify Document
+          {uploading ? "Uploading..." : "Upload & Verify Document"}
         </button>
       </DialogContent>
     </Dialog>
@@ -804,7 +1038,24 @@ export default function StudentDetail() {
         }
       }
 
-      setStudent(record as any);
+      let mappedDocuments: Document[] = [];
+      try {
+        const docRecords = await pb.collection("documents").getFullList({
+          filter: `field = "${studentId}"`,
+          sort: "-created",
+        });
+
+        mappedDocuments = docRecords as any;
+      } catch (documentsError: any) {
+        if (
+          documentsError?.status !== 404 &&
+          !isSuperuserOnlyError(documentsError)
+        ) {
+          console.error("Error fetching student documents:", documentsError);
+        }
+      }
+
+      setStudent({ ...(record as any), documents: mappedDocuments } as any);
       const remoteNote = (record as any).internalNote || "";
       const localNote =
         typeof window !== "undefined"
@@ -945,102 +1196,11 @@ export default function StudentDetail() {
             />
 
             {/* Reset Password Button and Modal */}
-            <ResetPasswordControl studentId={student.id} studentName={student.name} />
+            <ResetPasswordControl
+              studentId={student.id}
+              studentName={student.name}
+            />
           </div>
-        // ...existing code...
-
-        import { ModernModal } from "@/components/ui/modern-modal";
-
-        function ResetPasswordControl({ studentId, studentName }: { studentId: string; studentName: string }) {
-          const [isOpen, setIsOpen] = useState(false);
-          const [password, setPassword] = useState("");
-          const [passwordConfirm, setPasswordConfirm] = useState("");
-          const [saving, setSaving] = useState(false);
-
-          const handleReset = async () => {
-            if (!password || !passwordConfirm) {
-              toast.error("Please enter and confirm the new password.");
-              return;
-            }
-            if (password !== passwordConfirm) {
-              toast.error("Passwords do not match.");
-              return;
-            }
-            setSaving(true);
-            try {
-              await pb.collection("users").update(studentId, {
-                password,
-                passwordConfirm,
-              });
-              toast.success("Password reset successfully.");
-              setIsOpen(false);
-              setPassword("");
-              setPasswordConfirm("");
-            } catch (error: any) {
-              if (isSuperuserOnlyError(error)) {
-                toast.error("You don't have permission to reset passwords.");
-              } else {
-                toast.error(error?.message || "Failed to reset password.");
-              }
-            } finally {
-              setSaving(false);
-            }
-          };
-
-          return (
-            <>
-              <button
-                onClick={() => setIsOpen(true)}
-                className="px-6 py-3 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 font-black text-[10px] tracking-widest shadow-sm hover:bg-indigo-600 hover:text-white transition-all uppercase flex items-center gap-2"
-              >
-                <ShieldCheck size={14} /> Reset Password
-              </button>
-              <ModernModal
-                open={isOpen}
-                onOpenChange={setIsOpen}
-                title="Reset Password"
-                subtitle={`Set a new password for ${studentName}`}
-                avatarChar={studentName.charAt(0).toUpperCase()}
-                avatarColor="bg-indigo-600"
-              >
-                <div className="space-y-4">
-                  <input
-                    type="password"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                    placeholder="New Password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    disabled={saving}
-                  />
-                  <input
-                    type="password"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                    placeholder="Confirm New Password"
-                    value={passwordConfirm}
-                    onChange={e => setPasswordConfirm(e.target.value)}
-                    disabled={saving}
-                  />
-                  <div className="flex gap-4 pt-2">
-                    <button
-                      onClick={() => setIsOpen(false)}
-                      className="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-600 font-black text-[10px] tracking-widest hover:bg-gray-200 transition-all uppercase active:scale-95"
-                      disabled={saving}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleReset}
-                      className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
-                      disabled={saving}
-                    >
-                      {saving ? "Resetting..." : "Reset Password"}
-                    </button>
-                  </div>
-                </div>
-              </ModernModal>
-            </>
-          );
-        }
         </div>
 
         {/* Profile Summary Card */}
@@ -1444,10 +1604,11 @@ export default function StudentDetail() {
                   { id: "al", label: "AL TRANSCRIPTS" },
                   { id: "birth", label: "BIRTH CERTIFICATE" },
                 ].map((docDef) => {
+                  const docType = DOCUMENT_TYPE_BY_CATEGORY[docDef.id];
                   const doc = student.documents?.find(
-                    (d) => d.category === docDef.id,
+                    (d) => d.document_type === docType,
                   );
-                  const status = doc ? doc.status : "not_uploaded";
+                  const status = doc ? doc.status_ : "not_uploaded";
 
                   let statusBg = "bg-gray-50";
                   let statusText = "text-gray-400";
@@ -1461,7 +1622,18 @@ export default function StudentDetail() {
                     statusBg = "bg-amber-100/50";
                     statusText = "text-amber-500";
                     statusLabel = "PENDING";
+                  } else if (status === "rejected") {
+                    statusBg = "bg-red-100/50";
+                    statusText = "text-red-500";
+                    statusLabel = "REJECTED";
                   }
+
+                  const documentUrl = doc
+                    ? pb.files.getUrl(
+                        { id: doc.id, collectionId: "documents" },
+                        doc.document,
+                      )
+                    : null;
 
                   return (
                     <div
@@ -1483,9 +1655,9 @@ export default function StudentDetail() {
                         {docDef.label}
                       </h4>
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center mb-8">
-                        MODIFIED:{" "}
-                        {doc?.date
-                          ? new Date(doc.date)
+                        UPLOADED:{" "}
+                        {doc?.created
+                          ? new Date(doc.created)
                               .toLocaleDateString("en-US", {
                                 month: "short",
                                 day: "numeric",
@@ -1495,7 +1667,25 @@ export default function StudentDetail() {
                           : "-"}
                       </p>
 
-                      <UploadDocumentControl documentName={docDef.label} />
+                      {documentUrl && (
+                        <a
+                          href={documentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full mb-3 py-3.5 rounded-2xl border border-indigo-100 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors uppercase text-[9px] font-black tracking-widest shadow-sm flex items-center justify-center gap-2"
+                        >
+                          <ExternalLink size={14} /> View Current File
+                        </a>
+                      )}
+
+                      <UploadDocumentControl
+                        documentName={docDef.label}
+                        documentType={
+                          docDef.id as "nic" | "ol" | "al" | "birth"
+                        }
+                        studentId={student.id}
+                        onUploaded={fetchStudentDetails}
+                      />
                     </div>
                   );
                 })}
