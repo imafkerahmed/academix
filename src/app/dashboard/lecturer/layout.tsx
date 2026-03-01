@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import Sidebar from "@/components/lecturer/Sidebar";
+import { SessionWarningModal } from "@/components/SessionWarningModal";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { Menu, Layout as LayoutIcon } from "lucide-react";
 
 // Mock user for the layout
@@ -16,6 +18,12 @@ export default function LecturerLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { showWarning, timeRemaining, extendSession, forceLogout } =
+    useSessionTimeout({
+      timeoutMinutes: 120, // 2 hours
+      warningMinutes: 0, // no warning
+      enabled: true,
+    });
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans">
@@ -23,6 +31,13 @@ export default function LecturerLayout({
         lecturerName={mockUser.name}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
+      />
+
+      <SessionWarningModal
+        isOpen={showWarning}
+        timeRemaining={timeRemaining}
+        onExtend={extendSession}
+        onLogout={forceLogout}
       />
 
       {/* Main Content Area */}

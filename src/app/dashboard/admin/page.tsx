@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { useRouter } from "next/navigation";
 
 import AllSchedulesModal from "@/components/admin/AllSchedulesModal";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -21,9 +22,12 @@ import {
   Activity,
   Video,
   Calendar as CalendarIcon,
+  Lock,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import StatsCarousel from "@/components/admin/StatsCarousel";
+import pb from "@/lib/pocketbase";
 
 // Mock data for today's classes
 const todaysClasses = [
@@ -110,8 +114,56 @@ const statsData = [
 ];
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [isAllSchedulesOpen, setIsAllSchedulesOpen] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "admin") {
+      router.push("/login");
+      return;
+    }
+
+    // Check if account is disabled
+    if (currentUser.accountStatus === "disabled") {
+      return;
+    }
+  }, [router]);
+
+  // Show disabled account message if account is disabled
+  if (pb.authStore.model?.accountStatus === "disabled") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-12 max-w-md w-full text-center"
+        >
+          <div className="w-20 h-20 bg-red-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <Lock size={32} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">
+            Account Disabled
+          </h1>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            Your account has been disabled. Please contact the administrator for
+            assistance.
+          </p>
+          <button
+            onClick={() => {
+              pb.authStore.clear();
+              router.push("/login");
+            }}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
+          >
+            Logout
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   const mappedSchedulesForModal = todaysClasses.map((c) => ({
     id: String(c.id),

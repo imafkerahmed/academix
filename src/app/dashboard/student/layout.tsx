@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Sidebar from "@/components/student/Sidebar";
+import { SessionWarningModal } from "@/components/SessionWarningModal";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { Menu, LayoutDashboard } from "lucide-react";
 
 export default function StudentLayout({
@@ -10,6 +12,12 @@ export default function StudentLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { showWarning, timeRemaining, extendSession, forceLogout } =
+    useSessionTimeout({
+      timeoutMinutes: 120, // 2 hours
+      warningMinutes: 0, // no warning
+      enabled: true,
+    });
 
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
@@ -17,6 +25,13 @@ export default function StudentLayout({
         studentName="Afker Ahmed"
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
+      />
+
+      <SessionWarningModal
+        isOpen={showWarning}
+        timeRemaining={timeRemaining}
+        onExtend={extendSession}
+        onLogout={forceLogout}
       />
 
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">

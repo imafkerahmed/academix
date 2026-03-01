@@ -12,7 +12,9 @@ import {
   Menu,
 } from "lucide-react";
 import { RouteLink } from "@/components/ui/route-link";
+import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
+import { logout } from "@/lib/pocketbase";
 
 const menuItems = [
   {
@@ -53,6 +55,7 @@ export default function StudentSidebar({
 }) {
   const [profileOpen, setProfileOpen] = React.useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   // Determine active tab based on pathname
   const activeTab =
@@ -61,6 +64,11 @@ export default function StudentSidebar({
         ? pathname === item.href
         : pathname?.startsWith(item.href),
     )?.id || "dashboard";
+
+  const handleLogout = async () => {
+    logout();
+    router.push("/login");
+  };
 
   return (
     <>
@@ -168,9 +176,7 @@ export default function StudentSidebar({
                   VIEW PROFILE
                 </RouteLink>
                 <button
-                  onClick={() => {
-                    window.location.href = "/";
-                  }}
+                  onClick={handleLogout}
                   className="flex items-center gap-3 w-full text-left px-5 py-3 text-xs font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all uppercase tracking-widest mt-1"
                 >
                   <LogOut size={14} />

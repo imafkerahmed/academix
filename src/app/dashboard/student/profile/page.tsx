@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 export default function StudentProfilePage() {
   const router = useRouter();
@@ -31,44 +32,110 @@ export default function StudentProfilePage() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [isAccountDisabled, setIsAccountDisabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  // Required document types
+  const requiredDocuments = [
+    { type: "NIC / Identification", key: "nic" },
+    { type: "OL Transcripts", key: "ol_transcript" },
+    { type: "AL Transcripts", key: "al_transcript" },
+    { type: "Birth Certificate", key: "birth_certificate" },
+  ];
 
   useEffect(() => {
-    const currentUser = pb.authStore.model;
-    if (!currentUser || currentUser.role !== "student") {
-      router.push("/login");
-      return;
-    }
+    const checkAccountStatus = async () => {
+      const currentUser = pb.authStore.model;
+      if (!currentUser || currentUser.role !== "student") {
+        router.push("/login");
+        return;
+      }
 
-    setStudentData({
-      fullName: currentUser.name || "Student",
-      email: currentUser.email || "",
-      mobile: currentUser.mobile || "",
-      dob: currentUser.dateOfBirth || "",
-      nic: currentUser.IdentificationDocument || "",
-      studentId: currentUser.userId || "N/A",
-      avatarUrl: currentUser.avatar
-        ? pb.files.getUrl(currentUser, currentUser.avatar)
-        : "/profile-img.jpg",
-    });
+      // Refresh user auth to get latest account status from server
+      try {
+        await pb.collection("users").authRefresh();
+      } catch (error) {
+        console.log("Auth refresh failed:", error);
+      }
 
-    // Fetch documents from database
-    fetchDocuments(currentUser.id);
+      // Check account status from refreshed auth store
+      const latestUser = pb.authStore.model;
+      if (latestUser?.accountStatus === "disabled") {
+        setLoading(false);
+        setIsAccountDisabled(true);
+        return;
+      }
+
+      if (!latestUser?.id) {
+        router.push("/login");
+        return;
+      }
+
+      setStudentData({
+        fullName: latestUser.name || "Student",
+        email: latestUser.email || "",
+        mobile: latestUser.mobile || "",
+        dob: latestUser.dateOfBirth || "",
+        nic: latestUser.IdentificationDocument || "",
+        studentId: latestUser.userId || "N/A",
+        avatarUrl: latestUser.avatar
+          ? pb.files.getUrl(latestUser, latestUser.avatar)
+          : "/profile-img.jpg",
+      });
+
+      // Fetch documents from database
+      fetchDocuments(latestUser.id);
+    };
+
+    checkAccountStatus();
   }, [router]);
 
   const fetchDocuments = async (studentId: string) => {
     try {
-      const docs = await pb
-        .collection("documents")
-        .getFullList({
-          filter: `student = "${studentId}"`,
-          sort: "-created",
-        })
-        .catch(() => []);
+      // Fetch documents via API endpoint
+      const token = pb.authStore.token;
+      const response = await fetch("/api/student/documents", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-      setDocuments(docs);
-    } catch (error) {
+      if (!response.ok) {
+        throw { status: response.status, message: response.statusText };
+      }
+
+      const data = await response.json();
+      const docs = data.documents;
+
+      // Merge required documents with fetched documents
+      const mergedDocs = requiredDocuments.map((reqDoc) => {
+        const existingDoc = docs.find(
+          (d: any) => d.document_type === reqDoc.key,
+        );
+        return (
+          existingDoc || {
+            document_type: reqDoc.key,
+            name: reqDoc.type,
+            status_: null,
+            field: studentId,
+          }
+        );
+      });
+
+      setDocuments(mergedDocs);
+    } catch (error: any) {
       console.error("Error fetching documents:", error);
+      // Handle permission errors by redirecting to login
+      if (error?.status === 403 || error?.status === 404) {
+        toast.error("Permission denied. Please log in again.");
+        setLoading(false);
+        await pb.authStore.clear();
+        router.push("/login");
+        return;
+      }
       setDocuments([]);
     } finally {
       setLoading(false);
@@ -81,11 +148,67 @@ export default function StudentProfilePage() {
 
   const handleUploadClick = (doc: any) => {
     // Don't allow upload if document is already verified
-    if (doc.status === "Verified") {
+    if (doc.status_ === "verified") {
       return;
     }
     setSelectedDoc(doc);
+    setUploadFile(null);
     setIsUploadModalOpen(true);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File size must be less than 5MB");
+        return;
+      }
+      // Validate file type
+      const validTypes = ["application/pdf", "image/png", "image/jpeg"];
+      if (!validTypes.includes(file.type)) {
+        toast.error("Only PDF, PNG, and JPG files are allowed");
+        return;
+      }
+      setUploadFile(file);
+    }
+  };
+
+  const handleUploadSubmit = async () => {
+    if (!uploadFile || !selectedDoc) return;
+
+    setUploading(true);
+    try {
+      const currentUser = pb.authStore.model;
+      if (!currentUser) return;
+
+      const formData = new FormData();
+      formData.append("field", currentUser.id);
+      formData.append("document_type", selectedDoc.document_type);
+      formData.append("document", uploadFile);
+      formData.append("status_", "pending");
+
+      if (selectedDoc.id) {
+        // Update existing document
+        await pb.collection("documents").update(selectedDoc.id, formData);
+      } else {
+        // Create new document
+        await pb.collection("documents").create(formData);
+      }
+
+      // Refresh documents
+      await fetchDocuments(currentUser.id);
+      setIsUploadModalOpen(false);
+      setUploadFile(null);
+      toast.success(
+        "Document uploaded successfully and is pending verification!",
+      );
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Failed to upload document. Please try again.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const containerVariants = {
@@ -109,6 +232,40 @@ export default function StudentProfilePage() {
       },
     },
   };
+
+  // Show disabled account message first (before loading or other checks)
+  if (isAccountDisabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-12 max-w-md w-full text-center"
+        >
+          <div className="w-20 h-20 bg-red-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <Lock size={32} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">
+            Account Disabled
+          </h1>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            Your account has been disabled. Please contact the administrator for
+            assistance.
+          </p>
+          <button
+            onClick={async () => {
+              await pb.authStore.clear();
+              router.push("/login");
+            }}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          >
+            Logout
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (loading || !studentData) {
     return (
@@ -297,56 +454,50 @@ export default function StudentProfilePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {documents.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
-                No documents uploaded yet
-              </p>
-            </div>
-          ) : (
-            documents.map((doc, idx) => (
-              <div
-                key={idx}
-                className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 hover:border-indigo-100 hover:bg-white transition-all duration-500 group flex flex-col items-center text-center"
-              >
-                <div className="flex items-center justify-between w-full mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-gray-400 group-hover:text-indigo-600 shadow-sm transition-all group-hover:shadow-lg">
-                    <FileText size={24} />
-                  </div>
-                  <Badge doc={doc} />
+          {documents.map((doc, idx) => (
+            <div
+              key={idx}
+              className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 hover:border-indigo-100 hover:bg-white transition-all duration-500 group flex flex-col items-center text-center"
+            >
+              <div className="flex items-center justify-between w-full mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-gray-400 group-hover:text-indigo-600 shadow-sm transition-all group-hover:shadow-lg">
+                  <FileText size={24} />
                 </div>
-                <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight mb-2">
-                  {doc.documentType || doc.name || "Document"}
-                </h4>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">
-                  Modified:{" "}
-                  {doc.updated
-                    ? new Date(doc.updated).toLocaleDateString()
-                    : "-"}
-                </p>
-
-                <button
-                  onClick={() => handleUploadClick(doc)}
-                  disabled={doc.status === "Verified"}
-                  className={`w-full py-4 bg-white border border-gray-200 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 group/upload ${
-                    doc.status === "Verified"
-                      ? "opacity-50 cursor-not-allowed text-gray-400"
-                      : "text-gray-500 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-xl hover:shadow-indigo-50"
-                  }`}
-                >
-                  <Upload
-                    size={16}
-                    className={
-                      doc.status !== "Verified"
-                        ? "group-hover/upload:-translate-y-1 transition-transform"
-                        : ""
-                    }
-                  />
-                  {doc.status === "Verified" ? "Verified" : "Update File"}
-                </button>
+                <Badge doc={doc} />
               </div>
-            ))
-          )}
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight mb-2">
+                {doc.name || doc.documentType || "Document"}
+              </h4>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">
+                Modified:{" "}
+                {doc.updated ? new Date(doc.updated).toLocaleDateString() : "-"}
+              </p>
+
+              <button
+                onClick={() => handleUploadClick(doc)}
+                disabled={doc.status_ === "verified"}
+                className={`w-full py-4 bg-white border border-gray-200 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 group/upload ${
+                  doc.status_ === "verified"
+                    ? "opacity-50 cursor-not-allowed text-gray-400"
+                    : "text-gray-500 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-xl hover:shadow-indigo-50"
+                }`}
+              >
+                <Upload
+                  size={16}
+                  className={
+                    doc.status_ !== "verified"
+                      ? "group-hover/upload:-translate-y-1 transition-transform"
+                      : ""
+                  }
+                />
+                {doc.status_ === "verified"
+                  ? "Verified"
+                  : !doc.status_
+                    ? "Upload File"
+                    : "Update File"}
+              </button>
+            </div>
+          ))}
         </div>
       </motion.div>
 
@@ -386,23 +537,60 @@ export default function StudentProfilePage() {
       {/* Document Upload Modal */}
       <Modal
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setUploadFile(null);
+        }}
         title={`Upload ${selectedDoc?.name || "Document"}`}
       >
         <div className="space-y-6">
-          <div className="border-2 border-dashed border-gray-200 rounded-[2.5rem] p-12 text-center hover:border-indigo-400 hover:bg-indigo-50/30 transition-all group cursor-pointer">
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <div
+            onClick={() => uploadInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-200 rounded-[2.5rem] p-12 text-center hover:border-indigo-400 hover:bg-indigo-50/30 transition-all group cursor-pointer"
+          >
             <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mx-auto mb-4 group-hover:scale-110 transition-transform">
               <Upload size={32} />
             </div>
-            <p className="text-sm font-black text-gray-900 uppercase tracking-tight mb-1">
-              Click or drag to upload
-            </p>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              PDF, PNG or JPG (Max 5MB)
-            </p>
+            {uploadFile ? (
+              <>
+                <p className="text-sm font-black text-indigo-600 uppercase tracking-tight mb-1">
+                  {uploadFile.name}
+                </p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-black text-gray-900 uppercase tracking-tight mb-1">
+                  Click to upload
+                </p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  PDF, PNG or JPG (Max 5MB)
+                </p>
+              </>
+            )}
           </div>
-          <button className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">
-            Submit for Verification
+          <button
+            onClick={handleUploadSubmit}
+            disabled={!uploadFile || uploading}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {uploading ? (
+              <>
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              "Submit for Verification"
+            )}
           </button>
         </div>
       </Modal>
@@ -463,18 +651,24 @@ function Modal({
 }
 
 function Badge({ doc }: { doc: any }) {
+  const statusMap: Record<string, string> = {
+    verified: "Verified",
+    pending: "Pending",
+    rejected: "Rejected",
+  };
+
   const styles =
     {
-      Verified: "bg-green-100 text-green-600 border-green-200",
-      Pending: "bg-amber-100 text-amber-600 border-amber-200",
-      "Not Uploaded": "bg-gray-100 text-gray-400 border-gray-200",
-    }[doc.status as string] || "bg-gray-100 text-gray-400 border-gray-200";
+      verified: "bg-green-100 text-green-600 border-green-200",
+      pending: "bg-amber-100 text-amber-600 border-amber-200",
+      rejected: "bg-red-100 text-red-600 border-red-200",
+    }[doc.status_ as string] || "bg-gray-100 text-gray-400 border-gray-200";
 
   return (
     <span
       className={`px-4 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest border ${styles}`}
     >
-      {doc.status}
+      {statusMap[doc.status_ as string] || "Not Uploaded"}
     </span>
   );
 }

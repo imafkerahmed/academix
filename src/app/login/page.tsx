@@ -48,6 +48,17 @@ export default function LoginPage() {
         .authWithPassword(userId, password);
 
       console.log("Login successful, user data:", authData.record);
+
+      // Check if account is disabled
+      if (authData.record.accountStatus === "disabled") {
+        pb.authStore.clear();
+        setLoginError(
+          "Your account has been disabled. Please contact the administrator.",
+        );
+        toast.error("Your account has been disabled.");
+        return;
+      }
+
       // Get user role
       const role = authData.record.role;
 

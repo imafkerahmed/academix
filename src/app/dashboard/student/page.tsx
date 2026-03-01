@@ -15,6 +15,7 @@ import {
   Info,
   X as CloseIcon,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import StatsCarousel from "@/components/admin/StatsCarousel";
@@ -45,31 +46,63 @@ export default function StudentDashboard() {
   const [user, setUser] = useState<any>(null);
   const [courses, setCourses] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [isAccountDisabled, setIsAccountDisabled] = useState(false);
 
+  // Check account status on initial load
   useEffect(() => {
-    const currentUser = pb.authStore.model;
-    if (!currentUser || currentUser.role !== "student") {
-      router.push("/login");
-      return;
-    }
+    const checkAccountStatus = async () => {
+      const currentUser = pb.authStore.model;
+      if (!currentUser || currentUser.role !== "student") {
+        router.push("/login");
+        return;
+      }
 
-    setUser(currentUser);
-    fetchStudentData(currentUser.id);
+      // Refresh user auth to get latest account status from server
+      try {
+        await pb.collection("users").authRefresh();
+      } catch (error) {
+        console.log("Auth refresh failed:", error);
+      }
+
+      // Check account status from refreshed auth store
+      const latestUser = pb.authStore.model;
+      if (latestUser?.accountStatus === "disabled") {
+        setLoading(false);
+        setIsAccountDisabled(true);
+        return;
+      }
+
+      if (!latestUser?.id) {
+        router.push("/login");
+        return;
+      }
+
+      setUser(latestUser);
+      fetchStudentData(latestUser.id);
+    };
+
+    checkAccountStatus();
   }, [router]);
 
   const fetchStudentData = async (studentId: string) => {
     try {
-      // Fetch enrollments for this student without expand to avoid permission issues
-      const enrollmentRecords = await pb
-        .collection("enrollments")
-        .getFullList({
-          filter: `student = "${studentId}"`,
-        })
-        .catch(() => []);
+      // Fetch enrollments via API endpoint
+      const token = pb.authStore.token;
+      const response = await fetch("/api/student/enrollments", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw { status: response.status, message: response.statusText };
+      }
+
+      const data = await response.json();
+      const enrollmentRecords = data.enrollments;
 
       setEnrollments(enrollmentRecords);
 
-      // For now, show basic enrollment count
       // Transform enrollments into basic format
       const courseList = enrollmentRecords.map(
         (enrollment: any, index: number) => ({
@@ -84,9 +117,17 @@ export default function StudentDashboard() {
       );
 
       setCourses(courseList);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching student data:", error);
-      // Don't show error toast, just use empty data
+      // Handle permission errors by redirecting to login
+      if (error?.status === 403 || error?.status === 404) {
+        toast.error("Permission denied. Please log in again.");
+        setLoading(false);
+        await pb.authStore.clear();
+        router.push("/login");
+        return;
+      }
+      // For other errors, use empty data
       setCourses([]);
       setEnrollments([]);
     } finally {
@@ -155,6 +196,40 @@ export default function StudentDashboard() {
 
   // State for expanded announcements
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+
+  // Show disabled account message first (before loading or other checks)
+  if (isAccountDisabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-12 max-w-md w-full text-center"
+        >
+          <div className="w-20 h-20 bg-red-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <Lock size={32} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">
+            Account Disabled
+          </h1>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            Your account has been disabled. Please contact the administrator for
+            assistance.
+          </p>
+          <button
+            onClick={async () => {
+              await pb.authStore.clear();
+              router.push("/login");
+            }}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          >
+            Logout
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

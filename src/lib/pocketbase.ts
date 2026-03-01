@@ -112,6 +112,86 @@ export interface ClassAttendee {
   updated: string;
 }
 
+export interface Intake {
+  id: string;
+  code: string;
+  start_date: string;
+  end_date: string;
+  intakeStatus: "ongoing" | "peding" | "completed" | "disabled";
+  created: string;
+  updated: string;
+}
+
+export interface Course {
+  id: string;
+  code: string;
+  name: string;
+  status?: "active" | "completed" | "archived";
+  created: string;
+  updated: string;
+}
+
+export interface CourseTemplate {
+  id: string;
+  course_code: string;
+  course_name: string;
+  course_description?: string;
+  created: string;
+  updated: string;
+}
+
+export interface Subject {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  created: string;
+  updated: string;
+}
+
+export interface CourseIntake {
+  id: string;
+  course: string;
+  intake: string;
+  is_semester_based: boolean;
+  semester_count?: number;
+  course_status: "ongoing" | "completed" | "upcoming";
+  start_date: string;
+  end_date: string;
+  created: string;
+  updated: string;
+  expand?: {
+    course?: Course;
+    intake?: Intake;
+  };
+}
+
+export interface CourseSubject {
+  id: string;
+  course_intake: string;
+  subject: string | string[];
+  credits: number;
+  created: string;
+  updated: string;
+  expand?: {
+    subject?: Subject | Subject[];
+    course_intake?: CourseIntake;
+  };
+}
+
+export interface CourseIntakeFee {
+  id: string;
+  course_intake: string;
+  course_fee: number;
+  registration_fee: number;
+  duration: number;
+  created: string;
+  updated: string;
+  expand?: {
+    course_intake?: CourseIntake;
+  };
+}
+
 // Helper functions
 export const isAuthenticated = () => pb.authStore.isValid;
 

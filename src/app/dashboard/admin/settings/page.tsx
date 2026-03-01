@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import {
@@ -56,6 +57,7 @@ export default function SettingsPage() {
       link: "Manage Accounts",
       iconBg: "bg-blue-50",
       iconColor: "text-blue-600",
+      href: null,
     },
     {
       title: "Academic Structure",
@@ -65,6 +67,7 @@ export default function SettingsPage() {
       link: "Configure Subjects",
       iconBg: "bg-green-50",
       iconColor: "text-green-600",
+      href: "/dashboard/admin/settings/academic",
     },
     {
       title: "Operational Units",
@@ -74,6 +77,7 @@ export default function SettingsPage() {
       link: "Manage Branches",
       iconBg: "bg-purple-50",
       iconColor: "text-purple-600",
+      href: null,
     },
     {
       title: "Financial Protocol",
@@ -83,6 +87,7 @@ export default function SettingsPage() {
       link: "Finances & Gateways",
       iconBg: "bg-orange-50",
       iconColor: "text-orange-600",
+      href: null,
     },
     {
       title: "Visual & System UI",
@@ -92,6 +97,7 @@ export default function SettingsPage() {
       link: "Customize UI",
       iconBg: "bg-indigo-50",
       iconColor: "text-indigo-600",
+      href: null,
     },
     {
       title: "Communications Hub",
@@ -101,6 +107,7 @@ export default function SettingsPage() {
       link: "System Alerts",
       iconBg: "bg-amber-50",
       iconColor: "text-amber-600",
+      href: null,
     },
   ];
 
@@ -135,42 +142,49 @@ export default function SettingsPage() {
 
         {/* Settings Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-          {settingSections.map((s, idx) => (
-            <div
-              key={idx}
-              className="group bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 flex flex-col gap-6 ring-1 ring-gray-950/[0.02]"
-            >
-              <div className="flex items-center justify-between">
-                <div
-                  className={`w-14 h-14 ${s.iconBg} ${s.iconColor} rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:bg-indigo-600 group-hover:text-white shadow-sm`}
-                >
-                  <s.icon size={24} />
+          {settingSections.map((s, idx) => {
+            const CardContent = (
+              <div className="group bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 flex flex-col gap-6 ring-1 ring-gray-950/[0.02]">
+                <div className="flex items-center justify-between">
+                  <div
+                    className={`w-14 h-14 ${s.iconBg} ${s.iconColor} rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:bg-indigo-600 group-hover:text-white shadow-sm`}
+                  >
+                    <s.icon size={24} />
+                  </div>
+                  <div className="p-2 bg-gray-50 rounded-lg group-hover:bg-indigo-50 transition-colors">
+                    <ChevronRight
+                      size={16}
+                      className="text-gray-300 group-hover:text-indigo-600"
+                    />
+                  </div>
                 </div>
-                <div className="p-2 bg-gray-50 rounded-lg group-hover:bg-indigo-50 transition-colors">
-                  <ChevronRight
-                    size={16}
-                    className="text-gray-300 group-hover:text-indigo-600"
-                  />
+
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight leading-none">
+                    {s.title}
+                  </h3>
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest leading-relaxed">
+                    {s.desc}
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-6 border-t border-gray-50 flex items-center justify-between">
+                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] group-hover:translate-x-1 transition-transform flex items-center gap-2">
+                    {s.link} <ArrowRight size={14} />
+                  </span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-100 group-hover:bg-indigo-400 transition-colors" />
                 </div>
               </div>
+            );
 
-              <div className="flex flex-col gap-2">
-                <h3 className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight leading-none">
-                  {s.title}
-                </h3>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest leading-relaxed">
-                  {s.desc}
-                </p>
-              </div>
-
-              <div className="mt-4 pt-6 border-t border-gray-50 flex items-center justify-between">
-                <button className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] group-hover:translate-x-1 transition-transform flex items-center gap-2">
-                  {s.link} <ArrowRight size={14} />
-                </button>
-                <div className="w-1.5 h-1.5 rounded-full bg-gray-100 group-hover:bg-indigo-400 transition-colors" />
-              </div>
-            </div>
-          ))}
+            return s.href ? (
+              <Link key={idx} href={s.href}>
+                {CardContent}
+              </Link>
+            ) : (
+              <div key={idx}>{CardContent}</div>
+            );
+          })}
         </div>
 
         {/* System Summary Footer */}

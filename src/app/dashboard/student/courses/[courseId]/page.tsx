@@ -11,7 +11,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { RouteLink } from "@/components/ui/route-link";
 import pb from "@/lib/pocketbase";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
+import { motion } from "framer-motion";
   "1": {
     id: "1",
     name: "Mathematics 101",
@@ -122,6 +123,7 @@ export default function CoursePage() {
   const [activeSemester, setActiveSemester] = useState(0);
   const [disabledSemesters, setDisabledSemesters] = useState<string[]>([]);
   const [disabledSubjects, setDisabledSubjects] = useState<string[]>([]);
+  const [isAccountDisabled, setIsAccountDisabled] = useState(false);
 
   useEffect(() => {
     const currentUser = pb.authStore.model;
@@ -130,8 +132,37 @@ export default function CoursePage() {
       return;
     }
 
+    // Check if account is disabled
+    if (currentUser.accountStatus === "disabled") {
+      setIsAccountDisabled(true);
+      return;
+    }
+
     fetchCourseData();
   }, [courseId, router]);
+
+  // Periodic check for account status changes (every 2 seconds)
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      const currentUser = pb.authStore.model;
+      if (!currentUser) return;
+
+      try {
+        // Fetch the latest user data from the server
+        const latestUser = await pb
+          .collection("users")
+          .getOne(currentUser.id);
+
+        if (latestUser && latestUser.accountStatus === "disabled") {
+          setIsAccountDisabled(true);
+        }
+      } catch (error) {
+        // Silently handle errors
+      }
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   const fetchCourseData = async () => {
     try {
@@ -203,6 +234,82 @@ export default function CoursePage() {
   const handleCloseNotifications = () => {
     setShowNotifications(false);
   };
+
+  // Show disabled account message if account is disabled (BEFORE loading check)
+  if (isAccountDisabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-12 max-w-md w-full text-center"
+        >
+          <div className="w-20 h-20 bg-red-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <Lock size={32} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">
+            Account Disabled
+          </h1>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            Your account has been disabled. Please contact the administrator for assistance.
+          </p>
+          <button
+            onClick={() => {
+              pb.authStore.clear();
+              router.push("/login");
+            }}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
+          >
+            Logout
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
+  }
+
+  // Show disabled account message if account is disabled
+  if (pb.authStore.model?.accountStatus === "disabled" || isAccountDisabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-12 max-w-md w-full text-center"
+        >
+          <div className="w-20 h-20 bg-red-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <Lock size={32} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">
+            Account Disabled
+          </h1>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            Your account has been disabled. Please contact the administrator for assistance.
+          </p>
+          <button
+            onClick={() => {
+              pb.authStore.clear();
+              router.push("/login");
+            }}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
+          >
+            Logout
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

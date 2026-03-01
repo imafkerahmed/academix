@@ -9,9 +9,11 @@ import {
   BookOpen,
   ArrowRight,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 export default function StudentPaymentsPage() {
   const router = useRouter();
@@ -20,26 +22,58 @@ export default function StudentPaymentsPage() {
     null,
   );
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [isAccountDisabled, setIsAccountDisabled] = useState(false);
 
   useEffect(() => {
-    const currentUser = pb.authStore.model;
-    if (!currentUser || currentUser.role !== "student") {
-      router.push("/login");
-      return;
-    }
+    const checkAccountStatus = async () => {
+      const currentUser = pb.authStore.model;
+      if (!currentUser || currentUser.role !== "student") {
+        router.push("/login");
+        return;
+      }
 
-    fetchEnrollments(currentUser.id);
+      // Refresh user auth to get latest account status from server
+      try {
+        await pb.collection("users").authRefresh();
+      } catch (error) {
+        console.log("Auth refresh failed:", error);
+      }
+
+      // Check account status from refreshed auth store
+      const latestUser = pb.authStore.model;
+      if (latestUser?.accountStatus === "disabled") {
+        setLoading(false);
+        setIsAccountDisabled(true);
+        return;
+      }
+
+      if (!latestUser?.id) {
+        router.push("/login");
+        return;
+      }
+
+      fetchEnrollments(latestUser.id);
+    };
+
+    checkAccountStatus();
   }, [router]);
 
   const fetchEnrollments = async (studentId: string) => {
     try {
-      // Fetch enrollments for this student
-      const enrollmentRecords = await pb
-        .collection("enrollments")
-        .getFullList({
-          filter: `student = "${studentId}"`,
-        })
-        .catch(() => []);
+      // Fetch enrollments via API endpoint
+      const token = pb.authStore.token;
+      const response = await fetch("/api/student/enrollments", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw { status: response.status, message: response.statusText };
+      }
+
+      const data = await response.json();
+      const enrollmentRecords = data.enrollments;
 
       // Transform enrollments into course format
       const courseList = enrollmentRecords.map(
@@ -58,8 +92,16 @@ export default function StudentPaymentsPage() {
       if (courseList.length === 1) {
         setSelectedCourse(courseList[0].name);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching enrollments:", error);
+      // Handle permission errors by redirecting to login
+      if (error?.status === 403 || error?.status === 404) {
+        toast.error("Permission denied. Please log in again.");
+        setLoading(false);
+        await pb.authStore.clear();
+        router.push("/login");
+        return;
+      }
       setEnrolledCourses([]);
     } finally {
       setLoading(false);
@@ -70,6 +112,39 @@ export default function StudentPaymentsPage() {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (isAccountDisabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-12 max-w-md w-full text-center"
+        >
+          <div className="w-20 h-20 bg-red-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <Lock size={32} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">
+            Account Disabled
+          </h1>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            Your account has been disabled. Please contact the administrator for
+            assistance.
+          </p>
+          <button
+            onClick={async () => {
+              await pb.authStore.clear();
+              router.push("/login");
+            }}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          >
+            Logout
+          </button>
+        </motion.div>
       </div>
     );
   }

@@ -3,34 +3,67 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CourseList from "@/components/CourseList";
-import { BookOpen, TrendingUp, Loader2 } from "lucide-react";
+import { BookOpen, TrendingUp, Loader2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 export default function CoursesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<any[]>([]);
+  const [isAccountDisabled, setIsAccountDisabled] = useState(false);
 
   useEffect(() => {
-    const currentUser = pb.authStore.model;
-    if (!currentUser || currentUser.role !== "student") {
-      router.push("/login");
-      return;
-    }
+    const checkAccountStatus = async () => {
+      const currentUser = pb.authStore.model;
+      if (!currentUser || currentUser.role !== "student") {
+        router.push("/login");
+        return;
+      }
 
-    fetchCourses(currentUser.id);
+      // Refresh user auth to get latest account status from server
+      try {
+        await pb.collection("users").authRefresh();
+      } catch (error) {
+        console.log("Auth refresh failed:", error);
+      }
+
+      // Check account status from refreshed auth store
+      const latestUser = pb.authStore.model;
+      if (latestUser?.accountStatus === "disabled") {
+        setLoading(false);
+        setIsAccountDisabled(true);
+        return;
+      }
+
+      if (!latestUser?.id) {
+        router.push("/login");
+        return;
+      }
+
+      fetchCourses(latestUser.id);
+    };
+
+    checkAccountStatus();
   }, [router]);
 
   const fetchCourses = async (studentId: string) => {
     try {
-      // Fetch enrollments for this student
-      const enrollmentRecords = await pb
-        .collection("enrollments")
-        .getFullList({
-          filter: `student = "${studentId}"`,
-        })
-        .catch(() => []);
+      // Fetch enrollments via API endpoint
+      const token = pb.authStore.token;
+      const response = await fetch("/api/student/enrollments", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw { status: response.status, message: response.statusText };
+      }
+
+      const data = await response.json();
+      const enrollmentRecords = data.enrollments;
 
       // Transform enrollments into course format
       const courseList = enrollmentRecords.map(
@@ -46,8 +79,16 @@ export default function CoursesPage() {
       );
 
       setCourses(courseList);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching courses:", error);
+      // Handle permission errors by redirecting to login
+      if (error?.status === 403 || error?.status === 404) {
+        toast.error("Permission denied. Please log in again.");
+        setLoading(false);
+        await pb.authStore.clear();
+        router.push("/login");
+        return;
+      }
       setCourses([]);
     } finally {
       setLoading(false);
@@ -61,6 +102,41 @@ export default function CoursesPage() {
       </div>
     );
   }
+
+  // Show disabled account message if account is disabled
+  if (isAccountDisabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-12 max-w-md w-full text-center"
+        >
+          <div className="w-20 h-20 bg-red-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <Lock size={32} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">
+            Account Disabled
+          </h1>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            Your account has been disabled. Please contact the administrator for
+            assistance.
+          </p>
+          <button
+            onClick={async () => {
+              await pb.authStore.clear();
+              router.push("/login");
+            }}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          >
+            Logout
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

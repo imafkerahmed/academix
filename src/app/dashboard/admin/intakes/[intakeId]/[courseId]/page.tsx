@@ -26,111 +26,6 @@ import { ModernModal } from "@/components/ui/modern-modal";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 
-// --- Mock Data ---
-const mockIntakes = [
-  {
-    id: "1",
-    code: "INT/JUL2026",
-    start_date: "2026-01-01",
-    end_date: "2026-06-30",
-  },
-  {
-    id: "2",
-    code: "INT/JUL2025",
-    start_date: "2025-07-01",
-    end_date: "2025-12-31",
-  },
-];
-const mockCourses = [
-  { id: "c1", name: "Mathematics", code: "MATH101" },
-  { id: "c2", name: "Physics", code: "PHYS101" },
-];
-const mockCourseIntakes = [
-  {
-    id: "ci1",
-    course: "c1",
-    intake: "1",
-    start_date: "2026-01-01",
-    end_date: "2026-06-30",
-  },
-  {
-    id: "ci2",
-    course: "c2",
-    intake: "1",
-    start_date: "2026-01-01",
-    end_date: "2026-06-30",
-  },
-];
-
-const mockLecturers = [
-  "Dianne Russell",
-  "Albert Flores",
-  "Theresa Webb",
-  "Savannah Nguyen",
-  "Jenny Wilson",
-  "Leslie Alexander",
-  "Robert Fox",
-  "Esther Howard",
-];
-
-const availableSubjects = [
-  { name: "Linear Algebra", code: "MATH301" },
-  { name: "Discrete Mathematics", code: "CS101" },
-  { name: "Differential Equations", code: "MATH302" },
-  { name: "Physics I", code: "PHYS101" },
-  { name: "Physics II", code: "PHYS102" },
-];
-
-const initialSubjects = [
-  {
-    name: "Algebra",
-    code: "MATH101",
-    semester: "Semester 1",
-    assignedLecturer: "Dianne Russell",
-  },
-  {
-    name: "Calculus",
-    code: "MATH102",
-    semester: "Semester 1",
-    assignedLecturer: "Albert Flores",
-  },
-  {
-    name: "Geometry",
-    code: "MATH201",
-    semester: "Semester 2",
-    assignedLecturer: "Theresa Webb",
-  },
-];
-
-const initialAssignments = [
-  {
-    id: "asgn-1",
-    title: "Algebra Quiz 1",
-    subjectCode: "MATH101",
-    semester: "Semester 1",
-    dueDate: "2026-03-15",
-    status: "Upcoming",
-    totalMarks: 100,
-    assignmentSheet: "algebra-quiz-1.pdf",
-    rules: "• Answer all questions\n• Show working",
-    markingLecturer: "Dianne Russell",
-  },
-];
-
-const materials = [
-  { id: "mat-1", title: "Lecture Notes.pdf", uploadDate: "2026-01-15" },
-  { id: "mat-2", title: "Syllabus.docx", uploadDate: "2026-01-20" },
-];
-
-const videos = [
-  {
-    id: "vid-1",
-    title: "Introduction to Course",
-    duration: "45:30",
-    uploadDate: "2026-01-15",
-  },
-];
-
 // --- Utility Functions ---
 function calculateStatus(start_date: string, end_date: string) {
   const today = new Date();
@@ -152,6 +47,15 @@ export default function CourseDetailsPage() {
   const intakeId = typeof params?.intakeId === "string" ? params.intakeId : "";
   const courseId = typeof params?.courseId === "string" ? params.courseId : "";
   const router = useRouter();
+
+  // TODO: Fetch from PocketBase
+  const mockIntakes: any[] = [];
+  const mockCourses: any[] = [];
+  const mockCourseIntakes: any[] = [];
+  const mockLecturers: string[] = [];
+  const availableSubjects: any[] = [];
+  const materials: any[] = [];
+  const videos: any[] = [];
 
   // Find intake and course
   const intake = mockIntakes.find((i) => i.id === intakeId);
@@ -178,7 +82,7 @@ export default function CourseDetailsPage() {
     end_date: courseIntake?.end_date || "",
   });
 
-  const [courseSubjects, setCourseSubjects] = useState(initialSubjects);
+  const [courseSubjects, setCourseSubjects] = useState<any[]>([]);
   const [selectedSemester, setSelectedSemester] = useState("Semester 1");
   const [subjectSearchQuery, setSubjectSearchQuery] = useState("");
   const [selectedSubjectsInModal, setSelectedSubjectsInModal] = useState<
@@ -187,8 +91,7 @@ export default function CourseDetailsPage() {
   const [subjectToAssign, setSubjectToAssign] = useState<any>(null);
   const [lecturerSearchQuery, setLecturerSearchQuery] = useState("");
 
-  const [courseAssignments, setCourseAssignments] =
-    useState(initialAssignments);
+  const [courseAssignments, setCourseAssignments] = useState<any[]>([]);
   const [selectedAdminAssignment, setSelectedAdminAssignment] =
     useState<any>(null);
   const [assignmentModalSemester, setAssignmentModalSemester] =
@@ -203,7 +106,7 @@ export default function CourseDetailsPage() {
     rules: "",
     unlockDate: "2026-05-01",
     dueDate: "2026-06-01",
-    markingLecturer: mockLecturers[0],
+    markingLecturer: "",
     assignmentSheet: null,
   });
 
@@ -523,6 +426,11 @@ export default function CourseDetailsPage() {
                   )}
                 </button>
               ))}
+              {availableSubjects.length === 0 && (
+                <div className="text-center py-8 text-gray-400 text-sm font-bold">
+                  No subjects available
+                </div>
+              )}
             </div>
           </div>
 
@@ -598,6 +506,11 @@ export default function CourseDetailsPage() {
                   <span className="font-bold text-gray-900">{lecturer}</span>
                 </button>
               ))}
+            {mockLecturers.length === 0 && (
+              <div className="text-center py-8 text-gray-400 text-sm font-bold">
+                No lecturers available
+              </div>
+            )}
           </div>
           <button
             onClick={() => setShowLecturerModal(false)}
@@ -722,11 +635,8 @@ export default function CourseDetailsPage() {
                       Lecturer
                     </label>
                     <select className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-sm">
-                      {mockLecturers.map((l) => (
-                        <option key={l} value={l}>
-                          {l}
-                        </option>
-                      ))}
+                      {/* TODO: Populate from PocketBase */}
+                      <option value="">-- No lecturers available --</option>
                     </select>
                   </div>
                 </div>
@@ -1061,51 +971,9 @@ function AssignmentsTab({ groupedAssignments, onAdd, onView, router }: any) {
 }
 
 function MaterialsTab() {
-  // Mock subjects and materials for demonstration
-  const subjects = [
-    { id: "subj-1", name: "Algebra" },
-    { id: "subj-2", name: "Calculus" },
-    { id: "subj-3", name: "Geometry" },
-  ];
-  const initialMaterials = [
-    {
-      id: "mat-1",
-      title: "Lecture Notes.pdf",
-      type: "document",
-      subjectId: "subj-1",
-      date: "2026-01-15",
-    },
-    {
-      id: "mat-2",
-      title: "Syllabus.docx",
-      type: "document",
-      subjectId: "subj-1",
-      date: "2026-01-20",
-    },
-    {
-      id: "mat-3",
-      title: "Intro Video",
-      type: "video",
-      subjectId: "subj-1",
-      date: "2026-01-21",
-      videoUrl: "https://youtu.be/example",
-    },
-    {
-      id: "mat-4",
-      title: "Calculus Deep Dive.pdf",
-      type: "document",
-      subjectId: "subj-2",
-      date: "2026-01-18",
-    },
-    {
-      id: "mat-5",
-      title: "Limits Explained",
-      type: "video",
-      subjectId: "subj-2",
-      date: "2026-01-22",
-      videoUrl: "https://youtu.be/example2",
-    },
-  ];
+  // TODO: Fetch from PocketBase
+  const subjects: any[] = [];
+  const initialMaterials: any[] = [];
 
   const [materials, setMaterials] = useState(initialMaterials);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1118,7 +986,7 @@ function MaterialsTab() {
   }>({
     title: "",
     type: "document",
-    subjectId: subjects[0].id,
+    subjectId: subjects[0]?.id || "",
     file: null,
     videoUrl: "",
   });
@@ -1144,6 +1012,8 @@ function MaterialsTab() {
   const handleAddMaterial = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!formData.title || !formData.subjectId) return;
+    // TODO: Implement PocketBase integration
+    console.log("Adding material:", formData);
     setMaterials([
       {
         id: `mat-${Date.now()}`,
@@ -1160,7 +1030,7 @@ function MaterialsTab() {
     setFormData({
       title: "",
       type: "document",
-      subjectId: subjects[0].id,
+      subjectId: subjects[0]?.id || "",
       file: null,
       videoUrl: "",
     });
@@ -1220,11 +1090,15 @@ function MaterialsTab() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 required
               >
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
+                {subjects.length === 0 ? (
+                  <option value="">No subjects available</option>
+                ) : (
+                  subjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
             <div>
@@ -1302,7 +1176,7 @@ function MaterialsTab() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {subject.documents.map((doc) => (
+                {subject.documents.map((doc: any) => (
                   <li
                     key={doc.id}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100"
@@ -1324,7 +1198,7 @@ function MaterialsTab() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {subject.videos.map((vid) => (
+                {subject.videos.map((vid: any) => (
                   <li
                     key={vid.id}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100"

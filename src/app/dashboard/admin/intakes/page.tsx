@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 import {
   Plus,
   Calendar,
@@ -23,59 +25,6 @@ import { useRouter } from "next/navigation";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
 
-const mockIntakes = [
-  {
-    id: "1",
-    code: "JAN2026",
-    start_date: "2026-01-01",
-    end_date: "2026-06-30",
-    created: "2025-12-01",
-  },
-  {
-    id: "2",
-    code: "JUL2025",
-    start_date: "2025-07-01",
-    end_date: "2025-12-31",
-    created: "2025-06-01",
-  },
-  {
-    id: "3",
-    code: "JAN2025",
-    start_date: "2025-01-01",
-    end_date: "2025-06-30",
-    created: "2024-12-01",
-  },
-  {
-    id: "4",
-    code: "JUL2026",
-    start_date: "2026-07-01",
-    end_date: "2026-12-31",
-    created: "2026-06-01",
-  },
-];
-
-const mockCourses = [
-  { id: "c1", name: "Mathematics", code: "MATH101", created: "2025-01-01" },
-  { id: "c2", name: "Physics", code: "PHYS101", created: "2025-01-01" },
-];
-
-const mockCourseIntakes = [
-  {
-    id: "ci1",
-    course: "c1",
-    intake: "1",
-    start_date: "2026-01-01",
-    end_date: "2026-06-30",
-  },
-  {
-    id: "ci2",
-    course: "c2",
-    intake: "2",
-    start_date: "2025-07-01",
-    end_date: "2025-12-31",
-  },
-];
-
 // Stat type is only used for type checking in this file; the actual icon prop in stats array is a string for dynamic rendering in StatsCarousel.
 type Stat = {
   title: string;
@@ -91,9 +40,13 @@ interface StatsCarouselProps {
 }
 
 export default function IntakeCourseManagement() {
-  const [tab, setTab] = useState<"active" | "completed">("active");
+  const [tab, setTab] = useState<"active" | "completed" | "disabled">("active");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [intakes, setIntakes] = useState<any[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [courseIntakes, setCourseIntakes] = useState<any[]>([]);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -103,26 +56,25 @@ export default function IntakeCourseManagement() {
     end_date: "",
   });
 
-  // Use mock data directly
-  const intakes = mockIntakes;
-  const courses = mockCourses;
-  const courseIntakes = mockCourseIntakes;
+  // Fetch intakes from PocketBase
+  useEffect(() => {
+    fetchIntakes();
+  }, []);
 
-  // Helper to determine status
-  const getStatus = (intake: {
-    id?: string;
-    code?: string;
-    start_date: any;
-    end_date: any;
-    created?: string;
-  }) => {
-    const today = new Date();
-    const startDate = new Date(intake.start_date);
-    const endDate = new Date(intake.end_date);
-    if (today < startDate) return "upcoming";
-    if (today > endDate) return "completed";
-    return "active";
-  };
+  async function fetchIntakes() {
+    try {
+      setLoading(true);
+      const records = await pb.collection("intakes").getFullList({
+        sort: "-created",
+      });
+      setIntakes(records);
+    } catch (error) {
+      console.error("Error fetching intakes:", error);
+      toast.error("Failed to load intakes");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // Filter intakes by tab and search
   const filteredIntakes = intakes
@@ -130,22 +82,57 @@ export default function IntakeCourseManagement() {
       intake.code.toLowerCase().includes(searchQuery.toLowerCase()),
     )
     .filter((intake) => {
-      const status = getStatus(intake);
-      if (tab === "active") return status === "active" || status === "upcoming";
-      return status === "completed";
+      const status = intake.intakeStatus;
+      if (tab === "active") {
+        // Show ongoing and pending intakes in active tab
+        return status === "ongoing" || status === "peding" || !status;
+      }
+      if (tab === "completed") {
+        // Show only completed intakes
+        return status === "completed";
+      }
+      // Show only disabled intakes
+      return status === "disabled";
     });
 
   function handleCreateIntake(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    mockIntakes.push({
-      id: (mockIntakes.length + 1).toString(),
-      code: newIntake.code,
-      start_date: newIntake.start_date,
-      end_date: newIntake.end_date,
-      created: new Date().toISOString().split("T")[0],
-    });
-    setShowModal(false);
-    setNewIntake({ code: "", start_date: "", end_date: "" });
+    createIntake();
+  }
+
+  async function createIntake() {
+    try {
+      // Calculate status automatically based on dates
+      const today = new Date();
+      const startDate = new Date(newIntake.start_date);
+      const endDate = new Date(newIntake.end_date);
+
+      let calculatedStatus = "ongoing";
+      if (today < startDate) calculatedStatus = "peding";
+      else if (today > endDate) calculatedStatus = "completed";
+
+      const data = {
+        code: newIntake.code,
+        start_date: newIntake.start_date,
+        end_date: newIntake.end_date,
+        intakeStatus: calculatedStatus,
+      };
+
+      await pb.collection("intakes").create(data);
+      toast.success("Intake created successfully!");
+      setShowModal(false);
+      setNewIntake({
+        code: "",
+        start_date: "",
+        end_date: "",
+      });
+
+      // Refresh the list
+      fetchIntakes();
+    } catch (error: any) {
+      console.error("Error creating intake:", error);
+      toast.error(error?.message || "Failed to create intake");
+    }
   }
   const router = useRouter();
 
@@ -222,8 +209,9 @@ export default function IntakeCourseManagement() {
             action={
               <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 {[
-                  { id: "active", label: "ACTIVE & UPCOMING" },
+                  { id: "active", label: "ACTIVE" },
                   { id: "completed", label: "COMPLETED" },
+                  { id: "disabled", label: "DISABLED" },
                 ].map((t) => (
                   <button
                     key={t.id}
@@ -260,93 +248,109 @@ export default function IntakeCourseManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50/50">
-                {filteredIntakes.map((intake) => {
-                  const status = getStatus(intake);
-                  return (
-                    <tr
-                      key={intake.id}
-                      className="group/row hover:bg-indigo-50/30 transition-all duration-300 cursor-pointer"
-                      onClick={() =>
-                        router.push(`/dashboard/admin/intakes/${intake.id}`)
-                      }
-                    >
-                      <td className="px-10 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all">
-                            <Layers size={18} />
+                {loading ? (
+                  <tr>
+                    <td colSpan={3} className="text-center py-20">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+                          Loading intakes...
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredIntakes.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="text-center py-24 bg-gray-50/30">
+                      <div className="w-20 h-20 bg-gray-100 rounded-[2rem] flex items-center justify-center text-gray-300 mx-auto mb-6">
+                        <Search size={40} />
+                      </div>
+                      <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                        No cycles found
+                      </h3>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
+                        {intakes.length === 0
+                          ? "Create your first intake to get started"
+                          : "Adjust time filters or clear search query"}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredIntakes.map((intake) => {
+                    return (
+                      <tr
+                        key={intake.id}
+                        className="group/row hover:bg-indigo-50/30 transition-all duration-300 cursor-pointer"
+                        onClick={() =>
+                          router.push(`/dashboard/admin/intakes/${intake.id}`)
+                        }
+                      >
+                        <td className="px-10 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all">
+                              <Layers size={18} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-black text-gray-900 group-hover/row:text-indigo-600 transition-colors uppercase tracking-tight">
+                                {intake.code}
+                              </span>
+                              <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                                INTAKE-ARCH-ID: {intake.id.padStart(3, "0")}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-black text-gray-900 group-hover/row:text-indigo-600 transition-colors uppercase tracking-tight">
-                              {intake.code}
+                        </td>
+                        <td className="px-10 py-6">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center text-xs font-bold text-gray-900">
+                              {new Date(intake.start_date).toLocaleDateString(
+                                "en-GB",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
+                              <ArrowRight
+                                size={10}
+                                className="mx-2 text-indigo-400"
+                              />
+                              {new Date(intake.end_date).toLocaleDateString(
+                                "en-GB",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
+                            </div>
+                            <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest italic">
+                              Academic Cycle
                             </span>
-                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
-                              INTAKE-ARCH-ID: {intake.id.padStart(3, "0")}
-                            </span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-10 py-6">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center text-xs font-bold text-gray-900">
-                            {new Date(intake.start_date).toLocaleDateString(
-                              "en-GB",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              },
-                            )}
-                            <ArrowRight
-                              size={10}
-                              className="mx-2 text-indigo-400"
-                            />
-                            {new Date(intake.end_date).toLocaleDateString(
-                              "en-GB",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              },
-                            )}
-                          </div>
-                          <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest italic">
-                            Academic Cycle
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-10 py-6 text-center">
-                        <Badge
-                          className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-none shadow-sm ${
-                            status === "active"
-                              ? "bg-green-500 text-white"
-                              : status === "upcoming"
-                                ? "bg-blue-600 text-white"
-                                : "bg-gray-400 text-white"
-                          }`}
-                        >
-                          {status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-10 py-6 text-center">
+                          <Badge
+                            className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-none shadow-sm ${
+                              intake.intakeStatus === "disabled"
+                                ? "bg-red-600 text-white"
+                                : intake.intakeStatus === "ongoing"
+                                  ? "bg-green-500 text-white"
+                                  : intake.intakeStatus === "completed"
+                                    ? "bg-gray-400 text-white"
+                                    : "bg-yellow-500 text-white"
+                            }`}
+                          >
+                            {intake.intakeStatus || "N/A"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
-
-          {filteredIntakes.length === 0 && (
-            <div className="text-center py-24 bg-gray-50/30">
-              <div className="w-20 h-20 bg-gray-100 rounded-[2rem] flex items-center justify-center text-gray-300 mx-auto mb-6">
-                <Search size={40} />
-              </div>
-              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
-                No cycles found
-              </h3>
-              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
-                Adjust time filters or clear search query
-              </p>
-            </div>
-          )}
         </div>
       </main>
 

@@ -1,6 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import { SessionWarningModal } from "@/components/SessionWarningModal";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import { logout } from "@/lib/pocketbase";
@@ -13,6 +15,13 @@ export default function AdminDashboardLayout({
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const adminName = "Admin User";
+  const { showWarning, timeRemaining, extendSession, forceLogout } =
+    useSessionTimeout({
+      timeoutMinutes: 120, // 2 hours
+      warningMinutes: 0, // no warning
+      enabled: true,
+    });
+
   const onLogout = () => {
     logout();
     router.replace("/login");
@@ -35,6 +44,14 @@ export default function AdminDashboardLayout({
           setIsSidebarOpen={setIsSidebarOpen}
         />
       )}
+
+      <SessionWarningModal
+        isOpen={showWarning}
+        timeRemaining={timeRemaining}
+        onExtend={extendSession}
+        onLogout={forceLogout}
+      />
+
       <div className="flex-1 flex flex-col min-h-screen">
         {!hideSidebar && (
           <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
