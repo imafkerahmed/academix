@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
-import pb from "@/lib/pocketbase";
+import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import { toast } from "sonner";
 
 interface RegisterStudentModalProps {
@@ -78,6 +78,7 @@ export function RegisterStudentModal({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [enrollNow, setEnrollNow] = useState(true);
+  const [validationError, setValidationError] = useState<string>("");
 
   const [formData, setFormData] = useState({
     // Stage 1: Identity
@@ -100,6 +101,11 @@ export function RegisterStudentModal({
     password: "",
     branch: "Colombo",
 
+    // Guardian Details (required)
+    guardianName: "",
+    guardianRelationship: "",
+    guardianContact: "",
+
     // Stage 4: Enrollment
     intakeId: "",
     courseIntakeFeeId: "", // This maps to course_intake_fees
@@ -121,6 +127,7 @@ export function RegisterStudentModal({
       setAvatarFile(null);
       setAvatarPreview(null);
       setEnrollNow(true);
+      setValidationError("");
     }
   }, [isOpen, enrollOnly]);
 
@@ -157,7 +164,9 @@ export function RegisterStudentModal({
       const nextUserId = `ACDX${nextNumber}`;
       setFormData((prev) => ({ ...prev, userId: nextUserId }));
     } catch (error) {
-      console.error("Error generating userId:", error);
+      if (!isSuperuserOnlyError(error)) {
+        console.error("Error generating userId:", error);
+      }
       // Fallback to a timestamp based unique ID if DB fetch fails
       const fallbackId = `ACDX${Date.now().toString().slice(-6)}`;
       setFormData((prev) => ({ ...prev, userId: fallbackId }));
@@ -177,7 +186,9 @@ export function RegisterStudentModal({
       });
       setIntakes(records);
     } catch (error) {
-      console.error("Error fetching intakes:", error);
+      if (!isSuperuserOnlyError(error)) {
+        console.error("Error fetching intakes:", error);
+      }
     }
   };
 
@@ -193,14 +204,72 @@ export function RegisterStudentModal({
         });
       setCourseIntakes(records);
     } catch (error) {
-      console.error("Error fetching courses:", error);
+      if (!isSuperuserOnlyError(error)) {
+        console.error("Error fetching courses:", error);
+      }
     } finally {
       setFetchingData(false);
     }
   };
 
-  const handleNext = () => setStage((prev) => prev + 1);
-  const handleBack = () => setStage((prev) => prev - 1);
+  const handleNext = () => {
+    setValidationError("");
+    setStage((prev) => prev + 1);
+  };
+  const handleBack = () => {
+    setValidationError("");
+    setStage((prev) => prev - 1);
+  };
+
+  const getMissingRequiredFields = () => {
+    const missing: string[] = [];
+
+    if (stage === 1) {
+      if (!formData.name.trim()) missing.push("Full Name");
+      if (!formData.nameinitials.trim()) missing.push("Name with Initials");
+      if (!formData.dateOfBirth) missing.push("Date of Birth");
+      if (!formData.IdentificationDocument.trim())
+        missing.push("ID / Passport Number");
+      if (!formData.guardianName.trim()) missing.push("Guardian Name");
+      if (!formData.guardianRelationship.trim())
+        missing.push("Guardian Relationship");
+      if (!formData.guardianContact.trim()) missing.push("Guardian Contact");
+    }
+
+    if (stage === 2) {
+      if (!formData.email.trim()) missing.push("Email");
+      if (!formData.mobile.trim()) missing.push("Mobile");
+      if (!formData.address.trim()) missing.push("Address");
+      if (!formData.city.trim()) missing.push("City");
+    }
+
+    if (stage === 3 && !formData.password.trim()) {
+      missing.push("Password");
+    }
+
+    if (stage === 4 && enrollNow && !formData.courseIntakeFeeId) {
+      missing.push("Course Selection");
+    }
+
+    return missing;
+  };
+
+  const handlePrimaryAction = () => {
+    const missing = getMissingRequiredFields();
+    if (missing.length) {
+      const message = `Please fill required fields: ${missing.join(", ")}`;
+      setValidationError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (stage === 4) {
+      handleSubmit();
+      return;
+    }
+
+    handleNext();
+  };
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -222,8 +291,12 @@ export function RegisterStudentModal({
         data.append("whatsapp", formData.whatsapp);
         data.append("address", formData.address);
         data.append("city", formData.city);
+        data.append("guardianName", formData.guardianName);
+        data.append("guardianRelationship", formData.guardianRelationship);
+        data.append("guardianContact", formData.guardianContact);
         data.append("password", formData.password || "TempPassword123!");
         data.append("passwordConfirm", formData.password || "TempPassword123!");
+        data.append("emailVisibility", "true");
         data.append("role", "student");
         data.append("branch", formData.branch);
         data.append("accountStatus", "active");
@@ -261,7 +334,11 @@ export function RegisterStudentModal({
       onSuccess();
       onClose();
     } catch (error: any) {
-      toast.error(error.message || "Something went wrong");
+      if (isSuperuserOnlyError(error)) {
+        toast.error("You don't have permission to perform this action.");
+      } else {
+        toast.error(error.message || "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
@@ -279,7 +356,7 @@ export function RegisterStudentModal({
       }
       avatarChar={enrollOnly ? "E" : "S"}
       avatarColor={enrollOnly ? "bg-green-600" : "bg-indigo-600"}
-      className="max-w-xl"
+      className="max-w-3xl"
     >
       <div className="space-y-8 py-2">
         {/* Progress Stepper */}
@@ -320,90 +397,173 @@ export function RegisterStudentModal({
         {/* Form Content */}
         <div className="min-h-[400px]">
           {stage === 1 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+            <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-500">
+              {/* Section: Identity */}
+              <div className="pb-2 mb-6 border-b border-gray-100">
+                <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600 mb-4">
+                  Identity Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <User size={12} className="text-indigo-400" /> Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      required
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      placeholder="John Doe"
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Type size={12} className="text-indigo-400" /> Initials
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.nameinitials}
+                      required
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          nameinitials: e.target.value,
+                        })
+                      }
+                      placeholder="J.D."
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Users size={12} className="text-indigo-400" /> Gender
+                    </label>
+                    <select
+                      value={formData.gender}
+                      required
+                      onChange={(e) =>
+                        setFormData({ ...formData, gender: e.target.value })
+                      }
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all appearance-none"
+                    >
+                      <option value="male">MALE</option>
+                      <option value="female">FEMALE</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Calendar size={12} className="text-indigo-400" /> Date of
+                      Birth
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.dateOfBirth}
+                      required
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          dateOfBirth: e.target.value,
+                        })
+                      }
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2 mt-6">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                    <User size={12} className="text-indigo-400" /> Full Name
+                    <IdCard size={12} className="text-indigo-400" /> ID /
+                    Passport Number
                   </label>
                   <input
                     type="text"
-                    value={formData.name}
+                    value={formData.IdentificationDocument}
+                    required
                     onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
+                      setFormData({
+                        ...formData,
+                        IdentificationDocument: e.target.value,
+                      })
                     }
-                    placeholder="John Doe"
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                    <Type size={12} className="text-indigo-400" /> Initials
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.nameinitials}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nameinitials: e.target.value })
-                    }
-                    placeholder="J.D."
+                    placeholder="NIC or Passport"
                     className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
                   />
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                    <Users size={12} className="text-indigo-400" /> Gender
-                  </label>
-                  <select
-                    value={formData.gender}
-                    onChange={(e) =>
-                      setFormData({ ...formData, gender: e.target.value })
-                    }
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all appearance-none"
-                  >
-                    <option value="male">MALE</option>
-                    <option value="female">FEMALE</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                    <Calendar size={12} className="text-indigo-400" /> Date of
-                    Birth
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dateOfBirth: e.target.value })
-                    }
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
-                  />
+              {/* Section: Guardian Details */}
+              <div className="pt-8 pb-2 mb-6 border-b border-gray-100">
+                <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600 mb-4">
+                  Guardian Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <User size={12} className="text-indigo-400" /> Guardian
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.guardianName}
+                      required
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          guardianName: e.target.value,
+                        })
+                      }
+                      placeholder="Guardian Name"
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Users size={12} className="text-indigo-400" />{" "}
+                      Relationship
+                    </label>
+                    <select
+                      value={formData.guardianRelationship}
+                      required
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          guardianRelationship: e.target.value,
+                        })
+                      }
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all appearance-none"
+                    >
+                      <option value="">Select</option>
+                      <option value="father">Father</option>
+                      <option value="mother">Mother</option>
+                      <option value="guardian">Guardian</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Phone size={12} className="text-indigo-400" /> Guardian
+                      Contact
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.guardianContact}
+                      required
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          guardianContact: e.target.value,
+                        })
+                      }
+                      placeholder="Guardian Contact"
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
+                    />
+                  </div>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                  <IdCard size={12} className="text-indigo-400" /> ID / Passport
-                  Number
-                </label>
-                <input
-                  type="text"
-                  value={formData.IdentificationDocument}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      IdentificationDocument: e.target.value,
-                    })
-                  }
-                  placeholder="NIC or Passport"
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 font-bold transition-all"
-                />
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-gray-100">
+              {/* Section: Avatar */}
+              <div className="pt-8">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                   <Camera size={12} className="text-indigo-400" /> Student
                   Avatar
@@ -457,6 +617,7 @@ export function RegisterStudentModal({
 
           {stage === 2 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+              {/* Contact Fields (required) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
@@ -556,6 +717,7 @@ export function RegisterStudentModal({
 
           {stage === 3 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+              {/* Password required */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                   <Hash size={12} className="text-indigo-400" /> Student UserID
@@ -860,18 +1022,8 @@ export function RegisterStudentModal({
               </button>
             )}
             <button
-              disabled={
-                loading ||
-                (stage === 1 &&
-                  (!formData.name ||
-                    !formData.nameinitials ||
-                    !formData.dateOfBirth ||
-                    !formData.IdentificationDocument)) ||
-                (stage === 2 &&
-                  (!formData.email || !formData.mobile || !formData.address)) ||
-                (stage === 4 && enrollNow && !formData.courseIntakeFeeId)
-              }
-              onClick={stage === 4 ? handleSubmit : handleNext}
+              disabled={loading}
+              onClick={handlePrimaryAction}
               className={`flex-[2] py-4 rounded-2xl font-black text-xs tracking-widest transition-all flex items-center justify-center gap-2 uppercase tracking-widest shadow-xl ${
                 loading
                   ? "bg-gray-100 text-gray-400 shadow-none cursor-not-allowed"
@@ -893,6 +1045,11 @@ export function RegisterStudentModal({
               {!loading && stage < 4 && <ChevronRight size={18} />}
             </button>
           </div>
+          {validationError && (
+            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest text-center px-2">
+              {validationError}
+            </p>
+          )}
           <button
             onClick={onClose}
             className="w-full py-2 font-bold text-[10px] text-gray-300 hover:text-gray-500 transition-colors uppercase tracking-[0.2em]"

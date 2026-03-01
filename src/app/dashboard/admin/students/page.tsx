@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import pb, { logout } from "@/lib/pocketbase";
+import pb, { isSuperuserOnlyError, logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import {
   Search,
   Filter,
   UserPlus,
   Edit,
-  Trash2,
   Mail,
   Phone,
   MapPin,
@@ -42,7 +41,7 @@ interface Student {
   academicStatus: string;
   created: string;
   expand?: {
-    "enrollments(student)"?: Array<{
+    enrollments_via_student?: Array<{
       expand?: {
         course_intake?: {
           expand?: {
@@ -97,7 +96,7 @@ export default function StudentManagement() {
             : ""
         }`,
         sort: "-created",
-        expand: "enrollments(student).course_intake.course",
+        expand: "enrollments_via_student.course_intake.course",
       });
 
       setStudents(result.items as any);
@@ -105,7 +104,9 @@ export default function StudentManagement() {
       setTotalItems(result.totalItems);
       setLoading(false);
     } catch (error) {
-      console.error("Failed to fetch students:", error);
+      if (!isSuperuserOnlyError(error)) {
+        console.error("Failed to fetch students:", error);
+      }
       setStudents([]);
       setTotalPages(1);
       setTotalItems(0);
@@ -116,17 +117,6 @@ export default function StudentManagement() {
   const handleLogout = () => {
     logout();
     router.push("/");
-  };
-
-  const handleDeleteStudent = async (id: string) => {
-    if (confirm("Are you sure you want to delete this student?")) {
-      try {
-        await pb.collection("users").delete(id);
-        setStudents(students.filter((s) => s.id !== id));
-      } catch (error) {
-        console.error("Error deleting student:", error);
-      }
-    }
   };
 
   const handleSearchChange = (query: string) => {
@@ -144,7 +134,7 @@ export default function StudentManagement() {
     setCurrentPage(1);
   };
 
-  const filteredStudents = students; // We filter server-side now
+  const filteredStudents = students;
 
   if (loading) {
     return (
@@ -330,8 +320,8 @@ export default function StudentManagement() {
                     </td>
                     <td className="px-10 py-6">
                       <div className="flex flex-wrap gap-1.5 max-w-[250px]">
-                        {student.expand?.["enrollments(student)"]?.length ? (
-                          student.expand["enrollments(student)"].map(
+                        {student.expand?.enrollments_via_student?.length ? (
+                          student.expand.enrollments_via_student.map(
                             (enrollment, idx) => {
                               const course =
                                 enrollment.expand?.course_intake?.expand

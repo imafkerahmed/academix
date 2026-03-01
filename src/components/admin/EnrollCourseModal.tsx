@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Calendar, BookOpen, CreditCard, Building2 } from "lucide-react";
 import { ModernModal } from "@/components/ui/modern-modal";
-import pb from "@/lib/pocketbase";
+import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import { toast } from "sonner";
 
 interface EnrollCourseModalProps {
@@ -76,7 +76,9 @@ export function EnrollCourseModal({
       });
       setIntakes(records);
     } catch (error) {
-      console.error("Error fetching intakes:", error);
+      if (!isSuperuserOnlyError(error)) {
+        console.error("Error fetching intakes:", error);
+      }
       toast.error("Failed to load intakes");
     }
   };
@@ -92,7 +94,9 @@ export function EnrollCourseModal({
         });
       setCourseIntakes(records);
     } catch (error) {
-      console.error("Error fetching courses:", error);
+      if (!isSuperuserOnlyError(error)) {
+        console.error("Error fetching courses:", error);
+      }
       toast.error("Failed to load courses");
     } finally {
       setFetchingData(false);
@@ -121,8 +125,14 @@ export function EnrollCourseModal({
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error("Error creating enrollment:", error);
-      toast.error(error?.message || "Failed to create enrollment.");
+      if (!isSuperuserOnlyError(error)) {
+        console.error("Error creating enrollment:", error);
+      }
+      toast.error(
+        isSuperuserOnlyError(error)
+          ? "You don't have permission to perform this action."
+          : error?.message || "Failed to create enrollment.",
+      );
     } finally {
       setLoading(false);
     }

@@ -119,4 +119,22 @@ export const getCurrentUser = () => pb.authStore.model as User | null;
 
 export const logout = () => {
   pb.authStore.clear();
+  if (typeof document !== "undefined") {
+    document.cookie = pb.authStore.exportToCookie({ httpOnly: false });
+  }
+};
+
+export const isSuperuserOnlyError = (error: unknown): boolean => {
+  const err = error as {
+    status?: number;
+    message?: string;
+    response?: { message?: string };
+  };
+  const message = err?.message || err?.response?.message || "";
+
+  return (
+    err?.status === 403 &&
+    typeof message === "string" &&
+    message.toLowerCase().includes("only superusers can perform this action")
+  );
 };

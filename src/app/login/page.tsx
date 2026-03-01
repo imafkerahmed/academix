@@ -1,9 +1,76 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import LoginIllustration from "@/components/LoginIllustration";
 import { motion } from "framer-motion";
+import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  useEffect(() => {
+    if (!pb.authStore.isValid) return;
+
+    const role = (pb.authStore.model as any)?.role;
+    switch (role) {
+      case "admin":
+        router.replace("/dashboard/admin");
+        break;
+      case "student":
+        router.replace("/dashboard/student");
+        break;
+      case "lecturer":
+        router.replace("/dashboard/lecturer");
+        break;
+      default:
+        router.replace("/dashboard");
+    }
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setLoginError("");
+
+    try {
+      // Authenticate with PocketBase
+      const authData = await pb
+        .collection("users")
+        .authWithPassword(email, password);
+
+      // Get user role
+      const role = authData.record.role;
+
+      toast.success("Login successful!");
+
+      // Redirect based on role
+      switch (role) {
+        case "admin":
+          router.push("/dashboard/admin");
+          break;
+        case "student":
+          router.push("/dashboard/student");
+          break;
+        case "lecturer":
+          router.push("/dashboard/lecturer");
+          break;
+        default:
+          router.push("/dashboard");
+      }
+    } catch (error: any) {
+      setLoginError(error.message || "Invalid email or password");
+      toast.error(error.message || "Invalid email or password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <main className="flex flex-col items-center gap-0 bg-white rounded-[2.5rem] shadow-2xl shadow-gray-200/60 max-w-4xl w-full overflow-hidden md:flex-row border border-gray-100">
@@ -42,7 +109,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <form className="flex flex-col gap-4 w-full">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 Email Address
@@ -50,8 +117,11 @@ export default function LoginPage() {
               <input
                 type="email"
                 placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 text-gray-900 text-sm font-medium focus:outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50 transition-all placeholder:text-gray-300"
                 required
+                disabled={loading}
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -61,16 +131,32 @@ export default function LoginPage() {
               <input
                 type="password"
                 placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 text-gray-900 text-sm font-medium focus:outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50 transition-all placeholder:text-gray-300"
                 required
+                disabled={loading}
               />
             </div>
             <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-2xl font-black text-xs tracking-widest uppercase shadow-xl shadow-indigo-100 hover:shadow-lg transition-all mt-2"
+              disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-2xl font-black text-xs tracking-widest uppercase shadow-xl shadow-indigo-100 hover:shadow-lg transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Sign In
+              {loading ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </button>
+            {loginError && (
+              <p className="text-xs text-red-500 font-bold text-center mt-2">
+                {loginError}
+              </p>
+            )}
           </form>
 
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">

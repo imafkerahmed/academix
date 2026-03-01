@@ -7,3 +7,6 @@ services:
     volumes:
       - ./pb_data:/pb/pb_data
     restart: unless-stopped
+    environment:
+      - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
+      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}

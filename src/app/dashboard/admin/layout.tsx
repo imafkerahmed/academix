@@ -1,17 +1,22 @@
 "use client";
 import React, { useState } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
+import { logout } from "@/lib/pocketbase";
 
 export default function AdminDashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const adminName = "Admin User";
-  const onLogout = () => {};
+  const onLogout = () => {
+    logout();
+    router.replace("/login");
+  };
   const pathname = usePathname();
 
   // Hide sidebar for specific admin subpages

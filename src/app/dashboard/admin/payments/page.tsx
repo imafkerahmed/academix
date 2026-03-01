@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import pb, { logout } from "@/lib/pocketbase";
+import pb, { isSuperuserOnlyError, logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
@@ -27,6 +27,7 @@ import {
   Check,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 interface Payment {
   id: string;
@@ -112,6 +113,10 @@ export default function PaymentManagement() {
         payments.map((p) => (p.id === id ? { ...p, verified: true } : p)),
       );
     } catch (error) {
+      if (isSuperuserOnlyError(error)) {
+        toast.error("You don't have permission to verify this payment.");
+        return;
+      }
       console.error("Error verifying payment:", error);
     }
   };

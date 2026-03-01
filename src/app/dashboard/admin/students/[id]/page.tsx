@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import pb, { logout } from "@/lib/pocketbase";
+import pb, { isSuperuserOnlyError, logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 import {
@@ -31,6 +31,7 @@ import {
   Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -70,8 +71,9 @@ interface StudentDetails {
   guardianName?: string;
   guardianRelationship?: string;
   guardianContact?: string;
+  internalNote?: string;
   expand?: {
-    "enrollments(student)"?: Enrollment[];
+    enrollments_via_student?: Enrollment[];
   };
   academicAdvisor?: string;
   documents?: Document[];
@@ -193,16 +195,97 @@ function CertificateStatusControl({
   );
 }
 
-function UpdateProfileControl() {
+function UpdateProfileControl({
+  student,
+  onUpdated,
+}: {
+  student: StudentDetails;
+  onUpdated: (updated: StudentDetails) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    nameinitials: "",
+    mobile: "",
+    email: "",
+    address: "",
+    city: "",
+    gender: "",
+    dateOfBirth: "",
+    IdentificationDocument: "",
+    guardianName: "",
+    guardianRelationship: "",
+    guardianContact: "",
+    whatsapp: "",
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData({
+      name: student.name || "",
+      nameinitials: student.nameinitials || "",
+      mobile: student.mobile || "",
+      email: student.email || "",
+      address: student.address || "",
+      city: student.city || "",
+      gender: student.gender || "",
+      dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split("T")[0] : "",
+      IdentificationDocument: student.IdentificationDocument || "",
+      guardianName: student.guardianName || "",
+      guardianRelationship: student.guardianRelationship || "",
+      guardianContact: student.guardianContact || "",
+      whatsapp: student.whatsapp || "",
+    });
+    setAvatarPreview(
+      student.avatar ? pb.files.getUrl(student as any, student.avatar) : null,
+    );
+    setAvatarFile(null);
+  }, [isOpen, student]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setAvatarFile(file);
       setAvatarPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const data = new FormData();
+      data.append("name", formData.name);
+      data.append("nameinitials", formData.nameinitials);
+      data.append("mobile", formData.mobile);
+      data.append("email", formData.email);
+      data.append("emailVisibility", "true");
+      data.append("address", formData.address);
+      data.append("city", formData.city);
+      data.append("gender", formData.gender);
+      data.append("dateOfBirth", formData.dateOfBirth);
+      data.append("IdentificationDocument", formData.IdentificationDocument);
+      data.append("guardianName", formData.guardianName);
+      data.append("guardianRelationship", formData.guardianRelationship);
+      data.append("guardianContact", formData.guardianContact);
+      data.append("whatsapp", formData.whatsapp || formData.mobile);
+
+      if (avatarFile) {
+        data.append("avatar", avatarFile);
+      }
+
+      const updatedRecord = await pb
+        .collection("users")
+        .update(student.id, data);
+      onUpdated(updatedRecord as any);
+      toast.success("Profile updated successfully");
+      setIsOpen(false);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update profile");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -281,7 +364,10 @@ function UpdateProfileControl() {
               <input
                 type="text"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                defaultValue="Mohamed Afker"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, name: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -291,7 +377,13 @@ function UpdateProfileControl() {
               <input
                 type="text"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                defaultValue="Afker"
+                value={formData.nameinitials}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    nameinitials: e.target.value,
+                  }))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -301,7 +393,10 @@ function UpdateProfileControl() {
               <input
                 type="text"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                defaultValue="0771234567"
+                value={formData.mobile}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, mobile: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -311,7 +406,10 @@ function UpdateProfileControl() {
               <input
                 type="email"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                defaultValue="afker@example.com"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, email: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-2 md:col-span-2">
@@ -321,14 +419,36 @@ function UpdateProfileControl() {
               <input
                 type="text"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                defaultValue="123 Galle Road, Colombo 03"
+                value={formData.address}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, address: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <MapPin size={12} className="text-indigo-400" /> City
+              </label>
+              <input
+                type="text"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                value={formData.city}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, city: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
                 <User size={12} className="text-indigo-400" /> Gender
               </label>
-              <select className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-[10px] font-black uppercase tracking-widest text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all appearance-none cursor-pointer">
+              <select
+                value={formData.gender}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, gender: e.target.value }))
+                }
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-[10px] font-black uppercase tracking-widest text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all appearance-none cursor-pointer"
+              >
                 <option value="male">Male</option>
                 <option value="female">Female</option>
               </select>
@@ -340,7 +460,13 @@ function UpdateProfileControl() {
               <input
                 type="date"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                defaultValue="1998-05-15"
+                value={formData.dateOfBirth}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    dateOfBirth: e.target.value,
+                  }))
+                }
               />
             </div>
             <div className="space-y-2 md:col-span-2">
@@ -351,7 +477,13 @@ function UpdateProfileControl() {
               <input
                 type="text"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                defaultValue="981360123V"
+                value={formData.IdentificationDocument}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    IdentificationDocument: e.target.value,
+                  }))
+                }
               />
             </div>
           </div>
@@ -369,14 +501,29 @@ function UpdateProfileControl() {
                 <input
                   type="text"
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                  defaultValue="Mr. Kamal Perera"
+                  value={formData.guardianName}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      guardianName: e.target.value,
+                    }))
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
                   Relationship
                 </label>
-                <select className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-[10px] font-black uppercase tracking-widest text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all appearance-none cursor-pointer">
+                <select
+                  value={formData.guardianRelationship}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      guardianRelationship: e.target.value,
+                    }))
+                  }
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-[10px] font-black uppercase tracking-widest text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all appearance-none cursor-pointer"
+                >
                   <option value="father">Father</option>
                   <option value="mother">Mother</option>
                   <option value="guardian">Other Guardian</option>
@@ -389,7 +536,13 @@ function UpdateProfileControl() {
                 <input
                   type="text"
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
-                  defaultValue="0719876543"
+                  value={formData.guardianContact}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      guardianContact: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -400,14 +553,16 @@ function UpdateProfileControl() {
           <button
             onClick={() => setIsOpen(false)}
             className="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-600 font-black text-[10px] tracking-widest hover:bg-gray-200 transition-all uppercase active:scale-95"
+            disabled={saving}
           >
             Cancel
           </button>
           <button
-            onClick={() => setIsOpen(false)}
+            onClick={handleSave}
             className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
+            disabled={saving}
           >
-            Save Changes
+            {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </DialogContent>
@@ -613,6 +768,10 @@ export default function StudentDetail() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [financeFilter, setFinanceFilter] = useState("all");
+  const [internalNote, setInternalNote] = useState("");
+  const [savingInternalNote, setSavingInternalNote] = useState(false);
+  const [updatingAccountStatus, setUpdatingAccountStatus] = useState(false);
+  const noteStorageKey = `student_internal_note_${studentId}`;
 
   // Enrollment Modal state
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
@@ -626,22 +785,91 @@ export default function StudentDetail() {
   const fetchStudentDetails = async () => {
     try {
       setLoading(true);
-      const record = await pb.collection("users").getOne(studentId, {
-        expand: "enrollments(student).course_intake.course",
-      });
+      const record = await pb
+        .collection("users")
+        .getFirstListItem(`id = "${studentId}" && role = "student"`, {
+          expand: "enrollments_via_student.course_intake.course",
+        });
 
-      const paymentRecords = await pb.collection("payments").getFullList({
-        filter: `student = "${studentId}"`,
-        expand: "course",
-        sort: "-date_paid",
-      });
+      let paymentRecords: Payment[] = [];
+      try {
+        paymentRecords = (await pb.collection("payments").getFullList({
+          filter: `student = "${studentId}"`,
+          expand: "course",
+          sort: "-date_paid",
+        })) as any;
+      } catch (paymentError) {
+        if (!isSuperuserOnlyError(paymentError)) {
+          console.error("Error fetching student payments:", paymentError);
+        }
+      }
 
       setStudent(record as any);
-      setPayments(paymentRecords as any);
+      const remoteNote = (record as any).internalNote || "";
+      const localNote =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem(noteStorageKey) || ""
+          : "";
+      setInternalNote(remoteNote || localNote);
+      setPayments(paymentRecords);
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching student details:", error);
+      if (!isSuperuserOnlyError(error)) {
+        console.error("Error fetching student details:", error);
+      }
       router.push("/dashboard/admin/students");
+    }
+  };
+
+  const saveInternalNote = async () => {
+    if (!student) return;
+
+    try {
+      setSavingInternalNote(true);
+      const updated = await pb.collection("users").update(student.id, {
+        internalNote,
+      });
+      setStudent(updated as any);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(noteStorageKey, internalNote);
+      }
+      toast.success("Remarks saved");
+    } catch (error: any) {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(noteStorageKey, internalNote);
+      }
+      if (isSuperuserOnlyError(error)) {
+        toast.success("Remarks saved locally");
+      } else {
+        toast.success("Remarks saved locally");
+      }
+    } finally {
+      setSavingInternalNote(false);
+    }
+  };
+
+  const handleAccountStatusChange = async (
+    nextStatus: "active" | "disabled",
+  ) => {
+    if (!student) return;
+
+    try {
+      setUpdatingAccountStatus(true);
+      const updated = await pb.collection("users").update(student.id, {
+        accountStatus: nextStatus,
+      });
+      setStudent(updated as any);
+      toast.success(
+        `Student ${nextStatus === "active" ? "enabled" : "disabled"}`,
+      );
+    } catch (error: any) {
+      if (isSuperuserOnlyError(error)) {
+        toast.error("You don't have permission to update account status.");
+      } else {
+        toast.error(error?.message || "Failed to update account status");
+      }
+    } finally {
+      setUpdatingAccountStatus(false);
     }
   };
 
@@ -693,26 +921,126 @@ export default function StudentDetail() {
 
             {student.accountStatus === "active" ? (
               <button
-                onClick={() =>
-                  setStudent({ ...student, accountStatus: "disabled" })
-                }
-                className="px-6 py-3 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 font-black text-[10px] tracking-widest shadow-sm hover:bg-rose-600 hover:text-white transition-all uppercase flex items-center gap-2 active:scale-95"
+                onClick={() => handleAccountStatusChange("disabled")}
+                disabled={updatingAccountStatus}
+                className="px-6 py-3 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 font-black text-[10px] tracking-widest shadow-sm hover:bg-rose-600 hover:text-white transition-all uppercase flex items-center gap-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <XCircle size={14} /> Disable Access
+                <XCircle size={14} />
+                {updatingAccountStatus ? "Updating..." : "Disable Access"}
               </button>
             ) : (
               <button
-                onClick={() =>
-                  setStudent({ ...student, accountStatus: "active" })
-                }
-                className="px-6 py-3 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 font-black text-[10px] tracking-widest shadow-sm hover:bg-indigo-600 hover:text-white transition-all uppercase flex items-center gap-2 active:scale-95"
+                onClick={() => handleAccountStatusChange("active")}
+                disabled={updatingAccountStatus}
+                className="px-6 py-3 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 font-black text-[10px] tracking-widest shadow-sm hover:bg-indigo-600 hover:text-white transition-all uppercase flex items-center gap-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <CheckCircle size={14} /> Enable Access
+                <CheckCircle size={14} />
+                {updatingAccountStatus ? "Updating..." : "Enable Access"}
               </button>
             )}
 
-            <UpdateProfileControl />
+            <UpdateProfileControl
+              student={student}
+              onUpdated={(updated) => setStudent(updated)}
+            />
+
+            {/* Reset Password Button and Modal */}
+            <ResetPasswordControl studentId={student.id} studentName={student.name} />
           </div>
+        // ...existing code...
+
+        import { ModernModal } from "@/components/ui/modern-modal";
+
+        function ResetPasswordControl({ studentId, studentName }: { studentId: string; studentName: string }) {
+          const [isOpen, setIsOpen] = useState(false);
+          const [password, setPassword] = useState("");
+          const [passwordConfirm, setPasswordConfirm] = useState("");
+          const [saving, setSaving] = useState(false);
+
+          const handleReset = async () => {
+            if (!password || !passwordConfirm) {
+              toast.error("Please enter and confirm the new password.");
+              return;
+            }
+            if (password !== passwordConfirm) {
+              toast.error("Passwords do not match.");
+              return;
+            }
+            setSaving(true);
+            try {
+              await pb.collection("users").update(studentId, {
+                password,
+                passwordConfirm,
+              });
+              toast.success("Password reset successfully.");
+              setIsOpen(false);
+              setPassword("");
+              setPasswordConfirm("");
+            } catch (error: any) {
+              if (isSuperuserOnlyError(error)) {
+                toast.error("You don't have permission to reset passwords.");
+              } else {
+                toast.error(error?.message || "Failed to reset password.");
+              }
+            } finally {
+              setSaving(false);
+            }
+          };
+
+          return (
+            <>
+              <button
+                onClick={() => setIsOpen(true)}
+                className="px-6 py-3 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 font-black text-[10px] tracking-widest shadow-sm hover:bg-indigo-600 hover:text-white transition-all uppercase flex items-center gap-2"
+              >
+                <ShieldCheck size={14} /> Reset Password
+              </button>
+              <ModernModal
+                open={isOpen}
+                onOpenChange={setIsOpen}
+                title="Reset Password"
+                subtitle={`Set a new password for ${studentName}`}
+                avatarChar={studentName.charAt(0).toUpperCase()}
+                avatarColor="bg-indigo-600"
+              >
+                <div className="space-y-4">
+                  <input
+                    type="password"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                    placeholder="New Password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    disabled={saving}
+                  />
+                  <input
+                    type="password"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-indigo-600/20 transition-all"
+                    placeholder="Confirm New Password"
+                    value={passwordConfirm}
+                    onChange={e => setPasswordConfirm(e.target.value)}
+                    disabled={saving}
+                  />
+                  <div className="flex gap-4 pt-2">
+                    <button
+                      onClick={() => setIsOpen(false)}
+                      className="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-600 font-black text-[10px] tracking-widest hover:bg-gray-200 transition-all uppercase active:scale-95"
+                      disabled={saving}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleReset}
+                      className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
+                      disabled={saving}
+                    >
+                      {saving ? "Resetting..." : "Reset Password"}
+                    </button>
+                  </div>
+                </div>
+              </ModernModal>
+            </>
+          );
+        }
         </div>
 
         {/* Profile Summary Card */}
@@ -736,14 +1064,9 @@ export default function StudentDetail() {
 
             <div className="flex-1 space-y-4">
               <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">
-                    {student.name}
-                  </h1>
-                  <Badge className="bg-indigo-50 text-indigo-600 border border-indigo-100 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm">
-                    {student.userId}
-                  </Badge>
-                </div>
+                <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">
+                  {student.name}
+                </h1>
               </div>
 
               <div className="flex grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
@@ -762,9 +1085,9 @@ export default function StudentDetail() {
                     color: "text-indigo-600",
                   },
                   {
-                    label: "Location",
-                    value: student.city,
-                    color: "text-gray-600",
+                    label: "User ID",
+                    value: student.userId || "Not Assigned",
+                    color: "text-indigo-600",
                   },
                   {
                     label: "Registered date",
@@ -841,7 +1164,9 @@ export default function StudentDetail() {
                     },
                     {
                       label: "Date of Birth",
-                      value: student.dateOfBirth || "Not Provided",
+                      value: student.dateOfBirth
+                        ? student.dateOfBirth.split("T")[0]
+                        : "Not Provided",
                       icon: Calendar,
                     },
                     {
@@ -861,7 +1186,10 @@ export default function StudentDetail() {
                     },
                     {
                       label: "Home Address",
-                      value: student.address || student.city,
+                      value:
+                        [student.address, student.city]
+                          .filter(Boolean)
+                          .join(", ") || "Not Provided",
                       icon: MapPin,
                     },
                     {
@@ -907,10 +1235,16 @@ export default function StudentDetail() {
                 </div>
                 <textarea
                   placeholder="Write internal remarks about this student..."
+                  value={internalNote}
+                  onChange={(e) => setInternalNote(e.target.value)}
                   className="w-full min-h-[150px] bg-gray-50 border-none rounded-2xl p-4 text-xs font-medium text-gray-600 focus:ring-2 focus:ring-indigo-600/10 placeholder:text-gray-300 transition-all"
                 ></textarea>
-                <button className="w-full mt-4 py-4 rounded-2xl bg-gray-900 text-white font-black text-[10px] tracking-widest shadow-xl shadow-gray-200 hover:bg-indigo-600 transition-all active:scale-95 uppercase">
-                  Save Remarks
+                <button
+                  onClick={saveInternalNote}
+                  disabled={savingInternalNote}
+                  className="w-full mt-4 py-4 rounded-2xl bg-gray-900 text-white font-black text-[10px] tracking-widest shadow-xl shadow-gray-200 hover:bg-indigo-600 transition-all active:scale-95 uppercase disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {savingInternalNote ? "Saving..." : "Save Remarks"}
                 </button>
               </div>
             </div>
@@ -929,8 +1263,8 @@ export default function StudentDetail() {
                 </div>
 
                 <div className="space-y-4">
-                  {student.expand?.["enrollments(student)"]?.length ? (
-                    student.expand["enrollments(student)"].map(
+                  {student.expand?.enrollments_via_student?.length ? (
+                    student.expand.enrollments_via_student.map(
                       (enrollment, idx) => {
                         const course =
                           enrollment.expand?.course_intake?.expand?.course;
@@ -951,6 +1285,10 @@ export default function StudentDetail() {
                                   REG NO:{" "}
                                   {enrollment.registration_number || "N/A"}
                                 </p>
+                                <UpdateProfileControl
+                                  student={student}
+                                  onUpdated={(updated) => setStudent(updated)}
+                                />
                               </div>
                             </div>
                             <div className="flex flex-col items-end gap-3">
