@@ -1,10 +1,26 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Calendar, BookOpen, CreditCard, Building2 } from "lucide-react";
+import {
+  Calendar,
+  BookOpen,
+  CreditCard,
+  Building2,
+  DollarSign,
+  Check,
+} from "lucide-react";
 import { ModernModal } from "@/components/ui/modern-modal";
 import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import { toast } from "sonner";
+import {
+  calculateEnrollmentFees,
+  EnrollmentFeeCalculation,
+} from "@/lib/feeCalculator";
+import {
+  generateRegistrationNumber,
+  generateInstallmentId,
+  generatePaymentReferenceId,
+} from "@/lib/registrationNumberGenerator";
 
 interface EnrollCourseModalProps {
   isOpen: boolean;
@@ -27,6 +43,7 @@ interface CourseIntake {
   duration?: number;
   expand?: {
     course?: { id: string; name: string; code: string };
+    intake?: { id: string; code: string; name: string };
   };
 }
 
@@ -50,6 +67,15 @@ export function EnrollCourseModal({
     "full_payment" | "installments_only" | "upfront_installments"
   >("full_payment");
 
+  // Payment configuration
+  const [includeRegistrationFee, setIncludeRegistrationFee] = useState(true);
+  const [discountType, setDiscountType] = useState<
+    "percentage" | "flat" | null
+  >(null);
+  const [discountValue, setDiscountValue] = useState(0);
+  const [feeCalculation, setFeeCalculation] =
+    useState<EnrollmentFeeCalculation | null>(null);
+
   // Fetch intakes on open
   useEffect(() => {
     if (isOpen) {
@@ -57,6 +83,10 @@ export function EnrollCourseModal({
       setSelectedIntakeId("");
       setSelectedCourseIntakeId("");
       setPaymentOption("full_payment");
+      setIncludeRegistrationFee(true);
+      setDiscountType(null);
+      setDiscountValue(0);
+      setFeeCalculation(null);
     }
   }, [isOpen]);
 
@@ -68,6 +98,36 @@ export function EnrollCourseModal({
       setCourseIntakes([]);
     }
   }, [selectedIntakeId]);
+
+  // Recalculate fees when payment options change
+  useEffect(() => {
+    if (selectedCourseIntakeId) {
+      const selectedCourse = courseIntakes.find(
+        (c) => c.id === selectedCourseIntakeId,
+      );
+      if (selectedCourse?.course_fee && selectedCourse?.duration) {
+        const calc = calculateEnrollmentFees(
+          selectedCourse.course_fee,
+          selectedCourse.registration_fee || 0,
+          selectedCourse.duration,
+          paymentOption,
+          includeRegistrationFee,
+          discountType,
+          discountValue,
+        );
+        setFeeCalculation(calc);
+      }
+    } else {
+      setFeeCalculation(null);
+    }
+  }, [
+    selectedCourseIntakeId,
+    paymentOption,
+    includeRegistrationFee,
+    discountType,
+    discountValue,
+    courseIntakes,
+  ]);
 
   const fetchIntakes = async () => {
     try {
@@ -90,7 +150,7 @@ export function EnrollCourseModal({
         .collection("course_intakes")
         .getFullList<CourseIntake>({
           filter: `intake = "${intakeId}"`,
-          expand: "course",
+          expand: "course,intake",
         });
       setCourseIntakes(records);
     } catch (error) {
@@ -111,17 +171,127 @@ export function EnrollCourseModal({
 
     setLoading(true);
     try {
-      // Create new Enrollment directly using course_intake
-      await pb.collection("enrollments").create({
+      const selectedCourse = courseIntakes.find(
+        (c) => c.id === selectedCourseIntakeId,
+      );
+      const selectedIntake = intakes.find((i) => i.id === selectedIntakeId);
+
+      if (!selectedCourse || !selectedIntake) {
+        toast.error("Invalid intake or course selection");
+        return;
+      }
+
+      if (!feeCalculation) {
+        toast.error("Fee calculation not available");
+        return;
+      }
+
+      // Generate unique registration number
+      const registrationNumber = await generateRegistrationNumber(
+        selectedIntake.code,
+        selectedCourse.expand?.course?.code || "COURSE",
+      );
+
+      // Fetch course_intake_fees to link
+      const feeRecords = await pb.collection("course_intake_fees").getFullList({
+        filter: `course_intake="${selectedCourseIntakeId}"`,
+      });
+      const courseIntakeFeeId = feeRecords[0]?.id || null;
+
+      // Create enrollment with all fields
+      const enrollmentRecord = await pb.collection("enrollments").create({
         student: studentId,
+        registration_number: registrationNumber,
         course_intake: selectedCourseIntakeId,
+        course_intake_fees: courseIntakeFeeId,
+
+        // Payment configuration
         payment_option: paymentOption,
+        registration_fee: includeRegistrationFee,
+
+        // Discount details
+        discount_type: discountType,
+        discount: feeCalculation.discount_amount,
+
+        // Fee breakdown
+        total_course_fee: feeCalculation.total_course_fee,
+        fee_after_discount: feeCalculation.fee_after_discount,
+        upfront_payment: feeCalculation.upfront_payment,
+        installment_amount: feeCalculation.installment_amount,
+        installment_count: feeCalculation.installment_count,
+        months_remaining: feeCalculation.months_remaining,
+
+        // Status fields
         enrollment_date: new Date().toISOString(),
         enrollement_status: "enrolled",
         certificate_status: "pending",
+        remarks: discountType
+          ? `Enrolled with ${discountType} discount of ${discountValue}${discountType === "percentage" ? "%" : " LKR"}`
+          : "",
       });
 
-      toast.success("Enrolled successfully!");
+      // Create initial payment record(s) for upfront amount
+      if (feeCalculation.upfront_payment > 0) {
+        let paymentType: "registration" | "upfront" = "upfront";
+        if (includeRegistrationFee && paymentOption === "full_payment") {
+          paymentType = "registration";
+        } else if (
+          includeRegistrationFee &&
+          feeCalculation.upfront_payment ===
+            feeCalculation.registration_fee_amount
+        ) {
+          paymentType = "registration";
+        }
+
+        const paymentReferenceId = generatePaymentReferenceId(
+          registrationNumber,
+          paymentType,
+        );
+
+        await pb.collection("payments").create({
+          reference_Id: paymentReferenceId,
+          enrollment: enrollmentRecord.id,
+          student: studentId,
+          amount: feeCalculation.upfront_payment,
+          payment_type: paymentType,
+          date_paid: null,
+          verified: false,
+          bank_name: "",
+          remarks: `Auto-generated ${paymentType} payment - Awaiting student payment confirmation`,
+        });
+      }
+
+      // Create installment schedule if payment plan has installments
+      if (feeCalculation.installment_count > 0) {
+        const enrollmentDate = new Date();
+        let firstDueDate = new Date(enrollmentDate);
+
+        if (paymentOption === "upfront_installments") {
+          firstDueDate.setMonth(firstDueDate.getMonth() + 2);
+        } else {
+          firstDueDate.setMonth(firstDueDate.getMonth() + 1);
+        }
+
+        for (let i = 1; i <= feeCalculation.installment_count; i++) {
+          const dueDate = new Date(firstDueDate);
+          dueDate.setMonth(dueDate.getMonth() + (i - 1));
+
+          const installmentId = generateInstallmentId(registrationNumber, i);
+
+          await pb.collection("installments").create({
+            installement_id: installmentId,
+            enrollment: enrollmentRecord.id,
+            due_date: dueDate.toISOString().split("T")[0],
+            amount: feeCalculation.installment_amount,
+            status: "pending",
+            remarks: `Installment ${i} of ${feeCalculation.installment_count}`,
+          });
+        }
+      }
+
+      toast.success(
+        `Enrolled successfully! Registration: ${registrationNumber}`,
+      );
       onSuccess();
       onClose();
     } catch (error: any) {

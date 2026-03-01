@@ -138,11 +138,11 @@ export default function StudentManagement() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 via-white to-indigo-50/30">
         <div className="text-center">
-          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
-            Initialising Directory...
+          <div className="h-16 w-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+          <p className="text-gray-600 font-black text-sm tracking-wider">
+            Loading Student Directory...
           </p>
         </div>
       </div>
@@ -188,7 +188,7 @@ export default function StudentManagement() {
             stats={[
               {
                 title: "Total Students",
-                value: students.length,
+                value: totalItems,
                 icon: Users,
                 bgColor: "bg-blue-50",
                 iconColor: "text-blue-600",

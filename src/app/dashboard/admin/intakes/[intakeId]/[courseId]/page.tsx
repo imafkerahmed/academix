@@ -4,7 +4,7 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Edit,
   BookOpen,
@@ -20,11 +20,15 @@ import {
   ArrowLeft,
   Download,
   Info,
+  Loader2,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ModernModal } from "@/components/ui/modern-modal";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
+import { EnrollExistingStudentModal } from "@/components/admin/EnrollExistingStudentModal";
+import pb from "@/lib/pocketbase";
 
 // --- Utility Functions ---
 function calculateStatus(start_date: string, end_date: string) {
@@ -48,23 +52,178 @@ export default function CourseDetailsPage() {
   const courseId = typeof params?.courseId === "string" ? params.courseId : "";
   const router = useRouter();
 
-  // TODO: Fetch from PocketBase
-  const mockIntakes: any[] = [];
-  const mockCourses: any[] = [];
-  const mockCourseIntakes: any[] = [];
-  const mockLecturers: string[] = [];
-  const availableSubjects: any[] = [];
-  const materials: any[] = [];
-  const videos: any[] = [];
+  // Real data state
+  const [loading, setLoading] = useState(true);
+  const [intake, setIntake] = useState<any>(null);
+  const [course, setCourse] = useState<any>(null);
+  const [courseIntake, setCourseIntake] = useState<any>(null);
+  const [fees, setFees] = useState<any>(null);
+  const [editLoading, setEditLoading] = useState(false);
 
-  // Find intake and course
-  const intake = mockIntakes.find((i) => i.id === intakeId);
-  const course = mockCourses.find((c) => c.id === courseId);
-  const courseIntake = mockCourseIntakes.find(
-    (ci) => ci.intake === intakeId && ci.course === courseId,
-  );
+  // Placeholders for future features
+  const lecturers: string[] = [];
+  const availableSubjects: any[] = [];
+
+  // Edit form state (matching create course modal structure)
+  const [editCourse, setEditCourse] = useState({
+    name: "",
+    code: "",
+    start_date: "",
+    end_date: "",
+    isSemesterBased: false,
+    semesterCount: 1,
+    course_fee: "",
+    registration_fee: "",
+    duration: "",
+  });
+
+  useEffect(() => {
+    if (intakeId && courseId) fetchData();
+  }, [intakeId, courseId]);
+
+  async function fetchData() {
+    try {
+      setLoading(true);
+      const [intakeRecord, courseRecord, courseIntakesData] = await Promise.all(
+        [
+          pb.collection("intakes").getOne(intakeId),
+          pb.collection("courses").getOne(courseId),
+          pb.collection("course_intakes").getFullList({
+            filter: `intake="${intakeId}"&&course="${courseId}"`,
+          }),
+        ],
+      );
+
+      const courseIntakeRecord = courseIntakesData[0] ?? null;
+      setIntake(intakeRecord);
+      setCourse(courseRecord);
+      setCourseIntake(courseIntakeRecord);
+
+      // Fetch fees using course_intake relation
+      let feesRecord = null;
+      if (courseIntakeRecord?.id) {
+        const feesData = await pb
+          .collection("course_intake_fees")
+          .getFullList({
+            filter: `course_intake="${courseIntakeRecord.id}"`,
+          })
+          .catch(() => []);
+        feesRecord = feesData[0] ?? null;
+      }
+      setFees(feesRecord);
+
+      // Populate edit form with current data
+      const startDate = courseIntakeRecord?.start_date
+        ? formatDate(courseIntakeRecord.start_date)
+        : "";
+      const endDate = courseIntakeRecord?.end_date
+        ? formatDate(courseIntakeRecord.end_date)
+        : "";
+
+      // Calculate duration
+      let duration = "";
+      if (startDate && endDate) {
+        const months =
+          (new Date(endDate).getFullYear() -
+            new Date(startDate).getFullYear()) *
+            12 +
+          (new Date(endDate).getMonth() - new Date(startDate).getMonth());
+        duration = String(Math.max(0, months));
+      }
+
+      setEditCourse({
+        name: courseRecord.name,
+        code: courseRecord.code,
+        start_date: startDate,
+        end_date: endDate,
+        isSemesterBased: courseIntakeRecord?.is_semester_based || false,
+        semesterCount: courseIntakeRecord?.semester_count || 1,
+        course_fee: feesRecord?.course_fee ? String(feesRecord.course_fee) : "",
+        registration_fee: feesRecord?.registration_fee
+          ? String(feesRecord.registration_fee)
+          : "",
+        duration: duration,
+      });
+    } catch (error: any) {
+      console.error("Error fetching course details:", error);
+      toast.error("Failed to load course details");
+      if (error?.status === 404)
+        router.push(`/dashboard/admin/intakes/${intakeId}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveEditCourse(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setEditLoading(true);
+
+      // Update course
+      await pb.collection("courses").update(courseId, {
+        name: editCourse.name,
+        code: editCourse.code,
+      });
+
+      // Update course intake
+      if (courseIntake?.id) {
+        await pb.collection("course_intakes").update(courseIntake.id, {
+          start_date: editCourse.start_date,
+          end_date: editCourse.end_date,
+          is_semester_based: editCourse.isSemesterBased,
+          semester_count: editCourse.isSemesterBased
+            ? editCourse.semesterCount
+            : null,
+        });
+      }
+
+      // Update or create fees
+      if (courseIntake?.id) {
+        if (fees?.id) {
+          // Update existing fees
+          await pb.collection("course_intake_fees").update(fees.id, {
+            course_fee: parseFloat(editCourse.course_fee) || 0,
+            registration_fee: parseFloat(editCourse.registration_fee) || 0,
+          });
+        } else {
+          // Create new fees record
+          await pb.collection("course_intake_fees").create({
+            course_intake: courseIntake.id,
+            course_fee: parseFloat(editCourse.course_fee) || 0,
+            registration_fee: parseFloat(editCourse.registration_fee) || 0,
+          });
+        }
+      }
+
+      // Update local state
+      setCourse({ ...course, name: editCourse.name, code: editCourse.code });
+      setCourseIntake({
+        ...courseIntake,
+        start_date: editCourse.start_date,
+        end_date: editCourse.end_date,
+        is_semester_based: editCourse.isSemesterBased,
+        semester_count: editCourse.isSemesterBased
+          ? editCourse.semesterCount
+          : null,
+      });
+      setFees({
+        ...fees,
+        course_fee: parseFloat(editCourse.course_fee) || 0,
+        registration_fee: parseFloat(editCourse.registration_fee) || 0,
+      });
+
+      toast.success("Course updated successfully");
+      setShowEditModal(false);
+    } catch (error: any) {
+      console.error("Error saving course:", error);
+      toast.error("Failed to save course changes");
+    } finally {
+      setEditLoading(false);
+    }
+  }
 
   const [activeTab, setActiveTab] = useState(0);
+  const [studentsRefreshKey, setStudentsRefreshKey] = useState(0);
 
   // Modal states
   const [showEditModal, setShowEditModal] = useState(false);
@@ -73,14 +232,7 @@ export default function CourseDetailsPage() {
   const [showAddAssignmentModal, setShowAddAssignmentModal] = useState(false);
   const [showAssignmentDetailModal, setShowAssignmentDetailModal] =
     useState(false);
-
-  // Form states
-  const [editCourse, setEditCourse] = useState({
-    name: course?.name || "",
-    code: course?.code || "",
-    start_date: courseIntake?.start_date || "",
-    end_date: courseIntake?.end_date || "",
-  });
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
 
   const [courseSubjects, setCourseSubjects] = useState<any[]>([]);
   const [selectedSemester, setSelectedSemester] = useState("Semester 1");
@@ -110,10 +262,37 @@ export default function CourseDetailsPage() {
     assignmentSheet: null,
   });
 
+  if (loading) {
+    return (
+      <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+            Loading course details...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!intake || !course || !courseIntake) {
     return (
-      <div className="p-8 text-center text-gray-500">
-        Course or Intake not found.
+      <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔍</div>
+          <h2 className="text-2xl font-black text-gray-900 mb-2">
+            Course Not Found
+          </h2>
+          <p className="text-gray-500 mb-6">
+            This course or intake could not be found.
+          </p>
+          <button
+            onClick={() => router.push(`/dashboard/admin/intakes/${intakeId}`)}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+          >
+            Back to Intake
+          </button>
+        </div>
       </div>
     );
   }
@@ -181,7 +360,7 @@ export default function CourseDetailsPage() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="flex flex-col bg-gray-50/50 border border-gray-100 rounded-3xl p-6 hover:bg-white transition-all group">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover:text-indigo-400 transition-colors">
               START DATE
@@ -200,10 +379,18 @@ export default function CourseDetailsPage() {
           </div>
           <div className="flex flex-col bg-gray-50/50 border border-gray-100 rounded-3xl p-6 hover:bg-white transition-all group">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover:text-indigo-400 transition-colors">
-              TOTAL STUDENTS
+              COURSE FEE
             </span>
-            <span className="text-2xl font-black text-indigo-600 uppercase tracking-tighter">
-              128
+            <span className="text-xl font-bold text-gray-900">
+              LKR {(fees?.course_fee || 0).toLocaleString()}
+            </span>
+          </div>
+          <div className="flex flex-col bg-gray-50/50 border border-gray-100 rounded-3xl p-6 hover:bg-white transition-all group">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover:text-indigo-400 transition-colors">
+              REGISTRATION FEE
+            </span>
+            <span className="text-xl font-bold text-gray-900">
+              LKR {(fees?.registration_fee || 0).toLocaleString()}
             </span>
           </div>
         </div>
@@ -229,7 +416,13 @@ export default function CourseDetailsPage() {
 
       {/* Tab Content */}
       <div className="min-h-[400px]">
-        {activeTab === 0 && <StudentsList />}
+        {activeTab === 0 && (
+          <StudentsList
+            courseIntakeId={courseIntake?.id}
+            onAdd={() => setShowAddStudentModal(true)}
+            refreshKey={studentsRefreshKey}
+          />
+        )}
         {activeTab === 1 && (
           <SubjectsTab
             groupedSubjects={groupedSubjects}
@@ -260,21 +453,37 @@ export default function CourseDetailsPage() {
       <ModernModal
         open={showEditModal}
         onOpenChange={setShowEditModal}
-        title="Edit Course Details"
-        subtitle="Modify the core identification and schedule for this course."
-        avatarChar="C"
+        title="Edit Course Intake"
+        subtitle="Modify course details, dates, semester and fees."
+        avatarChar="E"
         avatarColor="bg-orange-500"
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            setShowEditModal(false);
+            handleSaveEditCourse(e);
           }}
-          className="space-y-6"
+          className="space-y-5"
         >
-          <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
+                Course Code
+              </label>
+              <input
+                type="text"
+                value={editCourse.code}
+                onChange={(e) =>
+                  setEditCourse({ ...editCourse, code: e.target.value })
+                }
+                className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
+                placeholder="e.g. BBM/MARCH/2026"
+                required
+                disabled={editLoading}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
                 Course Name
               </label>
               <input
@@ -285,64 +494,221 @@ export default function CourseDetailsPage() {
                 }
                 className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
                 required
+                disabled={editLoading}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                  Course Code
-                </label>
-                <input
-                  type="text"
-                  value={editCourse.code}
-                  onChange={(e) =>
-                    setEditCourse({ ...editCourse, code: e.target.value })
-                  }
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={editCourse.start_date}
-                  onChange={(e) =>
-                    setEditCourse({ ...editCourse, start_date: e.target.value })
-                  }
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
-                  required
-                />
-              </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={editCourse.start_date}
+                onChange={(e) => {
+                  const start = e.target.value;
+                  const end = editCourse.end_date;
+                  const months =
+                    start && end
+                      ? Math.max(
+                          0,
+                          (new Date(end).getFullYear() -
+                            new Date(start).getFullYear()) *
+                            12 +
+                            (new Date(end).getMonth() -
+                              new Date(start).getMonth()),
+                        )
+                      : "";
+                  setEditCourse((prev) => ({
+                    ...prev,
+                    start_date: start,
+                    duration: String(months),
+                  }));
+                }}
+                className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
+                required
+                disabled={editLoading}
+              />
             </div>
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
                 End Date
               </label>
               <input
                 type="date"
                 value={editCourse.end_date}
-                onChange={(e) =>
-                  setEditCourse({ ...editCourse, end_date: e.target.value })
-                }
+                onChange={(e) => {
+                  const end = e.target.value;
+                  const start = editCourse.start_date;
+                  const months =
+                    start && end
+                      ? Math.max(
+                          0,
+                          (new Date(end).getFullYear() -
+                            new Date(start).getFullYear()) *
+                            12 +
+                            (new Date(end).getMonth() -
+                              new Date(start).getMonth()),
+                        )
+                      : "";
+                  setEditCourse((prev) => ({
+                    ...prev,
+                    end_date: end,
+                    duration: String(months),
+                  }));
+                }}
                 className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
                 required
+                disabled={editLoading}
               />
             </div>
           </div>
+
+          <div className="flex items-center justify-between p-5 bg-gray-50 rounded-3xl border border-gray-100 group transition-all hover:border-orange-100">
+            <div className="flex flex-col">
+              <span className="text-sm font-black text-gray-700 uppercase tracking-wide">
+                Semester Based
+              </span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Enable for multi-semester courses
+              </span>
+            </div>
+            <button
+              type="button"
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none shadow-sm ${editCourse.isSemesterBased ? "bg-orange-600 ring-4 ring-orange-50" : "bg-gray-300"}`}
+              onClick={() =>
+                setEditCourse((prev) => ({
+                  ...prev,
+                  isSemesterBased: !prev.isSemesterBased,
+                  semesterCount: 1,
+                }))
+              }
+              disabled={editLoading}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all shadow-md ${editCourse.isSemesterBased ? "translate-x-6" : "translate-x-1"}`}
+              />
+            </button>
+          </div>
+
+          {editCourse.isSemesterBased && (
+            <div className="animate-in slide-in-from-top-2 duration-300">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
+                Number of Semesters
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={4}
+                value={editCourse.semesterCount || 1}
+                onChange={(e) =>
+                  setEditCourse((prev) => ({
+                    ...prev,
+                    semesterCount: Math.max(
+                      1,
+                      Math.min(4, Number(e.target.value)),
+                    ),
+                  }))
+                }
+                className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
+                required
+                disabled={editLoading}
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
+                Course Fee
+              </label>
+              <div className="relative">
+                <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-gray-400">
+                  LKR
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={editCourse.course_fee}
+                  onChange={(e) =>
+                    setEditCourse((prev) => ({
+                      ...prev,
+                      course_fee: e.target.value,
+                    }))
+                  }
+                  className="w-full pl-12 pr-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
+                  required
+                  disabled={editLoading}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
+                Registration Fee
+              </label>
+              <div className="relative">
+                <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-gray-400">
+                  LKR
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={editCourse.registration_fee}
+                  onChange={(e) =>
+                    setEditCourse((prev) => ({
+                      ...prev,
+                      registration_fee: e.target.value,
+                    }))
+                  }
+                  className="w-full pl-12 pr-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-bold transition-all text-gray-900"
+                  required
+                  disabled={editLoading}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
+              Duration (months)
+            </label>
+            <input
+              type="text"
+              value={editCourse.duration}
+              readOnly
+              className="w-full px-5 py-4 bg-gray-100 border border-gray-200 rounded-2xl font-bold text-gray-600 cursor-not-allowed"
+            />
+          </div>
+
           <div className="flex flex-col gap-3 pt-6 border-t border-gray-50">
             <button
               type="submit"
-              className="w-full py-4 bg-orange-500 text-white rounded-2xl font-black text-sm shadow-xl shadow-orange-100 hover:bg-orange-600 transition-all uppercase tracking-widest"
+              disabled={editLoading}
+              className="w-full py-4 bg-orange-500 text-white rounded-2xl font-black text-sm shadow-xl shadow-orange-100 hover:bg-orange-600 transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              SAVE CHANGES
+              {editLoading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  SAVING...
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  SAVE CHANGES
+                </>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setShowEditModal(false)}
-              className="w-full py-2 font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest"
+              disabled={editLoading}
+              className="w-full py-2 font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest disabled:opacity-50"
             >
               CANCEL
             </button>
@@ -485,7 +851,7 @@ export default function CourseDetailsPage() {
             />
           </div>
           <div className="max-h-60 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-            {mockLecturers
+            {lecturers
               .filter((l) =>
                 l.toLowerCase().includes(lecturerSearchQuery.toLowerCase()),
               )
@@ -506,7 +872,7 @@ export default function CourseDetailsPage() {
                   <span className="font-bold text-gray-900">{lecturer}</span>
                 </button>
               ))}
-            {mockLecturers.length === 0 && (
+            {lecturers.length === 0 && (
               <div className="text-center py-8 text-gray-400 text-sm font-bold">
                 No lecturers available
               </div>
@@ -635,7 +1001,6 @@ export default function CourseDetailsPage() {
                       Lecturer
                     </label>
                     <select className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-sm">
-                      {/* TODO: Populate from PocketBase */}
                       <option value="">-- No lecturers available --</option>
                     </select>
                   </div>
@@ -781,69 +1146,158 @@ export default function CourseDetailsPage() {
           </div>
         </div>
       </ModernModal>
+
+      {/* Add Student to Course Modal */}
+      <EnrollExistingStudentModal
+        isOpen={showAddStudentModal}
+        onClose={() => setShowAddStudentModal(false)}
+        onSuccess={() => {
+          setShowAddStudentModal(false);
+          setStudentsRefreshKey((prev) => prev + 1); // Trigger refresh
+        }}
+        intakeId={intakeId}
+        courseIntakeId={courseIntake?.id || ""}
+      />
     </div>
   );
 }
 
 // --- Sub-Components ---
 
-function StudentsList() {
-  const students = [
-    {
-      name: "Alice Johnson",
-      reg: "REG1001",
-      date: "2026-01-05",
-      status: "Active",
-    },
-    { name: "Bob Smith", reg: "REG1002", date: "2026-01-12", status: "Active" },
-    {
-      name: "Charlie Davis",
-      reg: "REG1003",
-      date: "2026-01-15",
-      status: "Deferred",
-    },
-  ];
+function StudentsList({
+  courseIntakeId,
+  onAdd,
+  refreshKey,
+}: {
+  courseIntakeId?: string;
+  onAdd?: () => void;
+  refreshKey?: number;
+}) {
+  const [students, setStudents] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (courseIntakeId) {
+      fetchEnrolledStudents();
+    }
+  }, [courseIntakeId, refreshKey]);
+
+  async function fetchEnrolledStudents() {
+    if (!courseIntakeId) return;
+
+    try {
+      setLoading(true);
+      const enrollments = await pb.collection("enrollments").getFullList({
+        filter: `course_intake="${courseIntakeId}"`,
+        expand: "student",
+        sort: "-created",
+      });
+
+      const formattedStudents = enrollments.map((enrollment: any) => ({
+        id: enrollment.id,
+        reg: enrollment.registration_number || "N/A",
+        name: enrollment.expand?.student?.name || "Unknown",
+        date: new Date(
+          enrollment.enrollment_date || enrollment.created,
+        ).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }),
+        status:
+          enrollment.enrollement_status === "active" ? "Active" : "Inactive",
+      }));
+
+      setStudents(formattedStudents);
+    } catch (error) {
+      console.error("Error fetching enrolled students:", error);
+      toast.error("Failed to load enrolled students");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400">
-            <tr>
-              <th className="px-10 py-6 text-left">Reg No</th>
-              <th className="px-10 py-6 text-left">Student Name</th>
-              <th className="px-10 py-6 text-left">Enrolled</th>
-              <th className="px-10 py-6 text-center">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {students.map((s, i) => (
-              <tr
-                key={i}
-                className="group hover:bg-indigo-50/30 transition-all cursor-pointer"
-              >
-                <td className="px-10 py-6">
-                  <span className="text-xs font-black text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl">
-                    {s.reg}
-                  </span>
-                </td>
-                <td className="px-10 py-6 font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                  {s.name}
-                </td>
-                <td className="px-10 py-6 text-sm text-gray-500 font-bold">
-                  {s.date}
-                </td>
-                <td className="px-10 py-6 text-center">
-                  <Badge
-                    className={`px-4 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${s.status === "Active" ? "bg-green-500 text-white" : "bg-orange-500 text-white"}`}
+    <div className="space-y-6">
+      {/* Action Bar */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">
+            Enrolled Students
+          </h3>
+          <p className="text-xs font-medium text-gray-500 mt-1">
+            {loading
+              ? "Loading..."
+              : `${students.length} student${students.length !== 1 ? "s" : ""} in this course`}
+          </p>
+        </div>
+        {onAdd && (
+          <button
+            onClick={onAdd}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
+          >
+            <Plus size={18} /> ADD STUDENT
+          </button>
+        )}
+      </div>
+
+      {/* Students Table */}
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+          </div>
+        ) : students.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Users size={48} className="text-gray-300 mb-4" />
+            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+              No students enrolled yet
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              Click "ADD STUDENT" to enroll students in this course
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <tr>
+                  <th className="px-10 py-6 text-left">Reg No</th>
+                  <th className="px-10 py-6 text-left">Student Name</th>
+                  <th className="px-10 py-6 text-left">Enrolled</th>
+                  <th className="px-10 py-6 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {students.map((s) => (
+                  <tr
+                    key={s.id}
+                    className="group hover:bg-indigo-50/30 transition-all cursor-pointer"
                   >
-                    {s.status}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    <td className="px-10 py-6">
+                      <span className="text-xs font-black text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl">
+                        {s.reg}
+                      </span>
+                    </td>
+                    <td className="px-10 py-6 font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                      {s.name}
+                    </td>
+                    <td className="px-10 py-6 text-sm text-gray-500 font-bold">
+                      {s.date}
+                    </td>
+                    <td className="px-10 py-6 text-center">
+                      <Badge
+                        className={`px-4 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${s.status === "Active" ? "bg-green-500 text-white" : "bg-orange-500 text-white"}`}
+                      >
+                        {s.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -971,11 +1425,8 @@ function AssignmentsTab({ groupedAssignments, onAdd, onView, router }: any) {
 }
 
 function MaterialsTab() {
-  // TODO: Fetch from PocketBase
   const subjects: any[] = [];
-  const initialMaterials: any[] = [];
-
-  const [materials, setMaterials] = useState(initialMaterials);
+  const [materials, setMaterials] = useState<any[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState<{
     title: string;
@@ -986,7 +1437,7 @@ function MaterialsTab() {
   }>({
     title: "",
     type: "document",
-    subjectId: subjects[0]?.id || "",
+    subjectId: "",
     file: null,
     videoUrl: "",
   });
@@ -1012,7 +1463,6 @@ function MaterialsTab() {
   const handleAddMaterial = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!formData.title || !formData.subjectId) return;
-    // TODO: Implement PocketBase integration
     console.log("Adding material:", formData);
     setMaterials([
       {

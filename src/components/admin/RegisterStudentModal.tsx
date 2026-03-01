@@ -30,15 +30,26 @@ import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
 import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import { toast } from "sonner";
+import {
+  calculateEnrollmentFees,
+  EnrollmentFeeCalculation,
+} from "@/lib/feeCalculator";
+import {
+  generateRegistrationNumber,
+  generateInstallmentId,
+  generatePaymentReferenceId,
+} from "@/lib/registrationNumberGenerator";
 
 interface RegisterStudentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   enrollOnly?: {
-    id: string;
-    name: string;
-    email: string;
+    id?: string;
+    name?: string;
+    email?: string;
+    preselectedIntakeId?: string;
+    preselectedCourseIntakeId?: string;
   };
 }
 
@@ -79,6 +90,8 @@ export function RegisterStudentModal({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [enrollNow, setEnrollNow] = useState(true);
   const [validationError, setValidationError] = useState<string>("");
+  const [feeCalculation, setFeeCalculation] =
+    useState<EnrollmentFeeCalculation | null>(null);
 
   const [formData, setFormData] = useState({
     // Stage 1: Identity
@@ -109,7 +122,13 @@ export function RegisterStudentModal({
     // Stage 4: Enrollment
     intakeId: "",
     courseIntakeFeeId: "", // This maps to course_intake_fees
-    paymentType: "full" as "full" | "installment" | "upfront_installment",
+    paymentOption: "full_payment" as
+      | "full_payment"
+      | "upfront_installments"
+      | "installments_only",
+    includeRegistrationFee: true,
+    discountType: null as "percentage" | "flat" | null,
+    discountValue: 0,
   });
 
   useEffect(() => {
@@ -119,17 +138,65 @@ export function RegisterStudentModal({
         ...prev,
         name: enrollOnly?.name || "",
         email: enrollOnly?.email || "",
+        intakeId: enrollOnly?.preselectedIntakeId || "",
       }));
       fetchIntakes();
-      if (!enrollOnly) {
+      if (!enrollOnly?.id) {
         generateNextUserId();
       }
       setAvatarFile(null);
       setAvatarPreview(null);
       setEnrollNow(true);
       setValidationError("");
+      setFeeCalculation(null);
     }
   }, [isOpen, enrollOnly]);
+
+  // Preselect course when courseIntakes load
+  useEffect(() => {
+    if (enrollOnly?.preselectedCourseIntakeId && courseIntakes.length > 0) {
+      const matchingFee = courseIntakes.find(
+        (f) => f.course_intake === enrollOnly.preselectedCourseIntakeId,
+      );
+      if (matchingFee) {
+        setFormData((prev) => ({
+          ...prev,
+          courseIntakeFeeId: matchingFee.id,
+        }));
+      }
+    }
+  }, [enrollOnly?.preselectedCourseIntakeId, courseIntakes]);
+
+  // Recalculate fees when payment options change
+  useEffect(() => {
+    if (formData.courseIntakeFeeId && enrollNow) {
+      const selectedFee = courseIntakes.find(
+        (f) => f.id === formData.courseIntakeFeeId,
+      );
+      if (selectedFee) {
+        const calc = calculateEnrollmentFees(
+          selectedFee.course_fee,
+          selectedFee.registration_fee,
+          selectedFee.duration,
+          formData.paymentOption,
+          formData.includeRegistrationFee,
+          formData.discountType,
+          formData.discountValue,
+        );
+        setFeeCalculation(calc);
+      }
+    } else {
+      setFeeCalculation(null);
+    }
+  }, [
+    formData.courseIntakeFeeId,
+    formData.paymentOption,
+    formData.includeRegistrationFee,
+    formData.discountType,
+    formData.discountValue,
+    enrollNow,
+    courseIntakes,
+  ]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -310,27 +377,142 @@ export function RegisterStudentModal({
         studentId = newUser.id;
       }
 
-      // Step 2: Create Enrollment/Payment Record
+      // Step 2: Create Enrollment with complete data
       if (enrollNow && formData.courseIntakeFeeId) {
         const selectedFee = courseIntakes.find(
           (f) => f.id === formData.courseIntakeFeeId,
         );
-        if (selectedFee) {
-          await pb.collection("enrollments").create({
-            student: studentId,
-            course_intake_fee: formData.courseIntakeFeeId,
-            course_intake: selectedFee.course_intake,
-            payment_type: formData.paymentType,
-            status: "pending",
-          });
-        }
-      }
+        const selectedIntake = intakes.find((i) => i.id === formData.intakeId);
 
-      toast.success(
-        enrollOnly
-          ? "Enrolled successfully!"
-          : "Student registered successfully!",
-      );
+        if (selectedFee && selectedIntake) {
+          // Calculate all fees
+          const feeCalc = calculateEnrollmentFees(
+            selectedFee.course_fee,
+            selectedFee.registration_fee,
+            selectedFee.duration,
+            formData.paymentOption,
+            formData.includeRegistrationFee,
+            formData.discountType,
+            formData.discountValue,
+          );
+
+          // Generate unique registration number
+          const courseInfo = selectedFee.expand?.course_intake?.expand?.course;
+          const registrationNumber = await generateRegistrationNumber(
+            selectedIntake.code,
+            courseInfo?.code || "COURSE",
+          );
+
+          // Create enrollment with all fields populated
+          const enrollmentRecord = await pb.collection("enrollments").create({
+            student: studentId,
+            registration_number: registrationNumber,
+            course_intake: selectedFee.course_intake,
+            course_intake_fees: formData.courseIntakeFeeId,
+
+            // Payment configuration
+            payment_option: formData.paymentOption,
+            registration_fee: formData.includeRegistrationFee,
+
+            // Discount details
+            discount_type: formData.discountType,
+            discount: feeCalc.discount_amount,
+
+            // Fee breakdown (all calculated values)
+            total_course_fee: feeCalc.total_course_fee,
+            fee_after_discount: feeCalc.fee_after_discount,
+            upfront_payment: feeCalc.upfront_payment,
+            installment_amount: feeCalc.installment_amount,
+            installment_count: feeCalc.installment_count,
+            months_remaining: feeCalc.months_remaining,
+
+            // Status fields
+            enrollment_date: new Date().toISOString(),
+            enrollement_status: "enrolled",
+            certificate_status: "pending",
+            remarks: formData.discountType
+              ? `Enrolled with ${formData.discountType} discount of ${formData.discountValue}${formData.discountType === "percentage" ? "%" : " LKR"}`
+              : "",
+          });
+
+          // Step 3: Create initial payment record(s) for upfront amount
+          if (feeCalc.upfront_payment > 0) {
+            // Determine payment type for upfront
+            let paymentType: "registration" | "upfront" = "upfront";
+            if (
+              formData.includeRegistrationFee &&
+              formData.paymentOption === "full_payment"
+            ) {
+              // Full payment includes registration
+              paymentType = "registration";
+            } else if (
+              formData.includeRegistrationFee &&
+              feeCalc.upfront_payment === feeCalc.registration_fee_amount
+            ) {
+              // Only registration fee upfront
+              paymentType = "registration";
+            }
+
+            const paymentReferenceId = generatePaymentReferenceId(
+              registrationNumber,
+              paymentType,
+            );
+
+            await pb.collection("payments").create({
+              reference_Id: paymentReferenceId,
+              enrollment: enrollmentRecord.id,
+              student: studentId,
+              amount: feeCalc.upfront_payment,
+              payment_type: paymentType,
+              date_paid: null,
+              verified: false,
+              bank_name: "",
+              remarks: `Auto-generated ${paymentType} payment - Awaiting student payment confirmation`,
+            });
+          }
+
+          // Step 4: Create installment schedule if payment plan has installments
+          if (feeCalc.installment_count > 0) {
+            const enrollmentDate = new Date();
+
+            // Determine first installment due date
+            let firstDueDate = new Date(enrollmentDate);
+            if (formData.paymentOption === "upfront_installments") {
+              // First installment due 2 months after enrollment (since first month paid upfront)
+              firstDueDate.setMonth(firstDueDate.getMonth() + 2);
+            } else {
+              // First installment due next month
+              firstDueDate.setMonth(firstDueDate.getMonth() + 1);
+            }
+
+            // Create installment records
+            for (let i = 1; i <= feeCalc.installment_count; i++) {
+              const dueDate = new Date(firstDueDate);
+              dueDate.setMonth(dueDate.getMonth() + (i - 1));
+
+              const installmentId = generateInstallmentId(
+                registrationNumber,
+                i,
+              );
+
+              await pb.collection("installments").create({
+                installement_id: installmentId,
+                enrollment: enrollmentRecord.id,
+                due_date: dueDate.toISOString().split("T")[0], // YYYY-MM-DD
+                amount: feeCalc.installment_amount,
+                status: "pending",
+                remarks: `Installment ${i} of ${feeCalc.installment_count}`,
+              });
+            }
+          }
+
+          toast.success(
+            `Student ${enrollOnly ? "enrolled" : "registered"} successfully! Registration: ${registrationNumber}`,
+          );
+        }
+      } else if (!enrollNow) {
+        toast.success("Student registered successfully!");
+      }
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -356,7 +538,7 @@ export function RegisterStudentModal({
       }
       avatarChar={enrollOnly ? "E" : "S"}
       avatarColor={enrollOnly ? "bg-green-600" : "bg-indigo-600"}
-      className="max-w-3xl"
+      className="max-w-6xl"
     >
       <div className="space-y-8 py-2">
         {/* Progress Stepper */}
@@ -945,45 +1127,280 @@ export function RegisterStudentModal({
                   )}
 
                   {formData.courseIntakeFeeId && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                        <DollarSign size={12} className="text-indigo-400" />{" "}
-                        Payment Plan
-                      </label>
-                      <div className="grid grid-cols-1 gap-2">
-                        {[
-                          {
-                            id: "full",
-                            label: "Full Payment",
-                            icon: CreditCard,
-                          },
-                          {
-                            id: "installment",
-                            label: "Installments",
-                            icon: Calendar,
-                          },
-                        ].map((plan) => (
-                          <button
-                            key={plan.id}
-                            onClick={() =>
-                              setFormData({
-                                ...formData,
-                                paymentType: plan.id as any,
-                              })
-                            }
-                            className={`p-4 rounded-2xl border-2 text-left transition-all flex items-center gap-4 ${
-                              formData.paymentType === plan.id
-                                ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md"
-                                : "border-gray-50 bg-gray-50/50 text-gray-400 hover:border-indigo-100"
-                            }`}
-                          >
-                            <plan.icon size={16} />
-                            <span className="text-xs font-black uppercase tracking-widest">
-                              {plan.label}
-                            </span>
-                          </button>
-                        ))}
+                    <div className="space-y-6 p-6 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-3xl border-2 border-indigo-100 animate-in fade-in slide-in-from-top-2">
+                      {/* Payment Structure Selection */}
+                      <div>
+                        <label className="flex items-center gap-2 text-xs font-black text-gray-700 uppercase tracking-widest mb-4">
+                          <CreditCard size={14} className="text-indigo-600" />
+                          Payment Structure
+                        </label>
+                        <div className="grid grid-cols-3 gap-4">
+                          {[
+                            {
+                              value: "full_payment",
+                              label: "Full Payment",
+                              description:
+                                "Pay entire course fee + registration upfront",
+                              badge: "Discount Eligible",
+                            },
+                            {
+                              value: "upfront_installments",
+                              label: "Upfront + Installments",
+                              description:
+                                "Registration + 1st month now, balance monthly",
+                              badge: "Most Popular",
+                            },
+                            {
+                              value: "installments_only",
+                              label: "Full Installments",
+                              description:
+                                "Pay course fee in monthly installments",
+                              badge: "Max Flexibility",
+                            },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  paymentOption: option.value as any,
+                                }))
+                              }
+                              className={`relative p-6 rounded-2xl border-2 transition-all text-left group ${
+                                formData.paymentOption === option.value
+                                  ? "border-indigo-600 bg-white shadow-lg ring-4 ring-indigo-100"
+                                  : "border-indigo-100 bg-white/70 hover:border-indigo-300 hover:bg-white"
+                              }`}
+                            >
+                              <div className="space-y-3">
+                                <div className="space-y-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <span className="font-black text-base text-gray-900 uppercase tracking-wide">
+                                      {option.label}
+                                    </span>
+                                    {formData.paymentOption ===
+                                      option.value && (
+                                      <Check
+                                        size={20}
+                                        className="text-indigo-600 flex-shrink-0"
+                                      />
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`inline-block text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${
+                                      formData.paymentOption === option.value
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-gray-100 text-gray-400"
+                                    }`}
+                                  >
+                                    {option.badge}
+                                  </span>
+                                </div>
+                                <p className="text-xs font-medium text-gray-500 leading-relaxed">
+                                  {option.description}
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
                       </div>
+
+                      {/* Registration Fee Toggle */}
+                      <div className="flex items-center justify-between p-5 bg-white rounded-2xl border-2 border-indigo-100 shadow-sm">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-black text-gray-700 uppercase tracking-wide">
+                            Include Registration Fee
+                          </span>
+                          <span className="text-xs font-bold text-indigo-600">
+                            LKR{" "}
+                            {courseIntakes
+                              .find((f) => f.id === formData.courseIntakeFeeId)
+                              ?.registration_fee?.toLocaleString() || "0"}
+                          </span>
+                          <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">
+                            One-time enrollment charge
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all shadow-md ${
+                            formData.includeRegistrationFee
+                              ? "bg-indigo-600 ring-4 ring-indigo-200"
+                              : "bg-gray-300"
+                          }`}
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              includeRegistrationFee:
+                                !prev.includeRegistrationFee,
+                            }))
+                          }
+                        >
+                          <span
+                            className={`inline-block h-6 w-6 bg-white rounded-full shadow-sm transition-transform ${
+                              formData.includeRegistrationFee
+                                ? "translate-x-7"
+                                : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Discount Section */}
+                      <div className="space-y-3">
+                        <label className="flex items-center gap-2 text-xs font-black text-gray-700 uppercase tracking-widest">
+                          <DollarSign size={14} className="text-green-600" />
+                          Apply Discount (Optional)
+                        </label>
+                        <div className="grid grid-cols-3 gap-3">
+                          <select
+                            value={formData.discountType || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                discountType: (e.target.value as any) || null,
+                                discountValue: 0,
+                              }))
+                            }
+                            className="px-4 py-3 bg-white border-2 border-indigo-100 rounded-xl text-sm font-bold text-gray-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
+                          >
+                            <option value="">No Discount</option>
+                            <option value="percentage">Percentage %</option>
+                            <option value="flat">Flat Amount</option>
+                          </select>
+                          <input
+                            type="number"
+                            min="0"
+                            max={
+                              formData.discountType === "percentage"
+                                ? 100
+                                : undefined
+                            }
+                            step={
+                              formData.discountType === "percentage"
+                                ? "0.1"
+                                : "100"
+                            }
+                            value={formData.discountValue || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                discountValue: parseFloat(e.target.value) || 0,
+                              }))
+                            }
+                            disabled={!formData.discountType}
+                            placeholder={
+                              formData.discountType === "percentage"
+                                ? "%"
+                                : "LKR"
+                            }
+                            className="col-span-2 px-4 py-3 bg-white border-2 border-indigo-100 rounded-xl text-sm font-bold text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live Fee Calculation Display */}
+                      {feeCalculation && (
+                        <div className="space-y-3 p-6 bg-white rounded-2xl border-2 border-indigo-200 shadow-lg">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-1 h-6 bg-indigo-600 rounded-full" />
+                            <span className="text-xs font-black text-indigo-900 uppercase tracking-widest">
+                              Fee Breakdown
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-gray-500 uppercase tracking-widest">
+                                Course Fee
+                              </span>
+                              <span className="font-black text-gray-900">
+                                LKR{" "}
+                                {feeCalculation.total_course_fee.toLocaleString()}
+                              </span>
+                            </div>
+
+                            {feeCalculation.discount_amount > 0 && (
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="font-bold text-green-600 uppercase tracking-widest">
+                                  Discount Applied
+                                </span>
+                                <span className="font-black text-green-600">
+                                  - LKR{" "}
+                                  {feeCalculation.discount_amount.toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+
+                            {feeCalculation.discount_amount > 0 && (
+                              <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-100">
+                                <span className="font-bold text-gray-500 uppercase tracking-widest">
+                                  Fee After Discount
+                                </span>
+                                <span className="font-black text-gray-900">
+                                  LKR{" "}
+                                  {feeCalculation.fee_after_discount.toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+
+                            {feeCalculation.registration_fee_amount > 0 && (
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="font-bold text-gray-500 uppercase tracking-widest">
+                                  Registration Fee
+                                </span>
+                                <span className="font-black text-gray-900">
+                                  LKR{" "}
+                                  {feeCalculation.registration_fee_amount.toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-4 border-t-2 border-indigo-100">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-black text-sm text-indigo-700 uppercase tracking-widest">
+                                Upfront Payment
+                              </span>
+                              <span className="font-black text-2xl text-indigo-600">
+                                LKR{" "}
+                                {feeCalculation.upfront_payment.toLocaleString()}
+                              </span>
+                            </div>
+                            {feeCalculation.upfront_payment === 0 && (
+                              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">
+                                No upfront payment required
+                              </p>
+                            )}
+                          </div>
+
+                          {feeCalculation.installment_count > 0 && (
+                            <div className="pt-3 border-t border-gray-100">
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-xs text-gray-700 uppercase tracking-widest">
+                                  {feeCalculation.installment_count} Monthly
+                                  Installments
+                                </span>
+                                <span className="font-black text-lg text-gray-900">
+                                  LKR{" "}
+                                  {feeCalculation.installment_amount.toLocaleString()}{" "}
+                                  <span className="text-xs font-bold text-gray-400">
+                                    each
+                                  </span>
+                                </span>
+                              </div>
+                              <p className="text-[10px] font-medium text-gray-400 mt-1 uppercase tracking-widest">
+                                Total Installments: LKR{" "}
+                                {(
+                                  feeCalculation.installment_amount *
+                                  feeCalculation.installment_count
+                                ).toLocaleString()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
