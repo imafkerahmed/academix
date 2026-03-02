@@ -22,6 +22,8 @@ export default function StudentPaymentsPage() {
     null,
   );
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [installments, setInstallments] = useState<any[]>([]);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
 
   useEffect(() => {
@@ -60,41 +62,45 @@ export default function StudentPaymentsPage() {
 
   const fetchEnrollments = async (studentId: string) => {
     try {
-      // Fetch enrollments via API endpoint
-      const token = pb.authStore.token;
-      const response = await fetch("/api/student/enrollments", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      // Fetch enrollments for the student
+      const enrollmentRecords = await pb.collection("enrollments").getFullList({
+        filter: `student = "${studentId}"`,
+        expand: "course",
       });
-
-      if (!response.ok) {
-        throw { status: response.status, message: response.statusText };
-      }
-
-      const data = await response.json();
-      const enrollmentRecords = data.enrollments;
-
       // Transform enrollments into course format
-      const courseList = enrollmentRecords.map(
-        (enrollment: any, index: number) => ({
-          id: enrollment.id,
-          name: `Course ${index + 1}`,
-          icon: BookOpen,
-          color: "text-indigo-600",
-          bg: "bg-indigo-50",
-        }),
-      );
-
+      const courseList = enrollmentRecords.map((enrollment: any) => ({
+        id: enrollment.id,
+        name: enrollment.expand?.course?.name || enrollment.id,
+        icon: BookOpen,
+        color: "text-indigo-600",
+        bg: "bg-indigo-50",
+      }));
       setEnrolledCourses(courseList);
-
       // Auto-select if only one course
       if (courseList.length === 1) {
         setSelectedCourse(courseList[0].name);
       }
+
+      // Fetch installments for all enrollments
+      const enrollmentIds = enrollmentRecords.map((e: any) => e.id);
+      const installmentsData = await pb.collection("installments").getFullList({
+        filter: enrollmentIds
+          .map((id: string) => `enrollment = "${id}"`)
+          .join(" || "),
+        sort: "due_date",
+      });
+      setInstallments(installmentsData);
+
+      // Fetch payments for all enrollments
+      const paymentsData = await pb.collection("payments").getFullList({
+        filter: enrollmentIds
+          .map((id: string) => `enrollment = "${id}"`)
+          .join(" || "),
+        sort: "date_paid",
+      });
+      setPayments(paymentsData);
     } catch (error: any) {
-      console.error("Error fetching enrollments:", error);
-      // Handle permission errors by redirecting to login
+      console.error("Error fetching enrollments/payments/installments:", error);
       if (error?.status === 403 || error?.status === 404) {
         toast.error("Permission denied. Please log in again.");
         setLoading(false);
@@ -103,6 +109,8 @@ export default function StudentPaymentsPage() {
         return;
       }
       setEnrolledCourses([]);
+      setInstallments([]);
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -309,7 +317,12 @@ export default function StudentPaymentsPage() {
                     View All
                   </button>
                 </div>
-                <StudentPayment selectedCourse={selectedCourse || undefined} />
+                <StudentPayment
+                  selectedCourse={selectedCourse || undefined}
+                  installments={installments}
+                  payments={payments}
+                  enrolledCourses={enrolledCourses}
+                />
               </div>
             </motion.div>
 

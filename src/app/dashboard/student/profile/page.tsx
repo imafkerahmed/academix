@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
+  Users,
   TrendingUp,
   Shield,
   FileBox,
@@ -84,6 +85,7 @@ export default function StudentProfilePage() {
         avatarUrl: latestUser.avatar
           ? pb.files.getUrl(latestUser, latestUser.avatar)
           : "/profile-img.jpg",
+        academicAdvisor: latestUser.academicAdvisor || "Not Assigned",
       });
 
       // Fetch documents from database
@@ -393,7 +395,13 @@ export default function StudentProfilePage() {
                 },
                 {
                   label: "Date of Birth",
-                  value: studentData.dob,
+                  value: studentData.dob
+                    ? new Date(studentData.dob).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })
+                    : "",
                   icon: Calendar,
                 },
                 {
@@ -434,6 +442,35 @@ export default function StudentProfilePage() {
           </motion.div>
         </div>
       </div>
+
+      {/* Academic Advisor */}
+      <motion.div
+        variants={itemVariants}
+        className="bg-indigo-50 rounded-[2.5rem] border border-indigo-100 p-6"
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
+              <Users size={28} />
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                Academic Advisor
+              </span>
+              <p className="text-xl font-black text-gray-900 mt-1">
+                {studentData.academicAdvisor}
+              </p>
+            </div>
+          </div>
+          <a
+            href="mailto:advisor@academix.edu"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-2xl text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:shadow-lg hover:shadow-indigo-100 transition-all border border-indigo-100"
+          >
+            <Mail size={14} />
+            Contact Advisor
+          </a>
+        </div>
+      </motion.div>
 
       {/* Full Width Bottom Section: Document Vault */}
       <motion.div

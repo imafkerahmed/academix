@@ -47,10 +47,16 @@ type PaymentHistoryItem = {
 
 interface StudentPaymentProps {
   selectedCourse?: string;
+  installments?: any[];
+  payments?: any[];
+  enrolledCourses?: any[];
 }
 
 export default function StudentPayment({
   selectedCourse,
+  installments = [],
+  payments = [],
+  enrolledCourses = [],
 }: StudentPaymentProps) {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
@@ -96,14 +102,11 @@ export default function StudentPayment({
       border: "border-gray-100",
     };
 
-  const courseFees: CourseInfo[] = [];
-  const mockDues: PaymentDue[] = [];
+  // Real data will be fetched from PocketBase
+  // Use props for real data
   const [history, setHistory] = useState<PaymentHistoryItem[]>([]);
-
-  const courseOptions = useMemo(
-    () => Array.from(new Set(courseFees.map((f) => f.courseName))),
-    [courseFees],
-  );
+  const [dues, setDues] = useState<PaymentDue[]>([]);
+  const courseOptions = enrolledCourses.map((c) => c.name);
 
   const onFilesSelected = (fileList: FileList | null) => {
     if (!fileList) return;
@@ -153,12 +156,55 @@ export default function StudentPayment({
     };
   }, []);
 
-  const filteredFeed = useMemo(() => {
-    const list = selectedCourse
-      ? history.filter((h) => h.course === selectedCourse)
-      : history;
-    return list.slice(0, 5);
-  }, [history, selectedCourse]);
+  // Group installments and payments by course
+  const course = selectedCourse;
+  const courseInstallments = installments.filter((i) =>
+    enrolledCourses.find((c) => c.name === course && c.id === i.enrollment),
+  );
+  const coursePayments = payments.filter((p) =>
+    enrolledCourses.find((c) => c.name === course && c.id === p.enrollment),
+  );
+  // Map installments to feed items
+  const installmentFeed = courseInstallments.map((i) => ({
+    id: i.id,
+    date: i.due_date,
+    description: i.remarks || "Installment Due",
+    amount: i.amount,
+    currency: "USD",
+    status: i.status === "paid" ? "Paid" : "Pending",
+    course,
+  }));
+  // Map payments to feed items
+  const paymentFeed = coursePayments.map((p) => ({
+    id: p.id,
+    date: p.date_paid,
+    description: p.remarks || "Payment",
+    amount: p.amount,
+    currency: "USD",
+    status: p.verified ? "Paid" : "Pending",
+    course,
+  }));
+  // Get current month/year
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  // Filter pending installments for current month
+  const pendingThisMonth = installmentFeed.filter(
+    (i) =>
+      i.status === "Pending" &&
+      new Date(i.date).getMonth() === currentMonth &&
+      new Date(i.date).getFullYear() === currentYear,
+  );
+  let filteredFeed;
+  if (pendingThisMonth.length > 0) {
+    filteredFeed = pendingThisMonth.slice(0, 3);
+  } else {
+    // If no pending, show up to 3 most recent verified payments
+    const verifiedPayments = paymentFeed
+      .filter((p) => p.status === "Paid")
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    filteredFeed = verifiedPayments.slice(0, 3);
+  }
 
   const handleSubmitReceipt = async () => {
     if (courseOptions.length > 0 && !activeCourse) {
@@ -172,17 +218,7 @@ export default function StudentPayment({
     setProcessing(true);
     await new Promise((r) => setTimeout(r, 1500));
 
-    const pending: PaymentHistoryItem = {
-      id: `pmt-${Date.now()}`,
-      date: new Date().toISOString().split("T")[0],
-      description: `Payment for ${activeCourse || "General"}`,
-      amount: 100,
-      currency: "USD",
-      status: "Pending",
-      course: activeCourse || undefined,
-    };
-
-    setHistory((prev) => [pending, ...prev]);
+    // TODO: Integrate with PocketBase payments API
     setProcessing(false);
     setShowPayModal(false);
     resetForm();
@@ -469,8 +505,6 @@ export default function StudentPayment({
           <PaymentHistoryModal
             onClose={() => setShowHistoryModal(false)}
             history={history}
-            mockDues={mockDues}
-            courseFees={courseFees}
             courseOptions={courseOptions}
             selectedCourse={selectedCourse}
           />
@@ -484,8 +518,6 @@ export default function StudentPayment({
 function PaymentHistoryModal({
   onClose,
   history,
-  mockDues,
-  courseFees,
   courseOptions,
   selectedCourse,
 }: any) {
@@ -509,21 +541,16 @@ function PaymentHistoryModal({
     );
 
   const mergedRows = useMemo(() => {
-    const historical = history.map((h: any) => ({ ...h, type: "Payment" }));
-    const dues = mockDues.map((d: any) => ({
-      id: `due-${d.course}-${d.dueDate}`,
-      date: d.dueDate,
-      description: d.description || d.course,
-      amount: d.amount,
-      currency: d.currency,
-      status: "Outstanding",
-      course: d.course,
-      type: "Invoice",
-    }));
-    return [...dues, ...historical]
-      .filter((r: any) => !filterCourse || r.course === filterCourse)
+    // Show all verified payments and all pending payments
+    const allPayments = history.map((h: any) => ({ ...h, type: "Payment" }));
+    return allPayments
+      .filter(
+        (r: any) =>
+          (!filterCourse || r.course === filterCourse) &&
+          (r.status === "Paid" || r.status === "Pending"),
+      )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [history, mockDues, filterCourse]);
+  }, [history, filterCourse]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

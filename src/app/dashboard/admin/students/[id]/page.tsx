@@ -1319,7 +1319,14 @@ export default function StudentDetail() {
                     {
                       label: "Date of Birth",
                       value: student.dateOfBirth
-                        ? student.dateOfBirth.split("T")[0]
+                        ? new Date(student.dateOfBirth).toLocaleDateString(
+                            "en-US",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            },
+                          )
                         : "Not Provided",
                       icon: Calendar,
                     },
