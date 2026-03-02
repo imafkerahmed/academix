@@ -62,6 +62,8 @@ export default function StudentPayment({
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [activeCourse, setActiveCourse] = useState<string>("");
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [modalStep, setModalStep] = useState(1); // 1 = choose amount, 2 = upload/remarks
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [fileError, setFileError] = useState<string>("");
@@ -103,10 +105,7 @@ export default function StudentPayment({
       border: "border-gray-100",
     };
 
-  // Real data will be fetched from PocketBase
-  // Use props for real data
-  const [history, setHistory] = useState<PaymentHistoryItem[]>([]);
-  const [dues, setDues] = useState<PaymentDue[]>([]);
+  // Real data will be fetched from PocketBase via props
   const courseOptions = enrolledCourses.map((c) => c.name);
 
   const onFilesSelected = (fileList: FileList | null) => {
@@ -124,6 +123,8 @@ export default function StudentPayment({
     setPreviews([]);
     setFileError("");
     setRemarks("");
+    setSelectedInvoice(null);
+    setModalStep(1);
   };
 
   const closePayModal = () => {
@@ -142,6 +143,7 @@ export default function StudentPayment({
   useEffect(() => {
     const handleOpenPay = (e: any) => {
       if (e.detail?.course) setActiveCourse(e.detail.course);
+      setSelectedInvoice(null);
       setShowPayModal(true);
     };
     const handleOpenHistory = () => setShowHistoryModal(true);
@@ -188,6 +190,12 @@ export default function StudentPayment({
     payment_type: p.payment_type,
   }));
 
+  // derive combined history from installments and payments feeds
+  const history = useMemo(
+    () => [...installmentFeed, ...paymentFeed],
+    [installmentFeed, paymentFeed],
+  );
+
   // Get current month/year
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -199,6 +207,60 @@ export default function StudentPayment({
       new Date(i.date).getMonth() === currentMonth &&
       new Date(i.date).getFullYear() === currentYear,
   );
+
+  // Calculate total balance for the selected course
+  const totalBalance = useMemo(() => {
+    // Sum all pending installment amounts for the selected course
+    return installmentFeed
+      .filter((i) => i.status === "Pending")
+      .reduce((sum, i) => sum + i.amount, 0);
+  }, [installmentFeed]);
+
+  // prepare options for pay modal
+  const paymentOptions = useMemo(() => {
+    // start with due this month installments
+    let opts = pendingThisMonth.map((i) => ({
+      ...i,
+      label: i.description,
+    }));
+
+    // additionally include any pending registration/upfront payments
+    const extra = paymentFeed
+      .filter(
+        (p) =>
+          p.status === "Pending" &&
+          (p.payment_type === "registration" || p.payment_type === "upfront"),
+      )
+      .map((p) => ({
+        id: p.id,
+        date: p.date,
+        description: p.description,
+        amount: p.amount,
+        currency: p.currency,
+        status: p.status,
+        course: p.course,
+        payment_type: p.payment_type,
+        label:
+          p.payment_type === "registration"
+            ? "Registration Fee"
+            : "Upfront Fee",
+      }));
+
+    opts = [...opts, ...extra];
+
+    if (opts.length > 0) return opts;
+
+    // fallback option: full balance
+    return [
+      {
+        id: "full",
+        label: "Full Balance",
+        amount: totalBalance,
+        currency: "USD",
+        status: "Pending",
+      },
+    ];
+  }, [pendingThisMonth, totalBalance, paymentFeed]);
   // Find registration and upfront payments using payment_type field
   // Show registration and upfront payments for the selected course, regardless of status
   const registrationPayments = paymentFeed.filter(
@@ -235,6 +297,10 @@ export default function StudentPayment({
   const handleSubmitReceipt = async () => {
     if (courseOptions.length > 0 && !activeCourse) {
       setFileError("Please select a course.");
+      return;
+    }
+    if (!selectedInvoice) {
+      setFileError("Please choose an amount to pay.");
       return;
     }
     if (files.length === 0) {
@@ -416,41 +482,119 @@ export default function StudentPayment({
 
                 {activeCourse ? (
                   <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-4">
-                        Upload Multi-receipts
-                      </label>
-                      <div className="relative group">
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*,.pdf"
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                          onChange={(e) => onFilesSelected(e.target.files)}
-                        />
-                        <div className="w-full border-4 border-dashed border-gray-50 bg-gray-50/30 rounded-[2.5rem] p-12 text-center group-hover:border-indigo-100 group-hover:bg-indigo-50/10 transition-all duration-500">
-                          <Plus
-                            className="mx-auto text-gray-300 group-hover:text-indigo-600 mb-4"
-                            size={40}
-                          />
-                          <p className="text-lg font-black text-gray-500 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
-                            Drop files or click
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                    {/* two-step wizard inside modal */}
+                    {modalStep === 1 ? (
+                      <>
+                        <fieldset className="space-y-4">
+                          <legend className="text-sm font-black text-gray-500 uppercase tracking-widest ml-1">
+                            Select Amount to Pay
+                          </legend>
+                          {paymentOptions.map((opt: any) => (
+                            <label
+                              key={opt.id}
+                              className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 hover:shadow-lg cursor-pointer transition-all"
+                            >
+                              <div className="flex items-center gap-4">
+                                <input
+                                  type="radio"
+                                  name="invoice"
+                                  value={opt.id}
+                                  checked={selectedInvoice?.id === opt.id}
+                                  onChange={() => setSelectedInvoice(opt)}
+                                  className="form-radio h-5 w-5 text-indigo-600"
+                                />
+                                <span className="text-sm font-bold text-gray-900">
+                                  {opt.label}
+                                </span>
+                              </div>
+                              <span className="inline-block px-3 py-1 text-xs font-black uppercase tracking-wide bg-gray-100 rounded-full">
+                                {formatCurrency(opt.amount, opt.currency)}
+                              </span>
+                            </label>
+                          ))}
+                        </fieldset>
 
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-4">
-                        Remarks
-                      </label>
-                      <textarea
-                        className="w-full bg-gray-50 border-gray-100 rounded-[2rem] p-8 text-sm font-bold focus:ring-4 focus:ring-indigo-100 focus:bg-white transition-all outline-none min-h-[140px]"
-                        placeholder="Type any instructions..."
-                        value={remarks}
-                        onChange={(e) => setRemarks(e.target.value)}
-                      />
-                    </div>
+                        <div className="text-right">
+                          <button
+                            className="mt-4 inline-flex items-center gap-2 bg-indigo-600 text-white font-black py-3 px-6 rounded-[2rem] shadow-lg hover:shadow-indigo-200 transition-all disabled:opacity-50"
+                            disabled={!selectedInvoice}
+                            onClick={() => setModalStep(2)}
+                          >
+                            Continue
+                            <ArrowRight size={18} />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {selectedInvoice && (
+                          <div className="text-sm font-bold text-gray-700">
+                            Amount to pay:{" "}
+                            {formatCurrency(
+                              selectedInvoice.amount,
+                              selectedInvoice.currency,
+                            )}
+                          </div>
+                        )}
+
+                        <div className="space-y-3">
+                          <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-4">
+                            Upload Multi-receipts
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*,.pdf"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              onChange={(e) => onFilesSelected(e.target.files)}
+                            />
+                            <div className="w-full border-4 border-dashed border-gray-50 bg-gray-50/30 rounded-[2.5rem] p-12 text-center group-hover:border-indigo-100 group-hover:bg-indigo-50/10 transition-all duration-500">
+                              <Plus
+                                className="mx-auto text-gray-300 group-hover:text-indigo-600 mb-4"
+                                size={40}
+                              />
+                              <p className="text-lg font-black text-gray-500 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
+                                Drop files or click
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-4">
+                            Remarks
+                          </label>
+                          <textarea
+                            className="w-full bg-gray-50 border-gray-100 rounded-[2rem] p-8 text-sm font-bold focus:ring-4 focus:ring-indigo-100 focus:bg-white transition-all outline-none min-h-[140px]"
+                            placeholder="Type any instructions..."
+                            value={remarks}
+                            onChange={(e) => setRemarks(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="flex justify-between mt-6">
+                          <button
+                            className="inline-flex items-center gap-2 bg-gray-200 text-gray-700 font-black py-3 px-6 rounded-[2rem] hover:bg-gray-300 transition-all"
+                            onClick={() => setModalStep(1)}
+                          >
+                            Back
+                          </button>
+                          <button
+                            className="inline-flex items-center gap-2 bg-indigo-600 text-white font-black py-3 px-6 rounded-[2rem] shadow-lg hover:shadow-indigo-200 transition-all disabled:opacity-50"
+                            disabled={
+                              processing || !activeCourse || files.length === 0
+                            }
+                            onClick={handleSubmitReceipt}
+                          >
+                            {processing
+                              ? "Uploading Data..."
+                              : "Confirm & Submit"}
+                            {!processing && <ArrowRight size={18} />}
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-20 bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
@@ -459,7 +603,7 @@ export default function StudentPayment({
                       size={48}
                     />
                     <p className="text-sm font-black text-gray-600 uppercase tracking-widest">
-                      Please select a course
+                      Please select an amount to pay
                     </p>
                   </div>
                 )}
@@ -571,14 +715,25 @@ function PaymentHistoryModal({
     );
 
   const mergedRows = useMemo(() => {
-    // Show all verified payments (including registration/upfront) and all pending payments
+    // Show all verified payments (including registration/upfront) and pending
+    // payments only if they fall in the current month/year
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
     const allPayments = history.map((h: any) => ({ ...h, type: "Payment" }));
     return allPayments
-      .filter(
-        (r: any) =>
-          (!filterCourse || r.course === filterCourse) &&
-          (r.status === "Paid" || r.status === "Pending"),
-      )
+      .filter((r: any) => {
+        if (filterCourse && r.course !== filterCourse) return false;
+        if (r.status === "Paid") return true;
+        if (r.status === "Pending") {
+          const d = new Date(r.date);
+          return (
+            d.getMonth() === currentMonth && d.getFullYear() === currentYear
+          );
+        }
+        return false;
+      })
       .sort(
         (a: { date: string }, b: { date: string }) =>
           new Date(b.date).getTime() - new Date(a.date).getTime(),
@@ -660,7 +815,11 @@ function PaymentHistoryModal({
                   </div>
                   <div>
                     <h4 className="font-black text-gray-900 text-xl tracking-tight transition-colors group-hover:text-indigo-600">
-                      {row.description}
+                      {row.payment_type === "registration"
+                        ? "Registration Fee"
+                        : row.payment_type === "upfront"
+                          ? "Upfront Fee"
+                          : row.description}
                     </h4>
                     <div className="flex items-center gap-4 mt-2 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">
                       <span>{row.date}</span>
@@ -711,30 +870,6 @@ function PaymentHistoryModal({
               </p>
             </div>
           )}
-        </div>
-
-        <div className="p-10 bg-white border-t border-gray-100 flex items-center justify-between relative z-10">
-          <div className="flex gap-16">
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                Cumulative Paid
-              </p>
-              <p className="text-3xl font-black text-gray-900 tracking-tighter">
-                $8,540.00
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                Pending Dues
-              </p>
-              <p className="text-3xl font-black text-red-600 tracking-tighter">
-                $1,200.00
-              </p>
-            </div>
-          </div>
-          <button className="bg-indigo-600 text-white font-black px-12 py-5 rounded-[2rem] shadow-2xl shadow-indigo-100 hover:shadow-indigo-200 hover:-translate-y-1 transition-all duration-300 uppercase tracking-tighter">
-            Download Full Statement
-          </button>
         </div>
       </motion.div>
     </div>
