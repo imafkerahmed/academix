@@ -58,6 +58,8 @@ export default function StudentPayment({
   payments = [],
   enrolledCourses = [],
 }: StudentPaymentProps) {
+  // Find registration and upfront payments for the course
+  // registrationPayments and upfrontPayments should be filtered from the mapped paymentFeed below
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [activeCourse, setActiveCourse] = useState<string>("");
@@ -173,16 +175,18 @@ export default function StudentPayment({
     currency: "USD",
     status: i.status === "paid" ? "Paid" : "Pending",
     course,
+    payment_type: i.payment_type || "installment", // Ensure payment_type exists
   }));
   // Map payments to feed items
   const paymentFeed = coursePayments.map((p) => ({
     id: p.id,
-    date: p.date_paid,
+    date: p.date_paid || p.created || "",
     description: p.remarks || "Payment",
     amount: p.amount,
     currency: "USD",
     status: p.verified ? "Paid" : "Pending",
     course,
+    payment_type: p.payment_type,
   }));
   // Get current month/year
   const now = new Date();
@@ -195,14 +199,36 @@ export default function StudentPayment({
       new Date(i.date).getMonth() === currentMonth &&
       new Date(i.date).getFullYear() === currentYear,
   );
+  // Find registration and upfront payments using payment_type field
+  // Show registration and upfront payments for the selected course, regardless of status
+  const registrationPayments = paymentFeed.filter(
+    (p) => p.payment_type === "registration",
+  );
+  const upfrontPayments = paymentFeed.filter(
+    (p) => p.payment_type === "upfront",
+  );
+
   let filteredFeed;
   if (pendingThisMonth.length > 0) {
-    filteredFeed = pendingThisMonth.slice(0, 3);
+    filteredFeed = [
+      ...pendingThisMonth,
+      ...registrationPayments,
+      ...upfrontPayments,
+    ]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 3);
   } else {
-    // If no pending, show up to 3 most recent verified payments
-    const verifiedPayments = paymentFeed
-      .filter((p) => p.status === "Paid")
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Always show registration and upfront payments, plus up to 3 most recent verified payments
+    const verifiedPayments = [
+      ...registrationPayments,
+      ...upfrontPayments,
+      ...paymentFeed.filter(
+        (p) =>
+          p.status === "Paid" &&
+          p.payment_type !== "registration" &&
+          p.payment_type !== "upfront",
+      ),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     filteredFeed = verifiedPayments.slice(0, 3);
   }
 
@@ -293,7 +319,11 @@ export default function StudentPayment({
                   </div>
                   <div>
                     <h4 className="font-black text-gray-900 text-lg tracking-tight group-hover/card:text-indigo-600 transition-colors">
-                      {item.description}
+                      {item.payment_type === "registration"
+                        ? "Registration Fee"
+                        : item.payment_type === "upfront"
+                          ? "Upfront Fee"
+                          : item.description}
                     </h4>
                     <div className="flex items-center gap-3 mt-1.5 text-[10px] font-black uppercase tracking-widest text-gray-400">
                       <span>{item.date}</span>
@@ -541,7 +571,7 @@ function PaymentHistoryModal({
     );
 
   const mergedRows = useMemo(() => {
-    // Show all verified payments and all pending payments
+    // Show all verified payments (including registration/upfront) and all pending payments
     const allPayments = history.map((h: any) => ({ ...h, type: "Payment" }));
     return allPayments
       .filter(
@@ -549,7 +579,10 @@ function PaymentHistoryModal({
           (!filterCourse || r.course === filterCourse) &&
           (r.status === "Paid" || r.status === "Pending"),
       )
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort(
+        (a: { date: string }, b: { date: string }) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
   }, [history, filterCourse]);
 
   return (
