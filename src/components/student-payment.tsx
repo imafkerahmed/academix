@@ -4,7 +4,6 @@ import React, { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CreditCard,
-  TrendingUp,
   Plus,
   FileText,
   CheckCircle,
@@ -188,6 +187,7 @@ export default function StudentPayment({
     course,
     payment_type: p.payment_type,
   }));
+
   // Get current month/year
   const now = new Date();
   const currentMonth = now.getMonth();

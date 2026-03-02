@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Loader2,
   Lock,
+  Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import pb from "@/lib/pocketbase";
@@ -25,6 +26,58 @@ export default function StudentPaymentsPage() {
   const [payments, setPayments] = useState<any[]>([]);
   const [installments, setInstallments] = useState<any[]>([]);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
+
+  // compute totals for selected course
+  const formatCurrency = (amount: number, currency = "USD") =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
+      amount,
+    );
+
+  const { totalPaid, totalBalance, totalDueThisMonth } = React.useMemo(() => {
+    const course = selectedCourse;
+    const courseInstallments = installments.filter((i) =>
+      enrolledCourses.find((c) => c.name === course && c.id === i.enrollment),
+    );
+    const coursePayments = payments.filter((p) =>
+      enrolledCourses.find((c) => c.name === course && c.id === p.enrollment),
+    );
+    const paid = coursePayments
+      .filter((p) => p.verified || p.status === "Paid")
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalDue = courseInstallments.reduce(
+      (sum, i) => sum + (i.amount || 0),
+      0,
+    );
+    const balance = totalDue - paid;
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    let dueThisMonth = courseInstallments
+      .filter(
+        (i) =>
+          new Date(i.due_date).getMonth() === currentMonth &&
+          new Date(i.due_date).getFullYear() === currentYear,
+      )
+      .reduce((sum, i) => sum + (i.amount || 0), 0);
+
+    // include any unpaid registration or upfront fees regardless of date
+    const regUpfrontDue = coursePayments
+      .filter(
+        (p) =>
+          !p.verified &&
+          (p.payment_type === "registration" || p.payment_type === "upfront"),
+      )
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    dueThisMonth += regUpfrontDue;
+
+    return {
+      totalPaid: paid,
+      totalBalance: balance,
+      totalDueThisMonth: dueThisMonth,
+    };
+  }, [selectedCourse, installments, payments, enrolledCourses]);
 
   useEffect(() => {
     const checkAccountStatus = async () => {
@@ -275,7 +328,7 @@ export default function StudentPaymentsPage() {
               transition={{ delay: 0.4, duration: 0.6 }}
               className="lg:col-span-8 space-y-8"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white rounded-[2rem] border border-gray-100 p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-100/30 transition-all duration-500 group">
                   <div className="flex items-center justify-between mb-4">
                     <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors duration-500">
@@ -285,7 +338,9 @@ export default function StudentPaymentsPage() {
                   <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">
                     Total Paid
                   </h3>
-                  <p className="text-3xl font-black text-gray-900">$4,500.00</p>
+                  <p className="text-3xl font-black text-gray-900">
+                    {formatCurrency(totalPaid, "USD")}
+                  </p>
                 </div>
 
                 <div className="bg-white rounded-[2rem] border border-gray-100 p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-100/30 transition-all duration-500 group">
@@ -297,7 +352,23 @@ export default function StudentPaymentsPage() {
                   <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">
                     Total Balance
                   </h3>
-                  <p className="text-3xl font-black text-gray-900">$250.00</p>
+                  <p className="text-3xl font-black text-gray-900">
+                    {formatCurrency(totalBalance, "USD")}
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-[2rem] border border-gray-100 p-6 shadow-sm hover:shadow-xl hover:shadow-indigo-100/30 transition-all duration-500 group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors duration-500">
+                      <Clock size={20} />
+                    </div>
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    Due This Month
+                  </h3>
+                  <p className="text-3xl font-black text-gray-900">
+                    {formatCurrency(totalDueThisMonth, "USD")}
+                  </p>
                 </div>
               </div>
 
