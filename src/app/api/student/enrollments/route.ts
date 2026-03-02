@@ -55,8 +55,10 @@ export async function GET(request: NextRequest) {
     // Try to fetch enrollments - first without filter, fall back to with filter
     let enrollmentRecords: any[] = [];
     try {
-      // Try fetching without filter first
-      enrollmentRecords = await pb.collection("enrollments").getFullList();
+      // Try fetching without filter first, with expand for course data
+      enrollmentRecords = await pb.collection("enrollments").getFullList({
+        expand: "course_intake.course",
+      });
     } catch (filterError: any) {
       console.log(
         `[API] getFullList failed, trying with database backup approach`,
@@ -65,6 +67,7 @@ export async function GET(request: NextRequest) {
       try {
         enrollmentRecords = await pb.collection("enrollments").getFullList({
           filter: `student = "${userId}"`,
+          expand: "course_intake.course",
         });
       } catch (e: any) {
         console.error(`[API] Both approaches failed:`, e);

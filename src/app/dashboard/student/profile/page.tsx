@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
 import {
   User,
   TrendingUp,
@@ -282,6 +283,8 @@ export default function StudentProfilePage() {
       variants={containerVariants}
       className="space-y-10 pb-20"
     >
+      <StudentBreadcrumbs items={[{ label: "Profile" }]} />
+
       <input
         type="file"
         ref={fileInputRef}

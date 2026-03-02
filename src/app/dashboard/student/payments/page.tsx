@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import StudentPayment from "@/components/student-payment";
+import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
 import {
   CreditCard,
   TrendingUp,
@@ -158,55 +159,59 @@ export default function StudentPaymentsPage() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="min-h-[60vh] flex flex-col items-center justify-center"
+          className="space-y-8"
         >
-          <div className="text-center mb-12">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 mx-auto mb-6"
-            >
-              <CreditCard size={40} />
-            </motion.div>
-            <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-2">
-              Select a <span className="text-indigo-600">Course</span>
-            </h1>
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
-              Choose a program to manage your financial records
-            </p>
-          </div>
+          <StudentBreadcrumbs items={[{ label: "Payments" }]} />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl px-6">
-            {enrolledCourses.map((course, idx) => (
-              <motion.button
-                key={course.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + idx * 0.1, duration: 0.5 }}
-                onClick={() => setSelectedCourse(course.name)}
-                className="group bg-white rounded-[2.5rem] border border-gray-100 p-8 text-left transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-2 hover:border-indigo-100 relative overflow-hidden"
+          <div className="min-h-[60vh] flex flex-col items-center justify-center">
+            <div className="text-center mb-12">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 mx-auto mb-6"
               >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full -mr-16 -mt-16 transition-transform duration-700 group-hover:scale-150" />
-                <div className="relative z-10">
-                  <div
-                    className={`w-14 h-14 rounded-2xl ${course.bg} ${course.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 shadow-sm font-black`}
-                  >
-                    <course.icon size={28} />
+                <CreditCard size={40} />
+              </motion.div>
+              <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-2">
+                Select a <span className="text-indigo-600">Course</span>
+              </h1>
+              <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
+                Choose a program to manage your financial records
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl px-6">
+              {enrolledCourses.map((course, idx) => (
+                <motion.button
+                  key={course.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + idx * 0.1, duration: 0.5 }}
+                  onClick={() => setSelectedCourse(course.name)}
+                  className="group bg-white rounded-[2.5rem] border border-gray-100 p-8 text-left transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-2 hover:border-indigo-100 relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full -mr-16 -mt-16 transition-transform duration-700 group-hover:scale-150" />
+                  <div className="relative z-10">
+                    <div
+                      className={`w-14 h-14 rounded-2xl ${course.bg} ${course.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 shadow-sm font-black`}
+                    >
+                      <course.icon size={28} />
+                    </div>
+                    <h3 className="text-xl font-black text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
+                      {course.name}
+                    </h3>
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-loose flex items-center gap-2">
+                      Manage Payments
+                      <ArrowRight
+                        size={14}
+                        className="group-hover:translate-x-1 transition-transform"
+                      />
+                    </p>
                   </div>
-                  <h3 className="text-xl font-black text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
-                    {course.name}
-                  </h3>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-loose flex items-center gap-2">
-                    Manage Payments
-                    <ArrowRight
-                      size={14}
-                      className="group-hover:translate-x-1 transition-transform"
-                    />
-                  </p>
-                </div>
-              </motion.button>
-            ))}
+                </motion.button>
+              ))}
+            </div>
           </div>
         </motion.div>
       ) : (
@@ -216,12 +221,15 @@ export default function StudentPaymentsPage() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
+          className="space-y-8"
         >
+          <StudentBreadcrumbs items={[{ label: "Payments" }]} />
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 mb-8"
+            className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8"
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-center gap-6">

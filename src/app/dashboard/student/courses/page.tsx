@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CourseList from "@/components/CourseList";
+import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
 import { BookOpen, TrendingUp, Loader2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import pb from "@/lib/pocketbase";
@@ -66,17 +67,40 @@ export default function CoursesPage() {
       const enrollmentRecords = data.enrollments;
 
       // Transform enrollments into course format
-      const courseList = enrollmentRecords.map(
-        (enrollment: any, index: number) => ({
+      const courseList = enrollmentRecords.map((enrollment: any) => {
+        // Get course name from expanded relation
+        const courseName =
+          enrollment.expand?.course_intake?.expand?.course?.name ||
+          "Unknown Course";
+
+        // Map enrollement_status to courseStatus
+        const statusMap: Record<string, string> = {
+          enrolled: "Ongoing",
+          "dropped-out": "Dropped Out",
+          expelled: "Expelled",
+          completed: "Completed",
+        };
+        const courseStatus =
+          statusMap[enrollment.enrollement_status || "enrolled"] || "Ongoing";
+
+        // Map certificate_status to certificateStatus
+        const certMap: Record<string, string> = {
+          pending: "Pending",
+          applied: "Applied",
+          delivered: "Issued",
+        };
+        const certificateStatus =
+          certMap[enrollment.certificate_status || "pending"] || "Not Issued";
+
+        return {
           id: enrollment.id,
-          name: `Course ${index + 1}`,
-          registrationNumber: enrollment.id.substring(0, 15).toUpperCase(),
+          name: courseName,
+          registrationNumber: enrollment.registration_number || "",
           description: "",
-          courseStatus:
-            enrollment.status === "completed" ? "Completed" : "Ongoing",
-          certificateStatus: "Not Issued",
-        }),
-      );
+          courseStatus,
+          certificateStatus,
+        };
+      });
 
       setCourses(courseList);
     } catch (error: any) {
@@ -144,6 +168,8 @@ export default function CoursesPage() {
       transition={{ duration: 0.6, ease: "easeOut" }}
       className="space-y-8"
     >
+      <StudentBreadcrumbs items={[{ label: "Courses" }]} />
+
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 shadow-indigo-100/20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-6">

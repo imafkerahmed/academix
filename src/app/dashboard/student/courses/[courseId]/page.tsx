@@ -10,105 +10,10 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RouteLink } from "@/components/ui/route-link";
+import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
 import pb from "@/lib/pocketbase";
 import { Loader2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
-  "1": {
-    id: "1",
-    name: "Mathematics 101",
-    registrationNumber: "REG-2024-001",
-    description: "Intro to Algebra and Calculus",
-    courseStatus: "Ongoing",
-    certificateStatus: "Not Issued",
-    intakeCode: "INT/JUL/2024",
-    startDate: "2024-01-15",
-    endDate: "2024-05-30",
-    semesters: [
-      {
-        id: "sem-1",
-        name: "Semester 1",
-        startDate: "2024-01-15",
-        endDate: "2024-03-30",
-        status: "Completed",
-        subjects: [
-          {
-            id: "sub-1",
-            name: "Linear Algebra",
-            code: "MATH-101-A",
-            instructor: "Prof. Sarah Johnson",
-            progress: 100,
-          },
-          {
-            id: "sub-2",
-            name: "Calculus I",
-            code: "MATH-101-B",
-            instructor: "Dr. Michael Brown",
-            progress: 95,
-          },
-        ],
-      },
-      {
-        id: "sem-2",
-        name: "Semester 2",
-        startDate: "2024-04-01",
-        endDate: "2024-05-30",
-        status: "Ongoing",
-        subjects: [
-          {
-            id: "sub-3",
-            name: "Differential Equations",
-            code: "MATH-101-C",
-            instructor: "Prof. Emily Davis",
-            progress: 65,
-          },
-          {
-            id: "sub-4",
-            name: "Advanced Calculus",
-            code: "MATH-101-D",
-            instructor: "Dr. Michael Brown",
-            progress: 48,
-          },
-        ],
-      },
-    ],
-  },
-  "2": {
-    id: "2",
-    name: "Physics 201",
-    registrationNumber: "REG-2024-002",
-    description: "Mechanics and Thermodynamics",
-    courseStatus: "Completed",
-    certificateStatus: "Issued",
-    intakeCode: "INT/SEP/2023",
-    intakeName: "INTAKE SEPTEMBER 2023",
-    startDate: "2023-09-01",
-    endDate: "2023-12-20",
-    semesters: [
-      {
-        id: "sem-1",
-        name: "Semester 1",
-        startDate: "2023-09-01",
-        endDate: "2023-12-20",
-        status: "Completed",
-        subjects: [
-          {
-            id: "sub-5",
-            name: "Classical Mechanics",
-            code: "PHYS-201-A",
-            instructor: "Dr. Robert Wilson",
-            progress: 100,
-          },
-          {
-            id: "sub-6",
-            name: "Thermodynamics",
-            code: "PHYS-201-B",
-            instructor: "Prof. Lisa Anderson",
-            progress: 100,
-          },
-        ],
-      },
-    ],
-  },
 
 export default function CoursePage() {
   const params = useParams();
@@ -141,48 +46,143 @@ export default function CoursePage() {
     fetchCourseData();
   }, [courseId, router]);
 
-  // Periodic check for account status changes (every 2 seconds)
+  // Periodic check for account status changes (every 30 seconds)
   useEffect(() => {
     const intervalId = setInterval(async () => {
       const currentUser = pb.authStore.model;
       if (!currentUser) return;
 
       try {
-        // Fetch the latest user data from the server
-        const latestUser = await pb
-          .collection("users")
-          .getOne(currentUser.id);
+        // Refresh auth to get latest account status
+        await pb.collection("users").authRefresh();
+        const latestUser = pb.authStore.model;
 
         if (latestUser && latestUser.accountStatus === "disabled") {
           setIsAccountDisabled(true);
         }
       } catch (error) {
-        // Silently handle errors
+        // Silently handle errors - user may be logged out
       }
-    }, 2000);
+    }, 30000);
 
     return () => clearInterval(intervalId);
   }, []);
 
   const fetchCourseData = async () => {
     try {
-      // Fetch enrollment by ID
-      const enrollment = await pb.collection("enrollments").getOne(courseId).catch(() => null);
-      
-      if (enrollment) {
-        setCourse({
-          id: enrollment.id,
-          name: `Course ${courseId.substring(0, 8)}`,
-          registrationNumber: enrollment.id.substring(0, 15).toUpperCase(),
-          description: "",
-          courseStatus: enrollment.status === "completed" ? "Completed" : "Ongoing",
-          certificateStatus: "Not Issued",
-          intakeCode: "",
-          startDate: enrollment.created,
-          endDate: "",
-          semesters: [],
-        });
+      // Fetch enrollment by ID with expanded relations
+      const enrollment = await pb
+        .collection("enrollments")
+        .getOne(courseId, {
+          expand: "course_intake.course,course_intake.intake",
+        })
+        .catch(() => null);
+
+      if (!enrollment) {
+        setLoading(false);
+        return;
       }
+
+      const courseIntake = enrollment.expand?.course_intake;
+      const course = courseIntake?.expand?.course;
+      const intake = courseIntake?.expand?.intake;
+
+      // Fetch course subjects for this course_intake
+      let semesters: any[] = [];
+      if (courseIntake?.id) {
+        const courseSubjects = await pb
+          .collection("course_subjects")
+          .getFullList({
+            filter: `course_intake="${courseIntake.id}"`,
+            expand: "subject,lecturer",
+          });
+
+        // Group subjects by semester
+        const semesterGroups: Record<string, any[]> = {};
+
+        if (courseIntake.is_semester_based && courseIntake.semester_count) {
+          // Initialize semesters
+          for (let i = 1; i <= courseIntake.semester_count; i++) {
+            semesterGroups[`Semester ${i}`] = [];
+          }
+        } else {
+          semesterGroups["All Subjects"] = [];
+        }
+
+        courseSubjects.forEach((cs: any) => {
+          const subjectData = cs.expand?.subject;
+          const lecturerData = cs.expand?.lecturer;
+
+          // Handle both single subject and array of subjects
+          const subjects = Array.isArray(subjectData)
+            ? subjectData
+            : subjectData
+              ? [subjectData]
+              : [];
+
+          subjects.forEach((subject: any) => {
+            const subjectEntry = {
+              id: subject.id,
+              name: subject.name,
+              code: subject.code,
+              instructor:
+                lecturerData?.name || lecturerData?.full_name || "TBA",
+              progress: 0, // Progress tracking not implemented yet
+            };
+
+            const semesterKey = cs.semester || "All Subjects";
+            if (!semesterGroups[semesterKey]) {
+              semesterGroups[semesterKey] = [];
+            }
+            semesterGroups[semesterKey].push(subjectEntry);
+          });
+        });
+
+        // Convert to array format expected by UI
+        semesters = Object.entries(semesterGroups)
+          .filter(([_, subjects]) => subjects.length > 0)
+          .map(([name, subjects], index) => ({
+            id: `sem-${index + 1}`,
+            name,
+            status: "Ongoing",
+            subjects,
+          }));
+      }
+
+      // Map enrollment status
+      const statusMap: Record<string, string> = {
+        enrolled: "Ongoing",
+        "dropped-out": "Dropped Out",
+        expelled: "Expelled",
+        completed: "Completed",
+      };
+      const courseStatus =
+        statusMap[enrollment.enrollement_status || "enrolled"] || "Ongoing";
+
+      // Map certificate status
+      const certMap: Record<string, string> = {
+        pending: "Pending",
+        applied: "Applied",
+        delivered: "Issued",
+      };
+      const certificateStatus =
+        certMap[enrollment.certificate_status || "pending"] || "Not Issued";
+
+      setCourse({
+        id: enrollment.id,
+        name: course?.name || "Unknown Course",
+        registrationNumber: enrollment.registration_number || "",
+        description: course?.description || "",
+        courseStatus,
+        certificateStatus,
+        intakeCode: intake?.code || "",
+        startDate:
+          courseIntake?.start_date ||
+          enrollment.enrollment_date ||
+          enrollment.created,
+        endDate: courseIntake?.end_date || "",
+        semesters,
+      });
     } catch (error) {
       console.error("Error fetching course:", error);
     } finally {
@@ -252,50 +252,8 @@ export default function CoursePage() {
             Account Disabled
           </h1>
           <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-            Your account has been disabled. Please contact the administrator for assistance.
-          </p>
-          <button
-            onClick={() => {
-              pb.authStore.clear();
-              router.push("/login");
-            }}
-            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
-          >
-            Logout
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-      </div>
-    );
-  }
-
-  }
-
-  // Show disabled account message if account is disabled
-  if (pb.authStore.model?.accountStatus === "disabled" || isAccountDisabled) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-12 max-w-md w-full text-center"
-        >
-          <div className="w-20 h-20 bg-red-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
-            <Lock size={32} className="text-red-600" />
-          </div>
-          <h1 className="text-2xl font-black text-gray-900 mb-2">
-            Account Disabled
-          </h1>
-          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-            Your account has been disabled. Please contact the administrator for assistance.
+            Your account has been disabled. Please contact the administrator for
+            assistance.
           </p>
           <button
             onClick={() => {
@@ -339,24 +297,12 @@ export default function CoursePage() {
 
   return (
     <div className="space-y-8">
-      {/* Breadcrumb Navigation - Admin Style */}
-      <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2">
-        <RouteLink
-          href="/dashboard/student"
-          className="hover:text-indigo-600 transition-colors flex items-center gap-1"
-        >
-          Dashboard
-        </RouteLink>
-        <span className="text-gray-300">/</span>
-        <RouteLink
-          href="/dashboard/student/courses"
-          className="hover:text-indigo-600 transition-colors flex items-center gap-1"
-        >
-          Courses
-        </RouteLink>
-        <span className="text-gray-300">/</span>
-        <span className="text-indigo-600">{course.name}</span>
-      </div>
+      <StudentBreadcrumbs
+        items={[
+          { label: "Courses", href: "/dashboard/student/courses" },
+          { label: course.name },
+        ]}
+      />
 
       {/* Header Card */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-start justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">

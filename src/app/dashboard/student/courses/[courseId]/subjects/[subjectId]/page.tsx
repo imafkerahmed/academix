@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RouteLink } from "@/components/ui/route-link";
+import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import pb from "@/lib/pocketbase";
 
@@ -50,29 +51,126 @@ export default function SubjectPage() {
       return;
     }
 
-    // Set empty subject data - no real data available yet
-    setSubject({
-      id: subjectId,
-      name: "Subject",
-      code: subjectId.substring(0, 10).toUpperCase(),
-      instructor: "Instructor",
-      instructorEmail: "",
-      semester: "",
-      courseId: courseId,
-      courseName: "Course",
-      progress: 0,
-      grade: "-",
-      credits: 0,
-      schedule: "",
-      room: "",
-      description: "",
-      attendance: { present: 0, total: 0, percentage: 0 },
-      assignments: [],
-      materials: [],
-      videos: [],
-    });
-    setLoading(false);
+    fetchSubjectData();
   }, [subjectId, courseId, router]);
+
+  const fetchSubjectData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch enrollment (courseId is actually the enrollment ID)
+      const enrollment = await pb.collection("enrollments").getOne(courseId, {
+        expand: "course_intake.course,course_intake.intake",
+      });
+
+      const courseIntake = enrollment.expand?.course_intake;
+      const course = courseIntake?.expand?.course;
+      const intake = courseIntake?.expand?.intake;
+
+      // Fetch the subject directly
+      const subjectRecord = await pb.collection("subjects").getOne(subjectId);
+
+      // Find the course_subject record to get lecturer info
+      let lecturer: any = null;
+      let semester = "";
+      let credits = 0;
+      let courseSubjectIds: string[] = [];
+
+      try {
+        const courseSubjects = await pb
+          .collection("course_subjects")
+          .getFullList({
+            filter: `course_intake="${courseIntake?.id}" && subject ~ "${subjectId}"`,
+            expand: "lecturer",
+          });
+
+        if (courseSubjects.length > 0) {
+          const cs = courseSubjects[0];
+          courseSubjectIds = courseSubjects.map((cs) => cs.id);
+          lecturer = cs.expand?.lecturer;
+          semester = cs.semester || "";
+          credits = cs.credits || 0;
+        }
+      } catch (e) {
+        console.log("Could not fetch course_subjects details");
+      }
+
+      // Fetch all study materials for this course_subject
+      let materials: any[] = [];
+      if (courseSubjectIds.length > 0) {
+        try {
+          // Build filter to match any of the course_subject IDs
+          const filterParts = courseSubjectIds.map(
+            (id) => `course_subject ~ "${id}"`,
+          );
+          const filter = filterParts.join(" || ");
+
+          materials = await pb.collection("study_materials").getFullList({
+            filter,
+            sort: "-created",
+          });
+        } catch (e) {
+          console.log("Could not fetch materials:", e);
+        }
+      }
+
+      // Separate materials by type
+      // Types used: "document", "video-upload", "youtube-link", "video-link"
+      const studyMaterials = materials.filter(
+        (m) => m.type === "document" || !m.type,
+      );
+      const videoMaterials = materials.filter(
+        (m) =>
+          m.type === "video-upload" ||
+          m.type === "youtube-link" ||
+          m.type === "video-link" ||
+          m.type === "video" ||
+          m.type === "youtube",
+      );
+
+      setSubject({
+        id: subjectRecord.id,
+        name: subjectRecord.name,
+        code: subjectRecord.code,
+        instructor: lecturer?.name || lecturer?.full_name || "TBA",
+        instructorEmail: lecturer?.email || "",
+        semester: semester || "N/A",
+        courseId: courseId,
+        courseName: course?.name || "Course",
+        progress: 0,
+        grade: "-",
+        credits: credits,
+        schedule: "",
+        room: "",
+        description: subjectRecord.description || "",
+        attendance: { present: 0, total: 0, percentage: 0 },
+        assignments: [],
+        materials: studyMaterials.map((m) => ({
+          id: m.id,
+          title: m.title,
+          type: m.type || "document",
+          url: m.file ? pb.files.getUrl(m, m.file) : m.video_url || "",
+          uploadedAt: m.created,
+          description: m.description || "",
+        })),
+        videos: videoMaterials.map((m) => ({
+          id: m.id,
+          title: m.title,
+          type: m.type,
+          url: m.video_url || (m.file ? pb.files.getUrl(m, m.file) : ""),
+          duration: m.duration || "",
+          thumbnail: "",
+          description: m.description || "",
+          uploadedAt: m.created,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching subject:", error);
+      setSubject(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load disabled assignments from localStorage
   React.useEffect(() => {
@@ -119,6 +217,35 @@ export default function SubjectPage() {
       /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return match && match[2].length === 11 ? match[2] : null;
+  };
+
+  // Helper function to check if URL is a Google Drive link
+  const isGoogleDriveUrl = (url: string) => {
+    return url.includes("drive.google.com") || url.includes("docs.google.com");
+  };
+
+  // Helper function to extract Google Drive file ID and return embed URL
+  const getGoogleDriveEmbedUrl = (url: string) => {
+    // Handle various Google Drive URL formats:
+    // https://drive.google.com/file/d/FILE_ID/view
+    // https://drive.google.com/open?id=FILE_ID
+    // https://docs.google.com/file/d/FILE_ID/preview
+    let fileId = null;
+
+    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch) {
+      fileId = fileIdMatch[1];
+    } else {
+      const openIdMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (openIdMatch) {
+        fileId = openIdMatch[1];
+      }
+    }
+
+    if (fileId) {
+      return `https://drive.google.com/file/d/${fileId}/preview`;
+    }
+    return null;
   };
 
   // Helper function to convert numeric grade to letter grade
@@ -325,31 +452,16 @@ export default function SubjectPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
-          <button
-            onClick={() => router.push("/dashboard/student")}
-            className="p-2 bg-white border border-gray-100 rounded-xl text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all mr-1"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <RouteLink
-            href="/dashboard/student"
-            className="hover:text-indigo-600 font-bold uppercase tracking-widest text-[10px] transition-colors"
-          >
-            Dashboard
-          </RouteLink>
-          <span className="text-gray-200">/</span>
-          <RouteLink
-            href={`/dashboard/student/courses/${courseId}`}
-            className="hover:text-indigo-600 font-bold uppercase tracking-widest text-[10px] transition-colors"
-          >
-            {subject.courseName}
-          </RouteLink>
-          <span className="text-gray-200">/</span>
-          <span className="text-indigo-600 font-black uppercase tracking-widest text-[10px]">
-            {subject.name}
-          </span>
-        </div>
+        <StudentBreadcrumbs
+          items={[
+            { label: "Courses", href: "/dashboard/student/courses" },
+            {
+              label: subject.courseName || "Course",
+              href: `/dashboard/student/courses/${courseId}`,
+            },
+            { label: subject.name },
+          ]}
+        />
 
         {/* Subject Header */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -579,7 +691,7 @@ export default function SubjectPage() {
                         </h3>
                         <p className="text-sm text-gray-600">
                           Uploaded:{" "}
-                          {new Date(material.uploadDate).toLocaleDateString(
+                          {new Date(material.uploadedAt).toLocaleDateString(
                             "en-US",
                             {
                               year: "numeric",
@@ -638,33 +750,37 @@ export default function SubjectPage() {
                         {video.title}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span className="flex items-center gap-1">
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          {video.duration}
-                        </span>
-                        <span>
-                          Uploaded:{" "}
-                          {new Date(video.uploadDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              year: "numeric",
-                              month: "2-digit",
-                              day: "2-digit",
-                            },
-                          )}
-                        </span>
+                        {video.duration && (
+                          <span className="flex items-center gap-1">
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            {video.duration}
+                          </span>
+                        )}
+                        {video.uploadedAt && (
+                          <span>
+                            Uploaded:{" "}
+                            {new Date(video.uploadedAt).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                              },
+                            )}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1369,7 +1485,7 @@ export default function SubjectPage() {
               <div className="mb-6">
                 <p className="text-sm text-gray-600">
                   Uploaded on{" "}
-                  {new Date(selectedMaterial.uploadDate).toLocaleDateString(
+                  {new Date(selectedMaterial.uploadedAt).toLocaleDateString(
                     "en-US",
                     {
                       year: "numeric",
@@ -1378,6 +1494,11 @@ export default function SubjectPage() {
                     },
                   )}
                 </p>
+                {selectedMaterial.description && (
+                  <p className="text-sm text-gray-700 mt-2">
+                    {selectedMaterial.description}
+                  </p>
+                )}
               </div>
 
               {/* PDF Viewer or Preview */}
@@ -1401,7 +1522,7 @@ export default function SubjectPage() {
                     Preview not available
                   </p>
                   <a
-                    href={selectedMaterial.fileUrl}
+                    href={selectedMaterial.url}
                     download
                     className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                   >
@@ -1426,7 +1547,7 @@ export default function SubjectPage() {
               {/* Actions */}
               <div className="flex gap-3">
                 <a
-                  href={selectedMaterial.fileUrl}
+                  href={selectedMaterial.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-center font-semibold text-sm md:text-base"
@@ -1461,18 +1582,26 @@ export default function SubjectPage() {
                 <div className="flex items-center gap-2 mt-2">
                   <Badge
                     className={
-                      selectedVideo.videoType === "youtube"
+                      selectedVideo.type === "youtube-link" ||
+                      selectedVideo.type === "youtube"
                         ? "bg-red-100 text-red-700"
-                        : "bg-purple-100 text-purple-700"
+                        : isGoogleDriveUrl(selectedVideo.url)
+                          ? "bg-green-100 text-green-700"
+                          : "bg-purple-100 text-purple-700"
                     }
                   >
-                    {selectedVideo.videoType === "youtube"
+                    {selectedVideo.type === "youtube-link" ||
+                    selectedVideo.type === "youtube"
                       ? "YouTube"
-                      : "Video File"}
+                      : isGoogleDriveUrl(selectedVideo.url)
+                        ? "Google Drive"
+                        : "Video File"}
                   </Badge>
-                  <span className="text-sm text-gray-500">
-                    {selectedVideo.duration}
-                  </span>
+                  {selectedVideo.duration && (
+                    <span className="text-sm text-gray-500">
+                      {selectedVideo.duration}
+                    </span>
+                  )}
                 </div>
               </div>
               <button
@@ -1502,14 +1631,29 @@ export default function SubjectPage() {
             <div className="px-4 py-4 md:px-6 md:py-6">
               {/* Video Player */}
               <div className="mb-6">
-                {selectedVideo.videoType === "youtube" ? (
+                {selectedVideo.type === "youtube-link" ||
+                selectedVideo.type === "youtube" ? (
                   <div className="relative w-full pb-[56.25%] bg-black rounded-lg overflow-hidden">
                     <iframe
                       className="absolute top-0 left-0 w-full h-full"
-                      src={`https://www.youtube.com/embed/${getYouTubeVideoId(selectedVideo.videoUrl)}`}
+                      src={`https://www.youtube.com/embed/${getYouTubeVideoId(selectedVideo.url)}`}
                       title={selectedVideo.title}
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    ></iframe>
+                  </div>
+                ) : isGoogleDriveUrl(selectedVideo.url) ? (
+                  <div className="relative w-full pb-[56.25%] bg-black rounded-lg overflow-hidden">
+                    <iframe
+                      className="absolute top-0 left-0 w-full h-full"
+                      src={
+                        getGoogleDriveEmbedUrl(selectedVideo.url) ||
+                        selectedVideo.url
+                      }
+                      title={selectedVideo.title}
+                      frameBorder="0"
+                      allow="autoplay; encrypted-media"
                       allowFullScreen
                     ></iframe>
                   </div>
@@ -1519,7 +1663,7 @@ export default function SubjectPage() {
                       className="w-full"
                       controls
                       controlsList="nodownload"
-                      src={selectedVideo.videoUrl}
+                      src={selectedVideo.url}
                     >
                       Your browser does not support the video tag.
                     </video>
@@ -1539,26 +1683,30 @@ export default function SubjectPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Duration</p>
-                  <p className="font-semibold text-gray-900">
-                    {selectedVideo.duration}
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Uploaded</p>
-                  <p className="font-semibold text-gray-900">
-                    {new Date(selectedVideo.uploadDate).toLocaleDateString(
-                      "en-US",
-                      {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      },
-                    )}
-                  </p>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {selectedVideo.duration && (
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-gray-600 mb-1">Duration</p>
+                    <p className="font-semibold text-gray-900">
+                      {selectedVideo.duration}
+                    </p>
+                  </div>
+                )}
+                {selectedVideo.uploadedAt && (
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-gray-600 mb-1">Uploaded</p>
+                    <p className="font-semibold text-gray-900">
+                      {new Date(selectedVideo.uploadedAt).toLocaleDateString(
+                        "en-US",
+                        {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        },
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
