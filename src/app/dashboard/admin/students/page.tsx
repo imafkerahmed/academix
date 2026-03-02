@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import pb, { isSuperuserOnlyError, logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -59,6 +59,8 @@ interface Student {
 export default function StudentManagement() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
+  const isInitialMount = useRef(true);
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -77,12 +79,18 @@ export default function StudentManagement() {
   >(undefined);
 
   useEffect(() => {
-    fetchStudents(currentPage);
+    const silent = !isInitialMount.current;
+    isInitialMount.current = false;
+    fetchStudents(currentPage, silent);
   }, [router, currentPage, statusFilter, academicFilter, searchQuery]);
 
-  const fetchStudents = async (page = 1) => {
+  const fetchStudents = async (page = 1, silent = false) => {
     try {
-      setLoading(true);
+      if (silent) {
+        setIsFetching(true);
+      } else {
+        setLoading(true);
+      }
       const result = await pb.collection("users").getList(page, perPage, {
         filter: `role = "student" ${
           statusFilter !== "all" ? ` && accountStatus = "${statusFilter}"` : ""
@@ -103,6 +111,7 @@ export default function StudentManagement() {
       setTotalPages(result.totalPages);
       setTotalItems(result.totalItems);
       setLoading(false);
+      setIsFetching(false);
     } catch (error) {
       if (!isSuperuserOnlyError(error)) {
         console.error("Failed to fetch students:", error);
@@ -111,6 +120,7 @@ export default function StudentManagement() {
       setTotalPages(1);
       setTotalItems(0);
       setLoading(false);
+      setIsFetching(false);
     }
   };
 
@@ -447,7 +457,7 @@ export default function StudentManagement() {
       <RegisterStudentModal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
-        onSuccess={() => fetchStudents()}
+        onSuccess={() => fetchStudents(currentPage, true)}
         enrollOnly={enrollTarget}
       />
     </div>

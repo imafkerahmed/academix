@@ -20,6 +20,7 @@ import {
 } from "@/lib/feeCalculator";
 import {
   generateRegistrationNumber,
+  rollbackRegistrationNumber,
   generateInstallmentId,
   generatePaymentReferenceId,
 } from "@/lib/registrationNumberGenerator";
@@ -75,6 +76,7 @@ export function EnrollExistingStudentModal({
     "percentage" | "flat" | null
   >(null);
   const [discountValue, setDiscountValue] = useState(0);
+  const [customUpfrontAmount, setCustomUpfrontAmount] = useState(0);
   const [feeCalculation, setFeeCalculation] =
     useState<EnrollmentFeeCalculation | null>(null);
 
@@ -98,6 +100,9 @@ export function EnrollExistingStudentModal({
         includeRegistrationFee,
         discountType,
         discountValue,
+        paymentOption === "upfront_installments"
+          ? customUpfrontAmount
+          : undefined,
       );
       setFeeCalculation(calc);
     }
@@ -110,6 +115,7 @@ export function EnrollExistingStudentModal({
     includeRegistrationFee,
     discountType,
     discountValue,
+    customUpfrontAmount,
   ]);
 
   function resetModal() {
@@ -120,6 +126,7 @@ export function EnrollExistingStudentModal({
     setIncludeRegistrationFee(true);
     setDiscountType(null);
     setDiscountValue(0);
+    setCustomUpfrontAmount(0);
     setFeeCalculation(null);
   }
 
@@ -178,12 +185,36 @@ export function EnrollExistingStudentModal({
         setDuration(fee.duration);
         setCourseIntakeFeeId(fee.id);
 
-        // Get intake and course codes
-        if (fee.expand?.course_intake?.expand?.intake?.code) {
-          setIntakeCode(fee.expand.course_intake.expand.intake.code);
+        // Get intake and course codes (with direct-fetch fallback)
+        const expandedIntakeCode =
+          fee.expand?.course_intake?.expand?.intake?.code || "";
+        const expandedCourseCode =
+          fee.expand?.course_intake?.expand?.course?.code || "";
+
+        if (!expandedIntakeCode && fee.expand?.course_intake?.intake) {
+          try {
+            const intakeRec = await pb
+              .collection("intakes")
+              .getOne(fee.expand.course_intake.intake);
+            setIntakeCode(intakeRec.code || "");
+          } catch {
+            setIntakeCode("");
+          }
+        } else {
+          setIntakeCode(expandedIntakeCode);
         }
-        if (fee.expand?.course_intake?.expand?.course?.code) {
-          setCourseCode(fee.expand.course_intake.expand.course.code);
+
+        if (!expandedCourseCode && fee.expand?.course_intake?.course) {
+          try {
+            const courseRec = await pb
+              .collection("courses")
+              .getOne(fee.expand.course_intake.course);
+            setCourseCode(courseRec.code || "");
+          } catch {
+            setCourseCode("");
+          }
+        } else {
+          setCourseCode(expandedCourseCode);
         }
       }
     } catch (error) {
@@ -193,18 +224,24 @@ export function EnrollExistingStudentModal({
   }
 
   async function handleEnroll() {
-    if (!selectedStudent || !feeCalculation) return;
+    if (!selectedStudent || !feeCalculation || !courseIntakeFeeId) return;
 
+    if (paymentOption === "upfront_installments" && customUpfrontAmount <= 0) {
+      toast.error("Please enter an upfront amount greater than 0");
+      return;
+    }
+
+    let registrationNumber: string | null = null;
     try {
       setLoading(true);
 
       // Generate registration number
-      const registrationNumber = await generateRegistrationNumber(
+      registrationNumber = await generateRegistrationNumber(
         intakeCode,
         courseCode,
       );
 
-      const enrollmentDate = new Date().toISOString().split("T")[0];
+      const enrollmentDate = new Date().toISOString();
 
       // Create enrollment
       const enrollmentData = {
@@ -213,9 +250,7 @@ export function EnrollExistingStudentModal({
         course_intake: courseIntakeId,
         course_intake_fees: courseIntakeFeeId,
         payment_option: paymentOption,
-        registration_fee: includeRegistrationFee
-          ? feeCalculation.registration_fee_amount
-          : 0,
+        registration_fee: includeRegistrationFee,
         discount_type: discountType || "",
         discount: feeCalculation.discount_amount,
         total_course_fee: feeCalculation.total_course_fee,
@@ -225,7 +260,7 @@ export function EnrollExistingStudentModal({
         installment_count: feeCalculation.installment_count,
         months_remaining: feeCalculation.months_remaining,
         enrollment_date: enrollmentDate,
-        enrollement_status: "active",
+        enrollement_status: "enrolled",
         certificate_status: "pending",
         remarks: "",
       };
@@ -234,60 +269,96 @@ export function EnrollExistingStudentModal({
         .collection("enrollments")
         .create(enrollmentData);
 
-      // Create payment record for upfront amount
-      if (feeCalculation.upfront_payment > 0) {
-        const paymentReferenceId = generatePaymentReferenceId(
-          registrationNumber,
-          "upfront",
-        );
-
-        await pb.collection("payments").create({
-          reference_Id: paymentReferenceId,
-          enrollment: enrollment.id,
-          student: selectedStudent.id,
-          amount: feeCalculation.upfront_payment,
-          payment_type: "upfront",
-          date_paid: null,
-          verified: false,
-          bank_name: "",
-          remarks: "Upfront payment - pending verification",
-        });
-      }
-
-      // Create installment records
-      if (feeCalculation.installment_count > 0) {
-        const startMonth = paymentOption === "upfront_installments" ? 1 : 0;
-
-        for (let i = 1; i <= feeCalculation.installment_count; i++) {
-          const installmentId = generateInstallmentId(registrationNumber, i);
-
-          // Calculate due date
-          const dueDate = new Date(enrollmentDate);
-          dueDate.setMonth(dueDate.getMonth() + startMonth + i);
-          const dueDateString = dueDate.toISOString().split("T")[0];
-
-          await pb.collection("installments").create({
-            installement_id: installmentId,
+      // Auto-create payment and installment records (non-blocking)
+      try {
+        // Registration fee — always a separate record
+        if (
+          includeRegistrationFee &&
+          feeCalculation.registration_fee_amount > 0
+        ) {
+          await pb.collection("payments").create({
+            reference_Id: generatePaymentReferenceId(
+              registrationNumber,
+              "registration",
+            ),
             enrollment: enrollment.id,
-            due_date: dueDateString,
-            amount: feeCalculation.installment_amount,
-            status: "pending",
-            remarks: `Installment ${i} of ${feeCalculation.installment_count}`,
+            student: selectedStudent.id,
+            amount: feeCalculation.registration_fee_amount,
+            payment_type: "registration",
+            verified: false,
+            bank_name: "",
+            remarks: "Registration fee - one-time enrollment charge",
           });
         }
+
+        // Course fee upfront portion — separate record
+        const coursePortion =
+          feeCalculation.upfront_payment -
+          (includeRegistrationFee ? feeCalculation.registration_fee_amount : 0);
+        if (coursePortion > 0) {
+          const coursePayType =
+            paymentOption === "full_payment" ? "full_payment" : "upfront";
+          await pb.collection("payments").create({
+            reference_Id: generatePaymentReferenceId(
+              registrationNumber,
+              coursePayType,
+            ),
+            enrollment: enrollment.id,
+            student: selectedStudent.id,
+            amount: coursePortion,
+            payment_type: coursePayType,
+            verified: false,
+            bank_name: "",
+            remarks: `Auto-generated ${coursePayType} payment - Awaiting student payment confirmation`,
+          });
+        }
+
+        // Create installment schedule
+        if (feeCalculation.installment_count > 0) {
+          // upfront_installments: first due month after upfront payment (+1)
+          // installments_only: first due same month as enrollment (+0)
+          const startMonth = paymentOption === "upfront_installments" ? 1 : 0;
+          for (let i = 1; i <= feeCalculation.installment_count; i++) {
+            const installmentId = generateInstallmentId(registrationNumber, i);
+            const dueDate = new Date(enrollmentDate);
+            dueDate.setMonth(dueDate.getMonth() + startMonth + (i - 1));
+            await pb.collection("installments").create({
+              installement_id: installmentId,
+              enrollment: enrollment.id,
+              due_date: dueDate.toISOString().split("T")[0],
+              amount: feeCalculation.installment_amount,
+              status: "pending",
+              remarks: `Installment ${i} of ${feeCalculation.installment_count}`,
+            });
+          }
+        }
+      } catch (paymentError: any) {
+        console.error(
+          "Payment/installment creation error:",
+          paymentError?.message,
+          paymentError?.data,
+        );
       }
 
-      // Update student's academic status to active
+      // Update student's academic status
       await pb.collection("users").update(selectedStudent.id, {
-        academicStatus: "active",
+        academicStatus: "enrolled",
       });
 
       toast.success(`${selectedStudent.name} enrolled successfully!`);
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error("Error enrolling student:", error);
-      toast.error(error?.message || "Failed to enroll student");
+      console.error("Error enrolling student:", error?.message, error?.data);
+      const fieldErrors = error?.data?.data
+        ? Object.entries(error.data.data)
+            .map(([field, err]: any) => `${field}: ${err?.message || err}`)
+            .join(", ")
+        : null;
+      if (registrationNumber) {
+        await rollbackRegistrationNumber(registrationNumber);
+      }
+      toast.error(fieldErrors || error?.message || "Failed to enroll student");
     } finally {
       setLoading(false);
     }
@@ -401,93 +472,121 @@ export function EnrollExistingStudentModal({
           </>
         ) : (
           // Stage 2: Payment Options
-          <div className="space-y-6">
-            {/* Selected Student Info */}
-            <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-100">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-black text-2xl shadow-lg">
-                  {selectedStudent?.name.charAt(0).toUpperCase()}
+          <div className="space-y-5">
+            {/* Selected Student Info - compact */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl">
+              <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center text-white font-black text-base flex-shrink-0">
+                {selectedStudent?.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="font-black text-sm text-gray-900 truncate">
+                  {selectedStudent?.name}
                 </div>
-                <div>
-                  <div className="font-black text-xl text-gray-900">
-                    {selectedStudent?.name}
-                  </div>
-                  <div className="text-sm font-medium text-gray-600 mt-1">
-                    {selectedStudent?.email}
-                  </div>
+                <div className="text-xs font-medium text-gray-400 truncate">
+                  {selectedStudent?.email}
                 </div>
               </div>
             </div>
 
-            {/* Payment Structure Selection */}
+            {/* Payment Structure - compact stacked */}
             <div>
-              <label className="flex items-center gap-2 text-xs font-black text-gray-700 uppercase tracking-widest mb-4">
-                <CreditCard size={14} className="text-green-600" />
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
                 Payment Structure
               </label>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
                 {[
                   {
                     value: "full_payment",
                     label: "Full Payment",
-                    description: "Pay entire course fee + registration upfront",
-                    badge: "Discount Eligible",
+                    desc: "Pay the entire course fee upfront",
                   },
                   {
                     value: "upfront_installments",
                     label: "Upfront + Installments",
-                    description:
-                      "Registration + 1st month now, balance monthly",
-                    badge: "Most Popular",
+                    desc: "Enter an upfront amount — balance splits into monthly installments",
                   },
                   {
                     value: "installments_only",
                     label: "Full Installments",
-                    description: "Pay course fee in monthly installments",
-                    badge: "Max Flexibility",
+                    desc: "Full course fee converts to equal monthly installments",
                   },
                 ].map((option) => (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setPaymentOption(option.value as any)}
-                    className={`relative p-6 rounded-2xl border-2 transition-all text-left ${
+                    onClick={() => {
+                      setPaymentOption(option.value as any);
+                      if (option.value !== "upfront_installments")
+                        setCustomUpfrontAmount(0);
+                    }}
+                    className={`w-full flex items-center justify-between px-5 py-3 rounded-2xl border-2 transition-all text-left ${
                       paymentOption === option.value
-                        ? "border-green-600 bg-white shadow-lg ring-4 ring-green-100"
-                        : "border-gray-100 bg-white/70 hover:border-green-300 hover:bg-white"
+                        ? "border-green-600 bg-green-50"
+                        : "border-gray-100 bg-gray-50 hover:border-green-200"
                     }`}
                   >
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-black text-base text-gray-900 uppercase tracking-wide">
-                            {option.label}
-                          </span>
-                          {paymentOption === option.value && (
-                            <Check
-                              size={20}
-                              className="text-green-600 flex-shrink-0"
-                            />
-                          )}
-                        </div>
-                        <span
-                          className={`inline-block text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${
-                            paymentOption === option.value
-                              ? "bg-green-600 text-white"
-                              : "bg-gray-100 text-gray-400"
-                          }`}
-                        >
-                          {option.badge}
-                        </span>
+                    <div>
+                      <div
+                        className={`text-sm font-black uppercase tracking-wide ${
+                          paymentOption === option.value
+                            ? "text-green-700"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        {option.label}
                       </div>
-                      <p className="text-xs font-medium text-gray-500 leading-relaxed">
-                        {option.description}
-                      </p>
+                      <div className="text-[10px] font-medium text-gray-400 mt-0.5">
+                        {option.desc}
+                      </div>
                     </div>
+                    {paymentOption === option.value && (
+                      <Check
+                        size={16}
+                        className="text-green-600 flex-shrink-0"
+                      />
+                    )}
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Custom Upfront Amount — shown only for upfront_installments */}
+            {paymentOption === "upfront_installments" && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                  Upfront Amount (LKR) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={feeCalculation?.fee_after_discount ?? undefined}
+                  step="100"
+                  value={customUpfrontAmount || ""}
+                  onChange={(e) =>
+                    setCustomUpfrontAmount(parseFloat(e.target.value) || 0)
+                  }
+                  placeholder="e.g. 5000"
+                  className="w-full px-5 py-4 bg-white border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all placeholder:text-gray-300"
+                />
+                {feeCalculation && (
+                  <p className="text-[10px] font-medium text-gray-400 mt-1.5 ml-1">
+                    Balance:{" "}
+                    <span className="font-bold text-gray-600">
+                      LKR{" "}
+                      {Math.max(
+                        0,
+                        feeCalculation.fee_after_discount -
+                          (customUpfrontAmount || 0),
+                      ).toLocaleString()}
+                    </span>{" "}
+                    splits into{" "}
+                    <span className="font-bold text-green-600">
+                      {duration > 1 ? duration - 1 : 1} monthly installments
+                    </span>
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Registration Fee Toggle */}
             <div className="flex items-center justify-between p-5 bg-white rounded-2xl border-2 border-gray-100 shadow-sm">
@@ -605,14 +704,26 @@ export function EnrollExistingStudentModal({
                     </div>
                   )}
                   <div className="border-t-2 border-green-200 pt-3 mt-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-base font-black text-gray-900 uppercase">
-                        Upfront Payment
-                      </span>
-                      <span className="text-2xl font-black text-green-600">
-                        LKR {feeCalculation.upfront_payment.toLocaleString()}
-                      </span>
-                    </div>
+                    {paymentOption === "installments_only" ? (
+                      <p className="text-xs font-bold text-orange-500 uppercase tracking-widest">
+                        No upfront course payment — full fee splits into
+                        installments
+                      </p>
+                    ) : (
+                      <div className="flex justify-between items-center">
+                        <span className="text-base font-black text-gray-900 uppercase">
+                          {paymentOption === "full_payment"
+                            ? "Full Payment"
+                            : "Upfront Payment"}
+                        </span>
+                        <span className="text-2xl font-black text-green-600">
+                          LKR
+                          {paymentOption === "full_payment"
+                            ? ` ${feeCalculation.upfront_payment.toLocaleString()}`
+                            : ` ${customUpfrontAmount.toLocaleString()}`}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {feeCalculation.installment_count > 0 && (
                     <div className="flex justify-between items-center text-sm">

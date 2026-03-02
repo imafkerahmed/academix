@@ -18,6 +18,7 @@ export interface EnrollmentFeeCalculation {
  * @param includeRegistrationFee - Whether to include registration fee
  * @param discountType - Type of discount (percentage or flat amount)
  * @param discountValue - Discount value (percentage number or flat LKR)
+ * @param customUpfrontAmount - For upfront_installments: admin-entered upfront amount (excluding reg fee)
  * @returns Complete fee breakdown
  */
 export function calculateEnrollmentFees(
@@ -28,6 +29,7 @@ export function calculateEnrollmentFees(
   includeRegistrationFee: boolean,
   discountType: "percentage" | "flat" | null,
   discountValue: number,
+  customUpfrontAmount?: number,
 ): EnrollmentFeeCalculation {
   // Apply discount to course fee
   let discountAmount = 0;
@@ -56,12 +58,15 @@ export function calculateEnrollmentFees(
       break;
 
     case "upfront_installments":
-      // Pay registration + first month upfront, rest in installments
-      const monthlyFee = feeAfterDiscount / duration;
-      upfrontPayment = registrationFeeAmount + monthlyFee;
-
-      const remainingBalance = feeAfterDiscount - monthlyFee;
-      installmentCount = duration - 1;
+      // Admin enters a custom upfront amount; registration fee is always on top (separate)
+      // Balance (feeAfterDiscount - customUpfront) splits into (duration - 1) installments
+      const clampedUpfront = Math.min(
+        Math.max(customUpfrontAmount || 0, 0),
+        feeAfterDiscount,
+      );
+      upfrontPayment = registrationFeeAmount + clampedUpfront;
+      const remainingBalance = Math.max(0, feeAfterDiscount - clampedUpfront);
+      installmentCount = duration > 1 ? duration - 1 : 1;
       installmentAmount =
         installmentCount > 0 ? remainingBalance / installmentCount : 0;
       monthsRemaining = installmentCount;

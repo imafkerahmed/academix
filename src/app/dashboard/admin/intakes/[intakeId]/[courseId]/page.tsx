@@ -1204,8 +1204,7 @@ function StudentsList({
           month: "short",
           day: "numeric",
         }),
-        status:
-          enrollment.enrollement_status === "active" ? "Active" : "Inactive",
+        status: enrollment.enrollement_status || "enrolled",
       }));
 
       setStudents(formattedStudents);
@@ -1287,7 +1286,17 @@ function StudentsList({
                     </td>
                     <td className="px-10 py-6 text-center">
                       <Badge
-                        className={`px-4 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${s.status === "Active" ? "bg-green-500 text-white" : "bg-orange-500 text-white"}`}
+                        className={`px-4 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                          s.status === "enrolled"
+                            ? "bg-green-500 text-white"
+                            : s.status === "completed"
+                              ? "bg-blue-500 text-white"
+                              : s.status === "dropped-out"
+                                ? "bg-orange-500 text-white"
+                                : s.status === "expelled"
+                                  ? "bg-red-500 text-white"
+                                  : "bg-gray-400 text-white"
+                        }`}
                       >
                         {s.status}
                       </Badge>
