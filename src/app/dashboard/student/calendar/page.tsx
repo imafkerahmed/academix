@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Calendar from "@/components/Calendar";
-import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
 import { CalendarDays, TrendingUp, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import pb from "@/lib/pocketbase";
@@ -73,8 +72,6 @@ export default function CalendarPage() {
 
   return (
     <>
-      <StudentBreadcrumbs items={[{ label: "Calendar" }]} />
-
       {isAccountDisabled && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}

@@ -95,15 +95,15 @@ export default function SubjectPage() {
         console.log("Could not fetch course_subjects details");
       }
 
-      // Fetch all study materials for this course_subject
+      // Fetch all study materials for this course_subject (only visible ones)
       let materials: any[] = [];
       if (courseSubjectIds.length > 0) {
         try {
-          // Build filter to match any of the course_subject IDs
+          // Build filter to match any of the course_subject IDs and only visible materials
           const filterParts = courseSubjectIds.map(
             (id) => `course_subject ~ "${id}"`,
           );
-          const filter = filterParts.join(" || ");
+          const filter = `(${filterParts.join(" || ")}) && visible = true`;
 
           materials = await pb.collection("study_materials").getFullList({
             filter,
@@ -426,19 +426,34 @@ export default function SubjectPage() {
 
   if (!subject) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
+      <div className="min-h-[400px] flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-gray-100 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+            <svg
+              className="w-10 h-10 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              />
+            </svg>
+          </div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight mb-2">
             Subject Not Found
           </h1>
-          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-6">
+          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-8">
             We couldn&apos;t find this subject
           </p>
           <button
             onClick={() =>
               router.push(`/dashboard/student/courses/${courseId}`)
             }
-            className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+            className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
           >
             Back to Course
           </button>
@@ -448,83 +463,115 @@ export default function SubjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Breadcrumb */}
-        <StudentBreadcrumbs
-          items={[
-            { label: "Courses", href: "/dashboard/student/courses" },
-            {
-              label: subject.courseName || "Course",
-              href: `/dashboard/student/courses/${courseId}`,
-            },
-            { label: subject.name },
-          ]}
-        />
+    <div className="space-y-8">
+      <StudentBreadcrumbs
+        items={[
+          { label: "Courses", href: "/dashboard/student/courses" },
+          {
+            label: subject.courseName || "Course",
+            href: `/dashboard/student/courses/${courseId}`,
+          },
+          { label: subject.name },
+        ]}
+      />
 
-        {/* Subject Header */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-2">
-                {subject.name}
-              </h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                Code: {subject.code}
-              </p>
-            </div>
+      {/* Subject Header Card */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-start justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex items-start gap-6">
+          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50 shrink-0">
+            <span className="font-black text-2xl">
+              {subject.name.charAt(0)}
+            </span>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                Instructor
-              </h3>
-              <p className="text-base font-bold text-gray-900">
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-2">
+              {subject.name}
+            </h1>
+            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+              <Badge
+                variant="secondary"
+                className="bg-indigo-50 text-indigo-600 border-none rounded-lg px-2 py-0.5"
+              >
+                {subject.code}
+              </Badge>
+              <span>•</span>
+              {subject.semester}
+            </p>
+            <div className="flex items-center gap-2 text-sm">
+              <svg
+                className="w-4 h-4 text-indigo-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+              <span className="font-bold text-gray-700">
                 {subject.instructor}
-              </p>
-              <p className="text-sm text-gray-600">{subject.instructorEmail}</p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                Schedule
-              </h3>
-              <p className="text-base font-medium text-gray-900">
-                {subject.schedule}
-              </p>
-              <p className="text-sm text-gray-600">{subject.room}</p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                Semester
-              </h3>
-              <p className="text-base font-bold text-gray-900">
-                {subject.semester}
-              </p>
+              </span>
+              {subject.instructorEmail && (
+                <span className="text-gray-400">
+                  ({subject.instructorEmail})
+                </span>
+              )}
             </div>
           </div>
-
-          {subject.description && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                Description
-              </h3>
-              <p className="text-gray-700">{subject.description}</p>
-            </div>
-          )}
         </div>
 
-        {/* Tabbed Section */}
+        <div className="flex gap-3 flex-wrap items-start">
+          {subject.credits > 0 && (
+            <Badge className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-none bg-amber-100 text-amber-700 hover:bg-amber-100">
+              {subject.credits} Credits
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Info Cards Grid */}
+      {subject.schedule && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-[2rem] border border-gray-100 p-6 flex flex-col gap-2 shadow-sm">
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Schedule
+            </h3>
+            <p className="text-lg font-bold text-gray-900">
+              {subject.schedule}
+            </p>
+            {subject.room && (
+              <p className="text-sm text-gray-500">{subject.room}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {subject.description && (
+        <div className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
+          <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">
+            Subject Description
+          </h3>
+          <p className="text-gray-600 leading-relaxed">{subject.description}</p>
+        </div>
+      )}
+
+      {/* Content Section Header */}
+      <div>
+        <h2 className="text-2xl font-black text-gray-900 tracking-tight mb-6 flex items-center gap-2">
+          Subject <span className="text-indigo-600">Content</span>
+        </h2>
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Tabs */}
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <div className="flex gap-3 mb-8 overflow-x-auto pb-2">
             <button
               onClick={() => setActiveTab(0)}
               className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-200 ${
                 activeTab === 0
                   ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                  : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+                  : "bg-white text-gray-500 border border-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100"
               }`}
             >
               Assignments
@@ -534,7 +581,7 @@ export default function SubjectPage() {
               className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-200 ${
                 activeTab === 1
                   ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                  : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+                  : "bg-white text-gray-500 border border-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100"
               }`}
             >
               Study Materials
@@ -544,7 +591,7 @@ export default function SubjectPage() {
               className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-200 ${
                 activeTab === 2
                   ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                  : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+                  : "bg-white text-gray-500 border border-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100"
               }`}
             >
               Video Materials
@@ -555,7 +602,7 @@ export default function SubjectPage() {
           <div className="mt-6">
             {/* Assignments Tab */}
             {activeTab === 0 && (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {subject.assignments
                   ?.filter((a: any) => !disabledAssignments.includes(a.id))
                   .map((assignment: any) => (
@@ -565,95 +612,121 @@ export default function SubjectPage() {
                         setSelectedAssignment(assignment);
                         setShowAssignmentModal(true);
                       }}
-                      className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                      className="group bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-lg hover:-translate-y-1 hover:border-indigo-100 transition-all duration-300 cursor-pointer"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">
-                            {assignment.title}
-                          </h3>
-                          {assignment.assignmentSheet && (
-                            <span className="px-1.5 py-0.5 bg-green-50 text-[8px] font-black text-green-600 rounded-md flex items-center gap-1 border border-green-100">
-                              SHEET
-                            </span>
-                          )}
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300 shadow-sm shrink-0">
+                          <svg
+                            className="w-6 h-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
+                          </svg>
                         </div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <p className="text-sm text-gray-500 flex items-center gap-1">
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                              />
-                            </svg>
-                            Due:{" "}
-                            {new Date(assignment.dueDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                year: "numeric",
-                                month: "2-digit",
-                                day: "2-digit",
-                              },
-                            )}
-                          </p>
-                          <p className="text-sm text-gray-500 font-bold flex items-center gap-1">
-                            <svg
-                              className="w-3 h-3 text-amber-500"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                              />
-                            </svg>
-                            {assignment.totalMarks} Marks
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-0">
-                        <Badge
-                          className={
-                            assignment.status === "Submitted"
-                              ? "bg-blue-100 text-blue-700"
-                              : assignment.status === "Graded"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-700"
-                          }
-                        >
-                          {assignment.status}
-                        </Badge>
-                        {assignment.grade !== "-" &&
-                          assignment.grade !== "Pending" && (
-                            <>
-                              <Badge
-                                className={`${getGradeBadgeColor(getLetterGrade(assignment.grade))} text-base md:text-lg font-bold px-3 py-1`}
-                              >
-                                {getLetterGrade(assignment.grade)}
-                              </Badge>
-                              <span className="text-sm md:text-base font-semibold text-gray-600">
-                                {assignment.grade}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-black text-gray-900 group-hover:text-indigo-600 transition-colors">
+                              {assignment.title}
+                            </h3>
+                            {assignment.assignmentSheet && (
+                              <span className="px-2 py-0.5 bg-green-50 text-[8px] font-black text-green-600 rounded-lg border border-green-100">
+                                SHEET
                               </span>
-                            </>
-                          )}
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-3 text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                            <span className="flex items-center gap-1.5">
+                              <svg
+                                className="w-3.5 h-3.5 text-indigo-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              Due:{" "}
+                              {new Date(assignment.dueDate).toLocaleDateString(
+                                "en-US",
+                                { month: "short", day: "numeric" },
+                              )}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <svg
+                                className="w-3.5 h-3.5 text-amber-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                              {assignment.totalMarks} Marks
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-4 flex-wrap">
+                            <Badge
+                              className={`rounded-lg text-[9px] font-black uppercase tracking-widest border-none ${
+                                assignment.status === "Submitted"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : assignment.status === "Graded"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-gray-100 text-gray-500"
+                              }`}
+                            >
+                              {assignment.status}
+                            </Badge>
+                            {assignment.grade !== "-" &&
+                              assignment.grade !== "Pending" && (
+                                <Badge
+                                  className={`${getGradeBadgeColor(getLetterGrade(assignment.grade))} rounded-lg text-xs font-black px-3 py-1`}
+                                >
+                                  {getLetterGrade(assignment.grade)} •{" "}
+                                  {assignment.grade}
+                                </Badge>
+                              )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
                 {subject.assignments?.filter(
                   (a: any) => !disabledAssignments.includes(a.id),
                 ).length === 0 && (
-                  <div className="py-12 text-center text-gray-500 bg-white rounded-xl border border-dashed border-gray-200">
-                    No active assignments for this subject.
+                  <div className="col-span-full py-16 text-center">
+                    <div className="w-16 h-16 mx-auto bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                      <svg
+                        className="w-8 h-8 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                      No active assignments
+                    </p>
                   </div>
                 )}
               </div>
@@ -661,20 +734,22 @@ export default function SubjectPage() {
 
             {/* Course Materials Tab */}
             {activeTab === 1 && (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {subject.materials.map((material: any) => (
                   <div
                     key={material.id}
-                    onClick={() => {
-                      setSelectedMaterial(material);
-                      setShowMaterialModal(true);
-                    }}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="group bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-lg hover:-translate-y-1 hover:border-indigo-100 transition-all duration-300"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <div className="flex items-start gap-4">
+                      <div
+                        onClick={() => {
+                          setSelectedMaterial(material);
+                          setShowMaterialModal(true);
+                        }}
+                        className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors duration-300 shadow-sm shrink-0 cursor-pointer"
+                      >
                         <svg
-                          className="w-6 h-6 text-red-600"
+                          className="w-6 h-6"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -685,38 +760,72 @@ export default function SubjectPage() {
                           />
                         </svg>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => {
+                          setSelectedMaterial(material);
+                          setShowMaterialModal(true);
+                        }}
+                      >
+                        <h3 className="font-black text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-2">
                           {material.title}
                         </h3>
-                        <p className="text-sm text-gray-600">
-                          Uploaded:{" "}
+                        <div className="flex items-center gap-2 mt-3">
+                          <Badge className="bg-red-50 text-red-600 border-none rounded-lg text-[9px] font-bold uppercase tracking-wide">
+                            {material.type || "Document"}
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mt-3">
                           {new Date(material.uploadedAt).toLocaleDateString(
                             "en-US",
-                            {
-                              year: "numeric",
-                              month: "2-digit",
-                              day: "2-digit",
-                            },
+                            { month: "short", day: "numeric", year: "numeric" },
                           )}
                         </p>
                       </div>
+                      <a
+                        href={material.url}
+                        download
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-colors duration-200 shrink-0"
+                        title="Download"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                          />
+                        </svg>
+                      </a>
                     </div>
-                    <svg
-                      className="w-5 h-5 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                      />
-                    </svg>
                   </div>
                 ))}
+                {subject.materials.length === 0 && (
+                  <div className="col-span-full py-16 text-center">
+                    <div className="w-16 h-16 mx-auto bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                      <svg
+                        className="w-8 h-8 text-gray-400"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                      No study materials
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -730,7 +839,7 @@ export default function SubjectPage() {
                       setSelectedVideo(video);
                       setShowVideoModal(true);
                     }}
-                    className="flex flex-col md:flex-row gap-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="flex flex-col md:flex-row gap-4 p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <div className="w-full md:w-48 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
                       <svg
@@ -785,16 +894,21 @@ export default function SubjectPage() {
                     </div>
                   </div>
                 ))}
+                {subject.videos.length === 0 && (
+                  <div className="py-12 text-center text-gray-500 bg-white rounded-xl border border-dashed border-gray-200">
+                    No video materials for this subject.
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Assignment Modal */}
       {showAssignmentModal && selectedAssignment && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm md:p-4">
-          <div className="bg-white md:rounded-xl shadow-2xl max-w-4xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto">
+          <div className="bg-white md:rounded-[2rem] shadow-2xl max-w-4xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between z-10">
               <div className="flex-1 pr-2">
@@ -1438,7 +1552,7 @@ export default function SubjectPage() {
       {/* Study Material Modal */}
       {showMaterialModal && selectedMaterial && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm md:p-4">
-          <div className="bg-white md:rounded-xl shadow-2xl max-w-3xl w-full h-full md:h-auto md:max-h-[85vh] overflow-y-auto">
+          <div className="bg-white md:rounded-[2rem] shadow-2xl max-w-3xl w-full h-full md:h-auto md:max-h-[85vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between z-10">
               <div className="flex-1 pr-2">
@@ -1572,7 +1686,7 @@ export default function SubjectPage() {
       {/* Video Modal */}
       {showVideoModal && selectedVideo && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm md:p-4">
-          <div className="bg-white md:rounded-xl shadow-2xl max-w-5xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto">
+          <div className="bg-white md:rounded-[2rem] shadow-2xl max-w-5xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between z-10">
               <div className="flex-1 pr-2">

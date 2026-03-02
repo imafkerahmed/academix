@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import StudentPayment from "@/components/student-payment";
-import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
 import {
   CreditCard,
   TrendingUp,
@@ -161,8 +160,6 @@ export default function StudentPaymentsPage() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="space-y-8"
         >
-          <StudentBreadcrumbs items={[{ label: "Payments" }]} />
-
           <div className="min-h-[60vh] flex flex-col items-center justify-center">
             <div className="text-center mb-12">
               <motion.div
@@ -223,8 +220,6 @@ export default function StudentPaymentsPage() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="space-y-8"
         >
-          <StudentBreadcrumbs items={[{ label: "Payments" }]} />
-
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
