@@ -994,12 +994,27 @@ export default function CourseDetailsPage() {
                   }}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-50 bg-white hover:bg-indigo-50 hover:border-indigo-100 transition-all group"
                 >
-                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                    {lecturer.name.charAt(0)}
+                  {lecturer.avatar ? (
+                    <img
+                      src={pb.files.getURL(lecturer, lecturer.avatar, {
+                        thumb: "100x100",
+                      })}
+                      alt={lecturer.name}
+                      className="w-10 h-10 rounded-xl object-cover ring-2 ring-indigo-100 group-hover:ring-indigo-400 transition-all"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                      {lecturer.name.charAt(0)}
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="font-bold text-gray-900">
+                      {lecturer.name}
+                    </span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {lecturer.userId || lecturer.email}
+                    </span>
                   </div>
-                  <span className="font-bold text-gray-900">
-                    {lecturer.name}
-                  </span>
                 </button>
               ))}
             {allLecturers.length === 0 && (
@@ -1303,6 +1318,7 @@ function StudentsList({
   onAdd?: () => void;
   refreshKey?: number;
 }) {
+  const router = useRouter();
   const [students, setStudents] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -1323,19 +1339,25 @@ function StudentsList({
         sort: "-created",
       });
 
-      const formattedStudents = enrollments.map((enrollment: any) => ({
-        id: enrollment.id,
-        reg: enrollment.registration_number || "N/A",
-        name: enrollment.expand?.student?.name || "Unknown",
-        date: new Date(
-          enrollment.enrollment_date || enrollment.created,
-        ).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        }),
-        status: enrollment.enrollement_status || "enrolled",
-      }));
+      const formattedStudents = enrollments.map((enrollment: any) => {
+        const student = enrollment.expand?.student;
+        return {
+          id: enrollment.id,
+          studentId: student?.id || "",
+          reg: enrollment.registration_number || "N/A",
+          name: student?.name || "Unknown",
+          avatar: student?.avatar || "",
+          collectionId: student?.collectionId || "",
+          date: new Date(
+            enrollment.enrollment_date || enrollment.created,
+          ).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          }),
+          status: enrollment.enrollement_status || "enrolled",
+        };
+      });
 
       setStudents(formattedStudents);
     } catch (error) {
@@ -1391,25 +1413,52 @@ function StudentsList({
             <table className="w-full">
               <thead className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400">
                 <tr>
+                  <th className="px-10 py-6 text-left">Student</th>
                   <th className="px-10 py-6 text-left">Reg No</th>
-                  <th className="px-10 py-6 text-left">Student Name</th>
                   <th className="px-10 py-6 text-left">Enrolled</th>
                   <th className="px-10 py-6 text-center">Status</th>
+                  <th className="px-10 py-6 text-center"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {students.map((s) => (
                   <tr
                     key={s.id}
+                    onClick={() => {
+                      if (s.studentId)
+                        router.push(`/dashboard/admin/students/${s.studentId}`);
+                    }}
                     className="group hover:bg-indigo-50/30 transition-all cursor-pointer"
                   >
+                    <td className="px-10 py-6">
+                      <div className="flex items-center gap-4">
+                        {s.avatar ? (
+                          <img
+                            src={pb.files.getURL(
+                              {
+                                id: s.studentId,
+                                collectionId: s.collectionId,
+                              } as any,
+                              s.avatar,
+                              { thumb: "100x100" },
+                            )}
+                            alt={s.name}
+                            className="w-10 h-10 rounded-xl object-cover ring-2 ring-gray-100 group-hover:ring-indigo-300 transition-all"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold text-sm">
+                            {s.name.charAt(0)}
+                          </div>
+                        )}
+                        <span className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                          {s.name}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-10 py-6">
                       <span className="text-xs font-black text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl">
                         {s.reg}
                       </span>
-                    </td>
-                    <td className="px-10 py-6 font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                      {s.name}
                     </td>
                     <td className="px-10 py-6 text-sm text-gray-500 font-bold">
                       {s.date}
@@ -1430,6 +1479,12 @@ function StudentsList({
                       >
                         {s.status}
                       </Badge>
+                    </td>
+                    <td className="px-10 py-6 text-center">
+                      <ArrowRight
+                        size={16}
+                        className="text-gray-300 group-hover:text-indigo-600 transition-colors"
+                      />
                     </td>
                   </tr>
                 ))}
