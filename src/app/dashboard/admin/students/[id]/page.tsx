@@ -1150,13 +1150,7 @@ export default function StudentDetail() {
         {/* Header with Breadcrumbs & Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <AdminBreadcrumbs
-            items={[
-              { label: "Students", href: "/dashboard/admin/students" },
-              {
-                label: student.name,
-                href: `/dashboard/admin/students/${student.id}`,
-              },
-            ]}
+            items={[{ label: "Students", href: "/dashboard/admin/students" }]}
           />
           <div className="flex items-center gap-3">
             {activeTab === "payments" && <RecordPaymentControl />}
@@ -1445,10 +1439,6 @@ export default function StudentDetail() {
                                   REG NO:{" "}
                                   {enrollment.registration_number || "N/A"}
                                 </p>
-                                <UpdateProfileControl
-                                  student={student}
-                                  onUpdated={(updated) => setStudent(updated)}
-                                />
                               </div>
                             </div>
                             <div className="flex flex-col items-end gap-3">

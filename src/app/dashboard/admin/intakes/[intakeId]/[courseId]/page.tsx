@@ -59,10 +59,8 @@ export default function CourseDetailsPage() {
   const [courseIntake, setCourseIntake] = useState<any>(null);
   const [fees, setFees] = useState<any>(null);
   const [editLoading, setEditLoading] = useState(false);
-
-  // Placeholders for future features
-  const lecturers: string[] = [];
-  const availableSubjects: any[] = [];
+  const [allLecturers, setAllLecturers] = useState<any[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
 
   // Edit form state (matching create course modal structure)
   const [editCourse, setEditCourse] = useState({
@@ -144,6 +142,51 @@ export default function CourseDetailsPage() {
           : "",
         duration: duration,
       });
+
+      // Fetch subjects and lecturers
+      if (courseIntakeRecord?.id) {
+        const subjectsData = await pb
+          .collection("course_subjects")
+          .getFullList({
+            filter: `course_intake="${courseIntakeRecord.id}"`,
+            expand: "subject,lecturer",
+            sort: "semester,created",
+          });
+
+        const formattedSubjects = subjectsData.map((cs: any) => {
+          const subjects = Array.isArray(cs.expand?.subject)
+            ? cs.expand.subject
+            : cs.expand?.subject
+              ? [cs.expand.subject]
+              : [];
+
+          return {
+            id: cs.id,
+            name: subjects.map((s: any) => s.name).join(", ") || "No Subject",
+            code: subjects.map((s: any) => s.code).join(", ") || "N/A",
+            semester: cs.semester || "Semester 1",
+            assignedLecturer: cs.expand?.lecturer?.name || "Not Assigned",
+            credits: cs.credits || 0,
+          };
+        });
+
+        setCourseSubjects(formattedSubjects);
+
+        // Fetch all lecturers for the assignment modal
+        const lecturersData = await pb.collection("users").getFullList({
+          filter: 'role="lecturer"',
+          sort: "name",
+        });
+        setAllLecturers(lecturersData);
+
+        // Fetch all available subjects for the add subject modal
+        const allAvailableSubjects = await pb
+          .collection("subjects")
+          .getFullList({
+            sort: "name",
+          });
+        setAvailableSubjects(allAvailableSubjects);
+      }
     } catch (error: any) {
       console.error("Error fetching course details:", error);
       toast.error("Failed to load course details");
@@ -238,7 +281,7 @@ export default function CourseDetailsPage() {
   const [selectedSemester, setSelectedSemester] = useState("Semester 1");
   const [subjectSearchQuery, setSubjectSearchQuery] = useState("");
   const [selectedSubjectsInModal, setSelectedSubjectsInModal] = useState<
-    string[]
+    { id: string; credits: number }[]
   >([]);
   const [subjectToAssign, setSubjectToAssign] = useState<any>(null);
   const [lecturerSearchQuery, setLecturerSearchQuery] = useState("");
@@ -731,7 +774,10 @@ export default function CourseDetailsPage() {
               Target Semester
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {["Semester 1", "Semester 2"].map((sem) => (
+              {Array.from(
+                { length: courseIntake?.semester_count || 1 },
+                (_, i) => `Semester ${i + 1}`,
+              ).map((sem) => (
                 <button
                   key={sem}
                   onClick={() => setSelectedSemester(sem)}
@@ -765,33 +811,73 @@ export default function CourseDetailsPage() {
               />
             </div>
             <div className="max-h-52 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-              {availableSubjects.map((subj) => (
-                <button
-                  key={subj.code}
-                  onClick={() =>
-                    setSelectedSubjectsInModal((prev) =>
-                      prev.includes(subj.name)
-                        ? prev.filter((s) => s !== subj.name)
-                        : [...prev, subj.name],
-                    )
-                  }
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                    selectedSubjectsInModal.includes(subj.name)
-                      ? "border-indigo-600 bg-indigo-50"
-                      : "border-gray-50 bg-white hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="font-bold text-gray-900">{subj.name}</span>
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      {subj.code}
-                    </span>
+              {availableSubjects
+                .filter(
+                  (s) =>
+                    s.name
+                      .toLowerCase()
+                      .includes(subjectSearchQuery.toLowerCase()) ||
+                    s.code
+                      .toLowerCase()
+                      .includes(subjectSearchQuery.toLowerCase()),
+                )
+                .map((subj) => (
+                  <div
+                    key={subj.id}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                      selectedSubjectsInModal.some((s) => s.id === subj.id)
+                        ? "border-indigo-600 bg-indigo-50"
+                        : "border-gray-50 bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    <button
+                      onClick={() =>
+                        setSelectedSubjectsInModal((prev) =>
+                          prev.some((s) => s.id === subj.id)
+                            ? prev.filter((s) => s.id !== subj.id)
+                            : [...prev, { id: subj.id, credits: 3 }],
+                        )
+                      }
+                      className="flex-1 flex flex-col items-start text-left"
+                    >
+                      <span className="font-bold text-gray-900">
+                        {subj.name}
+                      </span>
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        {subj.code}
+                      </span>
+                    </button>
+                    {selectedSubjectsInModal.some((s) => s.id === subj.id) && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-end mr-2">
+                          <label className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">
+                            Credits
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={
+                              selectedSubjectsInModal.find(
+                                (s) => s.id === subj.id,
+                              )?.credits || 3
+                            }
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setSelectedSubjectsInModal((prev) =>
+                                prev.map((s) =>
+                                  s.id === subj.id ? { ...s, credits: val } : s,
+                                ),
+                              );
+                            }}
+                            className="w-16 px-2 py-1 bg-white border border-indigo-100 rounded-lg text-xs font-bold text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-center"
+                          />
+                        </div>
+                        <Check size={18} className="text-indigo-600" />
+                      </div>
+                    )}
                   </div>
-                  {selectedSubjectsInModal.includes(subj.name) && (
-                    <Check size={18} className="text-indigo-600" />
-                  )}
-                </button>
-              ))}
+                ))}
               {availableSubjects.length === 0 && (
                 <div className="text-center py-8 text-gray-400 text-sm font-bold">
                   No subjects available
@@ -802,14 +888,34 @@ export default function CourseDetailsPage() {
 
           <div className="flex flex-col gap-3 pt-6 border-t border-gray-50">
             <button
-              onClick={() => {
-                const count = selectedSubjectsInModal.length;
-                if (count > 0) {
+              onClick={async () => {
+                try {
+                  const selectedSubjects = selectedSubjectsInModal;
+                  if (selectedSubjects.length === 0) return;
+
+                  // Create course_subjects records for each selected subject
+                  await Promise.all(
+                    selectedSubjects.map((s) =>
+                      pb.collection("course_subjects").create({
+                        course_intake: courseIntake.id,
+                        subject: s.id,
+                        semester: selectedSemester,
+                        credits: s.credits,
+                      }),
+                    ),
+                  );
+
+                  // Re-fetch data to update the UI
+                  fetchData();
+
                   toast.success(
-                    `Added ${count} subjects to ${selectedSemester}`,
+                    `Added ${selectedSubjects.length} subjects to ${selectedSemester}`,
                   );
                   setShowAddSubjectModal(false);
                   setSelectedSubjectsInModal([]);
+                } catch (error) {
+                  console.error("Error adding subjects:", error);
+                  toast.error("Failed to add subjects");
                 }
               }}
               className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase tracking-widest disabled:opacity-50"
@@ -851,28 +957,52 @@ export default function CourseDetailsPage() {
             />
           </div>
           <div className="max-h-60 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-            {lecturers
+            {allLecturers
               .filter((l) =>
-                l.toLowerCase().includes(lecturerSearchQuery.toLowerCase()),
+                l.name
+                  .toLowerCase()
+                  .includes(lecturerSearchQuery.toLowerCase()),
               )
               .map((lecturer) => (
                 <button
-                  key={lecturer}
-                  onClick={() => {
-                    toast.success(
-                      `${lecturer} assigned to ${subjectToAssign?.name}`,
-                    );
-                    setShowLecturerModal(false);
+                  key={lecturer.id}
+                  onClick={async () => {
+                    try {
+                      await pb
+                        .collection("course_subjects")
+                        .update(subjectToAssign.id, {
+                          lecturer: lecturer.id,
+                        });
+
+                      // Update local state
+                      setCourseSubjects((prev) =>
+                        prev.map((s) =>
+                          s.id === subjectToAssign.id
+                            ? { ...s, assignedLecturer: lecturer.name }
+                            : s,
+                        ),
+                      );
+
+                      toast.success(
+                        `${lecturer.name} assigned to ${subjectToAssign?.name}`,
+                      );
+                      setShowLecturerModal(false);
+                    } catch (error) {
+                      console.error("Error assigning lecturer:", error);
+                      toast.error("Failed to assign lecturer");
+                    }
                   }}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-50 bg-white hover:bg-indigo-50 hover:border-indigo-100 transition-all group"
                 >
                   <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                    {lecturer.charAt(0)}
+                    {lecturer.name.charAt(0)}
                   </div>
-                  <span className="font-bold text-gray-900">{lecturer}</span>
+                  <span className="font-bold text-gray-900">
+                    {lecturer.name}
+                  </span>
                 </button>
               ))}
-            {lecturers.length === 0 && (
+            {allLecturers.length === 0 && (
               <div className="text-center py-8 text-gray-400 text-sm font-bold">
                 No lecturers available
               </div>
@@ -1313,6 +1443,15 @@ function StudentsList({
 }
 
 function SubjectsTab({ groupedSubjects, onAdd, onAssign }: any) {
+  // Sort semesters numerically/alphabetically
+  const sortedSemesters = Object.entries(groupedSubjects).sort(([a], [b]) => {
+    // Attempt to extract numbers for sorting (e.g. "Semester 1", "Semester 10")
+    const numA = parseInt(a.replace(/^\D+/g, ""));
+    const numB = parseInt(b.replace(/^\D+/g, ""));
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+    return a.localeCompare(b);
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
@@ -1323,39 +1462,58 @@ function SubjectsTab({ groupedSubjects, onAdd, onAssign }: any) {
           <Plus size={18} /> ADD SUBJECT
         </button>
       </div>
-      {Object.entries(groupedSubjects).map(([sem, subjects]: any) => (
-        <div
-          key={sem}
-          className="bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm"
-        >
-          <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-3">
-            <div className="w-2 h-8 bg-indigo-600 rounded-full" /> {sem}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {subjects.map((subj: any, i: number) => (
-              <div
-                key={i}
-                className="p-6 bg-gray-50/50 border border-gray-100 rounded-3xl flex items-center justify-between group hover:bg-white hover:shadow-md hover:border-indigo-100 transition-all"
-              >
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors">
-                    {subj.name}
-                  </span>
-                  <div
-                    onClick={() => onAssign(subj)}
-                    className="flex items-center gap-2 mt-1 text-xs font-bold text-gray-400 group-hover:text-indigo-400 transition-colors cursor-pointer hover:underline"
-                  >
-                    <User size={12} /> {subj.assignedLecturer}
+      {sortedSemesters.length > 0 ? (
+        sortedSemesters.map(([sem, subjects]: any) => (
+          <div
+            key={sem}
+            className="bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm"
+          >
+            <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-3">
+              <div className="w-2 h-8 bg-indigo-600 rounded-full" /> {sem}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {subjects.map((subj: any, i: number) => (
+                <div
+                  key={i}
+                  className="p-6 bg-gray-50/50 border border-gray-100 rounded-3xl flex items-center justify-between group hover:bg-white hover:shadow-md hover:border-indigo-100 transition-all"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors">
+                      {subj.name}
+                    </span>
+                    <div
+                      onClick={() => onAssign(subj)}
+                      className="flex items-center gap-2 mt-1 text-xs font-bold text-gray-400 group-hover:text-indigo-400 transition-colors cursor-pointer hover:underline"
+                    >
+                      <User size={12} /> {subj.assignedLecturer}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge className="bg-white text-gray-400 border border-gray-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
+                      {subj.code}
+                    </Badge>
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50/50 rounded-lg border border-indigo-100/50">
+                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">
+                        Credits:
+                      </span>
+                      <span className="text-xs font-black text-indigo-600">
+                        {subj.credits}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <Badge className="bg-white text-gray-400 border border-gray-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                  {subj.code}
-                </Badge>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+        ))
+      ) : (
+        <div className="text-center py-20 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm">
+          <BookOpen size={48} className="mx-auto text-gray-300 mb-4" />
+          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+            No subjects assigned to this course yet
+          </p>
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -94,7 +94,8 @@ export default function Sidebar({
   ];
 
   const handleLogout = () => {
-    router.push("/");
+    pb.authStore.clear();
+    router.replace("/login");
   };
 
   return (

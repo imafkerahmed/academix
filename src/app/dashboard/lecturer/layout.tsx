@@ -1,16 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "@/components/lecturer/Sidebar";
 import { SessionWarningModal } from "@/components/SessionWarningModal";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { Menu, Layout as LayoutIcon } from "lucide-react";
-
-// Mock user for the layout
-const mockUser = {
-  name: "Dr. Sarah Johnson",
-  role: "lecturer",
-};
+import pb from "@/lib/pocketbase";
 
 export default function LecturerLayout({
   children,
@@ -18,6 +13,15 @@ export default function LecturerLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [userName, setUserName] = useState("Lecturer");
+
+  useEffect(() => {
+    const user = pb.authStore.model;
+    if (user) {
+      setUserName(user.name || user.username || "Lecturer");
+    }
+  }, []);
+
   const { showWarning, timeRemaining, extendSession, forceLogout } =
     useSessionTimeout({
       timeoutMinutes: 120, // 2 hours
@@ -28,7 +32,7 @@ export default function LecturerLayout({
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans">
       <Sidebar
-        lecturerName={mockUser.name}
+        lecturerName={userName}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />

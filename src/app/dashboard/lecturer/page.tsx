@@ -197,24 +197,20 @@ function DateTimeStatCard() {
 
 export default function LecturerDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<MockUser | null>(mockUser);
+  const [user, setUser] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const currentUser = pb.authStore.model;
-    if (!currentUser || currentUser.role !== "lecturer") {
-      router.push("/login");
+    if (!pb.authStore.isValid || (currentUser as any)?.role !== "lecturer") {
+      router.replace("/login");
       return;
     }
-
-    // Check if account is disabled
-    if (currentUser.accountStatus === "disabled") {
-      return;
-    }
+    setUser(currentUser);
   }, [router]);
 
   // Show disabled account message if account is disabled
-  if (pb.authStore.model?.accountStatus === "disabled") {
+  if (user?.accountStatus === "disabled") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <motion.div
@@ -243,6 +239,16 @@ export default function LecturerDashboard() {
             Logout
           </button>
         </motion.div>
+      </div>
+    );
+  }
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }

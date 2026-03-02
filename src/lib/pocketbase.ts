@@ -170,11 +170,14 @@ export interface CourseSubject {
   id: string;
   course_intake: string;
   subject: string | string[];
+  lecturer?: string;
+  semester?: string;
   credits: number;
   created: string;
   updated: string;
   expand?: {
     subject?: Subject | Subject[];
+    lecturer?: User;
     course_intake?: CourseIntake;
   };
 }

@@ -57,7 +57,7 @@ export default function SettingsPage() {
       link: "Manage Accounts",
       iconBg: "bg-blue-50",
       iconColor: "text-blue-600",
-      href: null,
+      href: "/dashboard/admin/settings/user",
     },
     {
       title: "Academic Structure",

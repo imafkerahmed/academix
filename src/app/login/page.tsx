@@ -83,7 +83,9 @@ export default function LoginPage() {
       console.error("Error data:", error?.data);
       console.error("Error response:", error?.response);
       const errorMsg =
-        error?.data?.message || error.message || "Invalid user ID or password";
+        error?.data?.message ||
+        error?.message ||
+        "Invalid user ID or password. Please try again.";
       setLoginError(errorMsg);
       toast.error(errorMsg);
     } finally {
