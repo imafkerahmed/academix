@@ -1,13 +1,15 @@
 /**
  * Galene WebRTC SFU Client
  *
- * Wraps the Galene WebSocket signaling protocol for connecting to
+ * Implements the Galene WebSocket signaling protocol for connecting to
  * Galene groups (rooms) and managing WebRTC media streams.
  *
- * Protocol reference: https://galene.org/protocol.html
+ * Based on the official Galene protocol.js reference client:
+ * https://github.com/jech/galene/blob/master/static/protocol.js
  */
 
-const GALENE_URL = process.env.NEXT_PUBLIC_GALENE_URL || "http://localhost:8443";
+const GALENE_URL =
+  process.env.NEXT_PUBLIC_GALENE_URL || "http://localhost:8443";
 
 export type GalenePermission = "op" | "present" | "observe";
 
@@ -26,23 +28,55 @@ export interface GaleneStream {
   username?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GaleneEventCallback = (...args: any[]) => void;
+
+/**
+ * Generate a 32-hex-digit random ID (16 bytes), matching official Galene client.
+ */
+function newRandomId(): string {
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  return Array.from(a)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 export class GaleneClient {
   private ws: WebSocket | null = null;
   private group: string = "";
   private username: string = "";
   private password: string = "";
+  /** The connection ID sent in the handshake */
+  private connectionId: string = "";
   private localStream: MediaStream | null = null;
-  private upStreams: Map<string, { pc: RTCPeerConnection; id: string }> =
-    new Map();
+
+  private upStreams: Map<
+    string,
+    {
+      pc: RTCPeerConnection;
+      id: string;
+      localDescriptionSent: boolean;
+      localIceCandidates: RTCIceCandidate[];
+    }
+  > = new Map();
+
   private downStreams: Map<
     string,
-    { pc: RTCPeerConnection; stream: MediaStream; id: string; label?: string; username?: string }
+    {
+      pc: RTCPeerConnection;
+      stream: MediaStream;
+      id: string;
+      label?: string;
+      username?: string;
+      remoteIceCandidates: RTCIceCandidate[];
+    }
   > = new Map();
+
   private listeners: Map<string, GaleneEventCallback[]> = new Map();
   private _connected: boolean = false;
   private _permissions: GalenePermission[] = [];
+  private rtcConfiguration: RTCConfiguration | null = null;
 
   get connected(): boolean {
     return this._connected;
@@ -52,17 +86,11 @@ export class GaleneClient {
     return this._permissions;
   }
 
-  /**
-   * Get the WebSocket URL for a given group
-   */
   private getWsUrl(): string {
     const base = GALENE_URL.replace(/^http/, "ws");
     return `${base}/ws`;
   }
 
-  /**
-   * Register an event listener
-   */
   on(event: string, callback: GaleneEventCallback): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
@@ -70,22 +98,17 @@ export class GaleneClient {
     this.listeners.get(event)!.push(callback);
   }
 
-  /**
-   * Remove an event listener
-   */
   off(event: string, callback: GaleneEventCallback): void {
     const cbs = this.listeners.get(event);
     if (cbs) {
       this.listeners.set(
         event,
-        cbs.filter((cb) => cb !== callback)
+        cbs.filter((cb) => cb !== callback),
       );
     }
   }
 
-  /**
-   * Emit an event to all registered listeners
-   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private emit(event: string, ...args: any[]): void {
     const cbs = this.listeners.get(event);
     if (cbs) {
@@ -94,16 +117,28 @@ export class GaleneClient {
   }
 
   /**
-   * Connect to a Galene group (room)
+   * Get the RTC configuration, using server-provided config if available.
+   */
+  private getRTCConfiguration(): RTCConfiguration {
+    return (
+      this.rtcConfiguration || {
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      }
+    );
+  }
+
+  /**
+   * Connect to a Galene group (room).
    */
   async connect(
     group: string,
     username: string,
-    password: string
+    password: string,
   ): Promise<void> {
     this.group = group;
     this.username = username;
     this.password = password;
+    this.connectionId = newRandomId();
 
     return new Promise((resolve, reject) => {
       try {
@@ -111,11 +146,11 @@ export class GaleneClient {
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
-          // Send handshake
+          // Send handshake with protocol version 2 and our connection ID
           this.send({
             type: "handshake",
             version: ["2"],
-            id: this.generateId(),
+            id: this.connectionId,
           });
         };
 
@@ -128,8 +163,10 @@ export class GaleneClient {
           }
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.ws.onerror = (error: any) => {
-          const wsMsg = error?.message || "Check if Galene server is running at " + wsUrl;
+          const wsMsg =
+            error?.message || "Check if Galene server is running at " + wsUrl;
           console.error("[Galene] WebSocket error:", error, wsMsg);
           this.emit("error", new Error(wsMsg));
           reject(new Error(wsMsg));
@@ -147,31 +184,55 @@ export class GaleneClient {
   }
 
   /**
-   * Handle incoming Galene protocol messages
+   * Handle incoming Galene protocol messages.
    */
   private handleMessage(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     msg: any,
     connectResolve?: (value: void) => void,
-    connectReject?: (reason: any) => void
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    connectReject?: (reason: any) => void,
   ): void {
     switch (msg.type) {
       case "handshake": {
-        // Server accepted handshake, now join the group
-        this.send({
-          type: "join",
-          kind: "join",
-          group: this.group,
-          username: this.username,
-          password: this.password,
-        });
+        if (Array.isArray(msg.version) && msg.version.includes("2")) {
+          // Version 2 confirmed, now join the group
+          this.send({
+            type: "join",
+            kind: "join",
+            group: this.group,
+            username: this.username,
+            password: this.password,
+          });
+        } else {
+          const err = new Error(`Unknown protocol version: ${msg.version}`);
+          this.emit("error", err);
+          if (connectReject) connectReject(err);
+        }
         break;
       }
 
       case "joined": {
-        this._connected = true;
-        this._permissions = msg.permissions || [];
-        this.emit("connected", msg.permissions);
-        if (connectResolve) connectResolve();
+        if (msg.kind === "join") {
+          this._connected = true;
+          this._permissions = msg.permissions || [];
+          this.rtcConfiguration = msg.rtcConfiguration || null;
+          this.emit("connected", msg.permissions);
+
+          // Request to receive audio and video from all participants
+          this.send({
+            type: "request",
+            request: { "": ["audio", "video"] },
+          });
+
+          if (connectResolve) connectResolve();
+        } else if (msg.kind === "leave" || msg.kind === "fail") {
+          this._connected = false;
+          this._permissions = [];
+          const err = new Error(msg.value || msg.error || "Join failed");
+          this.emit("error", err);
+          if (connectReject) connectReject(err);
+        }
         break;
       }
 
@@ -182,6 +243,11 @@ export class GaleneClient {
 
       case "offer": {
         this.handleOffer(msg);
+        break;
+      }
+
+      case "renegotiate": {
+        this.handleRenegotiate(msg);
         break;
       }
 
@@ -196,10 +262,18 @@ export class GaleneClient {
       }
 
       case "abort": {
-        this._connected = false;
-        const error = new Error(msg.value || "Connection aborted by server");
-        this.emit("error", error);
-        if (connectReject) connectReject(error);
+        const abortUp = this.upStreams.get(msg.id);
+        if (abortUp) {
+          abortUp.pc.close();
+          this.upStreams.delete(msg.id);
+        }
+        if (!abortUp) {
+          // Connection-level abort
+          this._connected = false;
+          const error = new Error(msg.value || "Connection aborted by server");
+          this.emit("error", error);
+          if (connectReject) connectReject(error);
+        }
         break;
       }
 
@@ -213,9 +287,10 @@ export class GaleneClient {
         break;
       }
 
-      case "chat": {
+      case "chat":
+      case "chathistory": {
         this.emit("chat", {
-          id: msg.id,
+          id: msg.id || msg.source,
           username: msg.username,
           dest: msg.dest,
           value: msg.value,
@@ -240,90 +315,129 @@ export class GaleneClient {
   }
 
   /**
-   * Publish local media to the group
+   * Publish local media to the group.
+   * Matches the official newUpStream() + negotiate() flow.
    */
   async publishStream(stream: MediaStream, label?: string): Promise<string> {
     this.localStream = stream;
-    const id = this.generateId();
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
+    const id = newRandomId();
+
+    const pc = new RTCPeerConnection(this.getRTCConfiguration());
+
+    const upEntry = {
+      pc,
+      id,
+      localDescriptionSent: false,
+      localIceCandidates: [] as RTCIceCandidate[],
+    };
+    this.upStreams.set(id, upEntry);
+
+    // Buffer ICE candidates until local description is sent
+    pc.onicecandidate = (event) => {
+      if (!event.candidate) return;
+      if (upEntry.localDescriptionSent) {
+        this.send({
+          type: "ice",
+          id: id,
+          candidate: event.candidate,
+        });
+      } else {
+        upEntry.localIceCandidates.push(event.candidate);
+      }
+    };
 
     // Add all tracks from the local stream
     stream.getTracks().forEach((track) => {
       pc.addTrack(track, stream);
     });
 
-    // Handle ICE candidates
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        this.send({
-          type: "ice",
-          id: id,
-          candidate: event.candidate,
-        });
-      }
-    };
-
-    // Create offer
+    // Create and send offer
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    // Send offer to Galene
     this.send({
       type: "offer",
+      source: this.connectionId,
+      username: this.username,
+      kind: "",
       id: id,
-      kind: "up",
-      labels: {
-        [id]: label || "video",
-      },
-      source: id,
-      sdp: offer.sdp,
+      label: label || "video",
+      sdp: pc.localDescription!.sdp,
     });
 
-    this.upStreams.set(id, { pc, id });
+    // Mark local description as sent and flush buffered ICE candidates
+    upEntry.localDescriptionSent = true;
+    for (const candidate of upEntry.localIceCandidates) {
+      this.send({
+        type: "ice",
+        id: id,
+        candidate: candidate,
+      });
+    }
+    upEntry.localIceCandidates = [];
+
     this.emit("localStreamPublished", { id, stream });
     return id;
   }
 
   /**
-   * Handle answer from Galene for our published stream
+   * Handle answer from Galene for our published (upstream) stream.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async handleAnswer(msg: any): Promise<void> {
     const up = this.upStreams.get(msg.id);
-    if (up) {
+    if (!up) {
+      console.warn("[Galene] Got answer for unknown upstream:", msg.id);
+      return;
+    }
+    try {
       await up.pc.setRemoteDescription(
-        new RTCSessionDescription({ type: "answer", sdp: msg.sdp })
+        new RTCSessionDescription({ type: "answer", sdp: msg.sdp }),
       );
+    } catch (e) {
+      console.error("[Galene] Failed to set remote description:", e);
+      up.pc.close();
+      this.upStreams.delete(msg.id);
     }
   }
 
   /**
-   * Handle incoming stream offer from Galene (remote participant)
+   * Handle incoming stream offer from Galene (downstream / remote participant).
+   * Matches the official gotOffer() flow.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async handleOffer(msg: any): Promise<void> {
     const id = msg.id;
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
 
+    // If we already have this upstream, it's a conflict
+    if (this.upStreams.has(id)) {
+      console.error("[Galene] Duplicate connection id in offer");
+      this.send({ type: "abort", id: id });
+      return;
+    }
+
+    // Handle stream replacement
+    if (msg.replace) {
+      const old = this.downStreams.get(msg.replace);
+      if (old) {
+        old.pc.close();
+        this.downStreams.delete(msg.replace);
+        this.emit("remoteStreamRemoved", { id: msg.replace });
+      }
+    }
+
+    const pc = new RTCPeerConnection(this.getRTCConfiguration());
     const stream = new MediaStream();
 
-    pc.ontrack = (event) => {
-      event.streams[0]?.getTracks().forEach((track) => {
-        stream.addTrack(track);
-      });
-      // Update downstream entry with tracks
-      const down = this.downStreams.get(id);
-      if (down) {
-        this.emit("remoteStream", {
-          id,
-          stream: down.stream,
-          label: down.label,
-          username: msg.username || down.username,
-        });
-      }
+    const downEntry = {
+      pc,
+      stream,
+      id,
+      label: msg.label,
+      username: msg.username,
+      remoteIceCandidates: [] as RTCIceCandidate[],
     };
+    this.downStreams.set(id, downEntry);
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -335,46 +449,116 @@ export class GaleneClient {
       }
     };
 
-    this.downStreams.set(id, {
-      pc,
-      stream,
-      id,
-      label: msg.labels?.[id] || msg.label,
-      username: msg.username,
-    });
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === "failed") {
+        // Request renegotiation
+        this.send({ type: "renegotiate", id: id });
+      }
+    };
 
-    await pc.setRemoteDescription(
-      new RTCSessionDescription({ type: "offer", sdp: msg.sdp })
-    );
+    pc.ontrack = (event) => {
+      if (event.streams.length > 0) {
+        downEntry.stream = event.streams[0];
+      } else {
+        event.track && downEntry.stream.addTrack(event.track);
+      }
+      this.emit("remoteStream", {
+        id,
+        stream: downEntry.stream,
+        label: downEntry.label,
+        username: msg.username || downEntry.username,
+      });
+    };
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+    try {
+      await pc.setRemoteDescription(
+        new RTCSessionDescription({ type: "offer", sdp: msg.sdp }),
+      );
 
-    this.send({
-      type: "answer",
-      id: id,
-      sdp: answer.sdp,
-    });
+      // Flush any buffered remote ICE candidates
+      for (const candidate of downEntry.remoteIceCandidates) {
+        await pc.addIceCandidate(candidate).catch(console.warn);
+      }
+      downEntry.remoteIceCandidates = [];
 
-    this.emit("remoteStream", {
-      id,
-      stream,
-      label: msg.labels?.[id] || msg.label,
-      username: msg.username,
-    });
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      this.send({
+        type: "answer",
+        id: id,
+        sdp: pc.localDescription!.sdp,
+      });
+    } catch (e) {
+      console.error("[Galene] Failed to handle downstream offer:", e);
+      pc.close();
+      this.downStreams.delete(id);
+    }
   }
 
   /**
-   * Handle ICE candidates from Galene
+   * Handle renegotiation request from the server for an upstream.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async handleRenegotiate(msg: any): Promise<void> {
+    const up = this.upStreams.get(msg.id);
+    if (!up) {
+      console.warn("[Galene] Renegotiate for unknown upstream:", msg.id);
+      return;
+    }
+
+    try {
+      const offer = await up.pc.createOffer({ iceRestart: true });
+      await up.pc.setLocalDescription(offer);
+
+      this.send({
+        type: "offer",
+        source: this.connectionId,
+        username: this.username,
+        kind: "renegotiate",
+        id: msg.id,
+        sdp: up.pc.localDescription!.sdp,
+      });
+
+      up.localDescriptionSent = true;
+      for (const candidate of up.localIceCandidates) {
+        this.send({
+          type: "ice",
+          id: msg.id,
+          candidate: candidate,
+        });
+      }
+      up.localIceCandidates = [];
+    } catch (e) {
+      console.error("[Galene] Renegotiation failed:", e);
+    }
+  }
+
+  /**
+   * Handle ICE candidates from Galene.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async handleIce(msg: any): Promise<void> {
     const up = this.upStreams.get(msg.id);
     const down = this.downStreams.get(msg.id);
-    const pc = up?.pc || down?.pc;
 
-    if (pc && msg.candidate) {
+    if (up && msg.candidate) {
       try {
-        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+        if (up.pc.remoteDescription) {
+          await up.pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+        }
+        // No buffering needed for upstream remote ICE — we already
+        // have remote description set from the answer.
+      } catch (e) {
+        console.warn("[Galene] Failed to add ICE candidate:", e);
+      }
+    } else if (down && msg.candidate) {
+      try {
+        if (down.pc.remoteDescription) {
+          await down.pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+        } else {
+          down.remoteIceCandidates.push(new RTCIceCandidate(msg.candidate));
+        }
       } catch (e) {
         console.warn("[Galene] Failed to add ICE candidate:", e);
       }
@@ -382,8 +566,9 @@ export class GaleneClient {
   }
 
   /**
-   * Handle remote stream closing
+   * Handle remote stream closing.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private handleStreamClose(msg: any): void {
     const down = this.downStreams.get(msg.id);
     if (down) {
@@ -394,23 +579,31 @@ export class GaleneClient {
   }
 
   /**
-   * Send a chat message to the group
+   * Send a chat message to the group.
    */
   sendChat(message: string, dest?: string): void {
     this.send({
       type: "chat",
-      source: this.username,
+      source: this.connectionId,
+      username: this.username,
       dest: dest || "",
       value: message,
     });
   }
 
   /**
-   * Disconnect from the Galene server
+   * Disconnect from the Galene server.
    */
   disconnect(): void {
     // Close all upstream connections
-    this.upStreams.forEach(({ pc }) => pc.close());
+    this.upStreams.forEach(({ pc, id }) => {
+      try {
+        this.send({ type: "close", id });
+      } catch {
+        // ignore
+      }
+      pc.close();
+    });
     this.upStreams.clear();
 
     // Close all downstream connections
@@ -434,8 +627,9 @@ export class GaleneClient {
   }
 
   /**
-   * Send a message over WebSocket
+   * Send a message over WebSocket.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private send(msg: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
@@ -443,14 +637,7 @@ export class GaleneClient {
   }
 
   /**
-   * Generate a unique ID
-   */
-  private generateId(): string {
-    return Math.random().toString(36).substring(2, 10);
-  }
-
-  /**
-   * Cleanup resources
+   * Cleanup resources on disconnect.
    */
   private cleanup(): void {
     this.upStreams.forEach(({ pc }) => pc.close());
@@ -466,14 +653,14 @@ export class GaleneClient {
 }
 
 /**
- * Get the public Galene URL for a given group
+ * Get the public Galene URL for a given group.
  */
 export function getGaleneGroupUrl(groupName: string): string {
   return `${GALENE_URL}/group/${groupName}/`;
 }
 
 /**
- * Create a new GaleneClient instance
+ * Create a new GaleneClient instance.
  */
 export function createGaleneClient(): GaleneClient {
   return new GaleneClient();

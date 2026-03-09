@@ -124,8 +124,8 @@ export default function AllSchedulesModal({
     return date.toLocaleDateString("en-US", { weekday: "short" });
   };
 
-  const handleQuickJoin = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+  const handleQuickJoin = (id: string) => {
+    window.location.href = `/dashboard/classroom/${id}`;
   };
 
   if (!isOpen) return null;
@@ -194,7 +194,7 @@ export default function AllSchedulesModal({
           ) : (
             <div className="space-y-4">
               {filteredClasses.map((classItem) => {
-                const isOngoing = classItem.status === "ongoing";
+                const isOngoing = classItem.status === "in_progress";
                 return (
                   <div
                     key={classItem.id}
@@ -227,18 +227,14 @@ export default function AllSchedulesModal({
                         </div>
                       </div>
 
-                      {classItem.zoomJoinUrl && (
-                        <div className="shrink-0">
-                          <button
-                            onClick={() =>
-                              handleQuickJoin(classItem.zoomJoinUrl)
-                            }
-                            className="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all"
-                          >
-                            Join Class
-                          </button>
-                        </div>
-                      )}
+                      <div className="shrink-0">
+                        <button
+                          onClick={() => handleQuickJoin(classItem.id)}
+                          className="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all"
+                        >
+                          Join Class
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 relative z-10 pt-4 border-t border-gray-50">

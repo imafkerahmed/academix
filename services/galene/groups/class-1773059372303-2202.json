@@ -1,0 +1,22 @@
+{
+  "users": {
+    "lecturer": {
+      "password": "lecturer123",
+      "permissions": [
+        "op",
+        "present",
+        "message",
+        "record"
+      ]
+    }
+  },
+  "wildcard-user": {
+    "password": "student123",
+    "permissions": [
+      "present",
+      "message"
+    ]
+  },
+  "autolock": false,
+  "max-history-age": 7200
+}

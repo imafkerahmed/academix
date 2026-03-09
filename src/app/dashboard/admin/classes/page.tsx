@@ -22,13 +22,26 @@ import {
   Activity,
   User,
   Hash,
+  Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 
@@ -37,6 +50,7 @@ interface ZoomClass {
   title: string;
   description?: string;
   zoom_meeting_id?: string;
+  galene_group?: string;
   start_time: string;
   duration: number;
   status: string;
@@ -52,7 +66,7 @@ interface ZoomClass {
           expand?: {
             course?: any;
             intake?: any;
-          }
+          };
         };
         lecturer?: any;
       };
@@ -90,7 +104,9 @@ export default function ClassManagement() {
   }, [router]);
 
   const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);
-  const [availableSubjects, setAvailableSubjects] = useState<CourseSubject[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<CourseSubject[]>(
+    [],
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -129,13 +145,29 @@ export default function ClassManagement() {
     try {
       // Filter out course_intake and format start_time
       const { course_intake, ...submitData } = formData;
-      
+
+      // Generate unique galene_group for each class
+      const galeneGroup = `class-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
       await pb.collection("classes").create({
         ...submitData,
         start_time: new Date(formData.start_time).toISOString(),
         status: "scheduled",
-        galene_group: "test-classroom",
+        galene_group: galeneGroup,
       });
+
+      // Automatically create the Galene backend room configuration
+      await fetch("/api/galene/group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          classId: galeneGroup,
+          passwordHost: "lecturer123",
+          passwordAttendee: "student123",
+          duration: formData.duration || 60,
+        }),
+      });
+
       toast.success("Class scheduled successfully!");
       setIsModalOpen(false);
       setFormData({
@@ -149,10 +181,52 @@ export default function ClassManagement() {
       fetchData();
     } catch (error) {
       console.error("Error creating class:", error);
-      if (error && typeof error === 'object' && 'response' in error) {
-        console.error("PB Validation Error Details:", (error as any).response?.data);
+      if (error && typeof error === "object" && "response" in error) {
+        console.error(
+          "PB Validation Error Details:",
+          (error as any).response?.data,
+        );
       }
       toast.error("Failed to schedule class");
+    }
+  };
+
+  const handleDeleteClass = async (classId: string, galeneGroup?: string) => {
+    if (!window.confirm("Are you sure you want to delete this session?"))
+      return;
+    try {
+      // First delete all linked attendance records
+      try {
+        const attendanceRecords = await pb
+          .collection("attendance")
+          .getFullList({
+            filter: `class = "${classId}"`,
+          });
+
+        for (const record of attendanceRecords) {
+          await pb.collection("attendance").delete(record.id);
+        }
+      } catch (attErr) {
+        console.warn(
+          "Could not fetch or delete attendance records prior to deleting class.",
+          attErr,
+        );
+      }
+
+      await pb.collection("classes").delete(classId);
+
+      // Delete the Galene group config file
+      if (galeneGroup) {
+        await fetch(`/api/galene/group?classId=${galeneGroup}`, {
+          method: "DELETE",
+        });
+      }
+
+      toast.success("Class deleted successfully!");
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      toast.error("Failed to delete class.");
     }
   };
 
@@ -162,7 +236,8 @@ export default function ClassManagement() {
         .collection("classes")
         .getFullList({
           sort: "-start_time",
-          expand: "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
+          expand:
+            "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
         })
         .catch(() => []);
 
@@ -238,28 +313,40 @@ export default function ClassManagement() {
                 <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight uppercase">
                   Schedule New <span className="text-indigo-600">Class</span>
                 </DialogTitle>
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">Setup virtual session parameters</p>
+                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">
+                  Setup virtual session parameters
+                </p>
               </DialogHeader>
 
               <form onSubmit={handleCreateClass} className="space-y-6 mt-6">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Class Title</Label>
-                  <Input 
-                    required 
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
+                    Class Title
+                  </Label>
+                  <Input
+                    required
                     className="rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 py-6 transition-all"
                     placeholder="e.g. Intro to Data Structures"
                     value={formData.title}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Course Intake</Label>
-                    <Select 
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
+                      Course Intake
+                    </Label>
+                    <Select
                       required
                       onValueChange={(val) => {
-                        setFormData({ ...formData, course_intake: val, course_subject: "" });
+                        setFormData({
+                          ...formData,
+                          course_intake: val,
+                          course_subject: "",
+                        });
                         fetchSubjectsForIntake(val);
                       }}
                     >
@@ -268,8 +355,13 @@ export default function ClassManagement() {
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl border-gray-100">
                         {courseIntakes.map((ci) => (
-                          <SelectItem key={ci.id} value={ci.id} className="rounded-xl">
-                            {ci.expand?.course?.name} - {ci.expand?.intake?.code}
+                          <SelectItem
+                            key={ci.id}
+                            value={ci.id}
+                            className="rounded-xl"
+                          >
+                            {ci.expand?.course?.name} -{" "}
+                            {ci.expand?.intake?.code}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -277,19 +369,28 @@ export default function ClassManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Subject</Label>
-                    <Select 
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
+                      Subject
+                    </Label>
+                    <Select
                       required
                       disabled={!formData.course_intake}
-                      onValueChange={(val) => setFormData({ ...formData, course_subject: val })}
+                      onValueChange={(val) =>
+                        setFormData({ ...formData, course_subject: val })
+                      }
                     >
                       <SelectTrigger className="rounded-2xl border-gray-100 bg-gray-50 py-6 transition-all">
                         <SelectValue placeholder="Select Subject" />
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl border-gray-100">
                         {availableSubjects.map((cs) => (
-                          <SelectItem key={cs.id} value={cs.id} className="rounded-xl">
-                            {cs.expand?.subject?.[0]?.name || cs.expand?.subject?.name}
+                          <SelectItem
+                            key={cs.id}
+                            value={cs.id}
+                            className="rounded-xl"
+                          >
+                            {cs.expand?.subject?.[0]?.name ||
+                              cs.expand?.subject?.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -299,38 +400,56 @@ export default function ClassManagement() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Start Time</Label>
-                    <Input 
-                      required 
-                      type="datetime-local" 
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
+                      Start Time
+                    </Label>
+                    <Input
+                      required
+                      type="datetime-local"
                       className="rounded-2xl border-gray-100 bg-gray-50 py-6"
                       value={formData.start_time}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, start_time: e.target.value })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setFormData({ ...formData, start_time: e.target.value })
+                      }
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Duration (Min)</Label>
-                    <Input 
-                      required 
-                      type="number" 
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
+                      Duration (Min)
+                    </Label>
+                    <Input
+                      required
+                      type="number"
                       className="rounded-2xl border-gray-100 bg-gray-50 py-6"
                       value={formData.duration}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setFormData({
+                          ...formData,
+                          duration: parseInt(e.target.value),
+                        })
+                      }
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Description (Optional)</Label>
-                  <Textarea 
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
+                    Description (Optional)
+                  </Label>
+                  <Textarea
                     className="rounded-2xl border-gray-100 bg-gray-50 focus:bg-white min-h-[100px]"
                     placeholder="Brief overview of session topics..."
                     value={formData.description}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
                   />
                 </div>
 
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs tracking-widest py-8 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-95 uppercase">
+                <Button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs tracking-widest py-8 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-95 uppercase"
+                >
                   Schedule session
                 </Button>
               </form>
@@ -444,9 +563,19 @@ export default function ClassManagement() {
                     </div>
                   </div>
                 </div>
-                <button className="p-3 bg-gray-50 rounded-xl text-gray-300 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
-                  <Eye size={18} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button className="p-3 bg-gray-50 rounded-xl text-gray-300 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                    <Eye size={18} />
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleDeleteClass(classItem.id, classItem.galene_group)
+                    }
+                    className="p-3 bg-red-50 rounded-xl text-red-300 hover:bg-red-600 hover:text-white transition-all duration-500 shadow-sm"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -472,7 +601,8 @@ export default function ClassManagement() {
                     <User size={12} className="text-indigo-400" /> Host
                   </span>
                   <span className="text-sm font-bold text-gray-900 truncate">
-                    {classItem.expand?.course_subject?.expand?.lecturer?.name || "Administrator"}
+                    {classItem.expand?.course_subject?.expand?.lecturer?.name ||
+                      "Administrator"}
                   </span>
                 </div>
               </div>
@@ -488,19 +618,30 @@ export default function ClassManagement() {
                   <div className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-xl">
                     <Users size={12} />
                     <span className="text-[10px] font-black tracking-widest font-mono">
-                      {classItem.expand?.course_subject?.expand?.course_intake?.expand?.intake?.code}
+                      {
+                        classItem.expand?.course_subject?.expand?.course_intake
+                          ?.expand?.intake?.code
+                      }
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => router.push(`/dashboard/classroom/${classItem.id}?role=host`)}
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/classroom/${classItem.id}?role=host`,
+                      )
+                    }
                     className="flex items-center gap-2 text-[10px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl transition-all uppercase tracking-widest"
                   >
                     Host <Play size={10} />
                   </button>
-                  <button 
-                    onClick={() => router.push(`/dashboard/classroom/${classItem.id}?role=attendee`)}
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/classroom/${classItem.id}?role=attendee`,
+                      )
+                    }
                     className="flex items-center gap-2 text-[10px] font-black text-gray-500 bg-gray-50 hover:bg-gray-200 px-4 py-2 rounded-xl transition-all uppercase tracking-widest"
                   >
                     View <Eye size={10} />

@@ -124,18 +124,25 @@ const mockIntakes: Intake[] = [
 ];
 
 // Data fetching for real classes
-const fetchUpcomingClasses = async (lecturerId: string): Promise<UpcomingClass[]> => {
+const fetchUpcomingClasses = async (
+  lecturerId: string,
+): Promise<UpcomingClass[]> => {
   try {
     const records = await pb.collection("classes").getFullList({
-      filter: `course_subject.lecturer = "${lecturerId}"`,
-      expand: "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
+      filter: `course_subject.lecturer ?= "${lecturerId}"`,
+      expand:
+        "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
       sort: "start_time",
     });
 
     return records.map((record: any) => ({
       id: record.id,
-      intakeName: record.expand?.course_subject?.expand?.course_intake?.expand?.intake?.code || "N/A",
-      courseName: record.expand?.course_subject?.expand?.course_intake?.expand?.course?.name || "N/A",
+      intakeName:
+        record.expand?.course_subject?.expand?.course_intake?.expand?.intake
+          ?.code || "N/A",
+      courseName:
+        record.expand?.course_subject?.expand?.course_intake?.expand?.course
+          ?.name || "N/A",
       classTitle: record.title,
       startTime: new Date(record.start_time).toLocaleString("en-US", {
         month: "short",

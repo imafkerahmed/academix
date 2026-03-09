@@ -33,11 +33,7 @@ export interface UseGaleneReturn {
   /** User's permissions in the group */
   permissions: string[];
   /** Connect to a Galene group and start publishing media */
-  connect: (
-    group: string,
-    username: string,
-    password: string
-  ) => Promise<void>;
+  connect: (group: string, username: string, password: string) => Promise<void>;
   /** Disconnect from the group */
   disconnect: () => void;
   /** Send a chat message */
@@ -67,6 +63,10 @@ export function useGalene(): UseGaleneReturn {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log(
+        "[useGalene] Unmounting useGalene hook, cleaning up client",
+        !!clientRef.current,
+      );
       if (clientRef.current) {
         clientRef.current.disconnect();
         clientRef.current = null;
@@ -102,12 +102,16 @@ export function useGalene(): UseGaleneReturn {
           setPermissions(perms || []);
         });
 
-        client.on("disconnected", () => {
+        client.on("disconnected", (code: number, reason: string) => {
+          console.warn(
+            `[useGalene] Disconnected from Galene. Code: ${code}, Reason: ${reason}`,
+          );
           setConnected(false);
           setConnecting(false);
         });
 
         client.on("error", (err: any) => {
+          console.error("[useGalene] Galene client error event:", err);
           setError(err?.message || "Connection error");
           setConnecting(false);
         });
@@ -129,7 +133,7 @@ export function useGalene(): UseGaleneReturn {
               }
               return [...prev, data];
             });
-          }
+          },
         );
 
         client.on("remoteStreamRemoved", (data: { id: string }) => {
@@ -155,7 +159,7 @@ export function useGalene(): UseGaleneReturn {
         console.error("[useGalene] Connection error:", err, message);
       }
     },
-    []
+    [],
   );
 
   const disconnect = useCallback(() => {

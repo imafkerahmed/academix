@@ -63,11 +63,11 @@ export default function Section5Schedules() {
       // 1. Fetch enrollments
       const token = pb.authStore.token;
       const resp = await fetch("/api/student/enrollments", {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!resp.ok) throw new Error("Failed to fetch enrollments");
       const { enrollments } = await resp.json();
-      
+
       const intakeIds = enrollments.map((e: any) => e.course_intake);
       if (intakeIds.length === 0) {
         setUpcoming([]);
@@ -76,9 +76,11 @@ export default function Section5Schedules() {
       }
 
       // 2. Fetch classes for these intakes
-      const filter = intakeIds.map((id: string) => `course_subject.course_intake = "${id}"`).join(" || ");
+      const filter = intakeIds
+        .map((id: string) => `course_subject.course_intake = "${id}"`)
+        .join(" || ");
       const classes = await pb.collection("classes").getFullList({
-        filter: `(${filter}) && start_time >= "${new Date().toISOString()}"`,
+        filter: `(${filter}) && status != "completed" && status != "cancelled"`,
         expand: "course_subject.subject,course_subject.course_intake.course",
         sort: "start_time",
       });
@@ -88,11 +90,19 @@ export default function Section5Schedules() {
         title: c.title,
         type: "Class",
         date: new Date(c.start_time).toISOString().slice(0, 10),
-        startTime: new Date(c.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        endTime: new Date(new Date(c.start_time).getTime() + c.duration * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        subject: c.expand?.course_subject?.expand?.subject?.[0]?.name || c.expand?.course_subject?.expand?.subject?.name,
-        course: c.expand?.course_subject?.expand?.course_intake?.expand?.course?.name,
-        status: c.status
+        startTime: new Date(c.start_time).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        endTime: new Date(
+          new Date(c.start_time).getTime() + c.duration * 60000,
+        ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        subject:
+          c.expand?.course_subject?.expand?.subject?.[0]?.name ||
+          c.expand?.course_subject?.expand?.subject?.name,
+        course:
+          c.expand?.course_subject?.expand?.course_intake?.expand?.course?.name,
+        status: c.status,
       }));
 
       setUpcoming(formatted);
@@ -175,7 +185,10 @@ export default function Section5Schedules() {
                       <div className="flex items-center gap-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                         <span className="flex items-center gap-1.5">
                           <CalendarIcon size={12} className="text-gray-300" />{" "}
-                          {new Date(ev.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          {new Date(ev.date).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </span>
                         <span className="flex items-center gap-1.5">
                           <Clock size={12} className="text-gray-300" />{" "}
@@ -183,8 +196,12 @@ export default function Section5Schedules() {
                         </span>
                       </div>
 
-                      <button 
-                        onClick={() => router.push(`/dashboard/classroom/${ev.id}?role=attendee`)}
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/classroom/${ev.id}?role=attendee`,
+                          )
+                        }
                         className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 transition-all"
                       >
                         Join
@@ -268,8 +285,12 @@ export default function Section5Schedules() {
                           </div>
 
                           <div className="shrink-0 flex gap-3">
-                            <button 
-                              onClick={() => router.push(`/dashboard/classroom/${ev.id}?role=attendee`)}
+                            <button
+                              onClick={() =>
+                                router.push(
+                                  `/dashboard/classroom/${ev.id}?role=attendee`,
+                                )
+                              }
                               className="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all"
                             >
                               Join Session
@@ -280,7 +301,11 @@ export default function Section5Schedules() {
                         <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 relative z-10 pt-2 border-t border-gray-50">
                           <span className="flex items-center gap-2">
                             <CalendarIcon size={14} className="text-gray-300" />{" "}
-                            {new Date(ev.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                            {new Date(ev.date).toLocaleDateString(undefined, {
+                              weekday: "long",
+                              month: "long",
+                              day: "numeric",
+                            })}
                           </span>
                           <span className="flex items-center gap-2">
                             <Clock size={14} className="text-gray-300" />{" "}
