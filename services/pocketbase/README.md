@@ -4,20 +4,20 @@ This folder contains the configuration to run [PocketBase](https://pocketbase.io
 
 ## Usage
 
-1. **Build and start PocketBase:**
+1. **Build and start all services (including PocketBase):**
 
    ```bash
-   cd pocktbase
+   # From the project root
    docker-compose up --build -d
    ```
 
    PocketBase will be available at [http://localhost:8090](http://localhost:8090).
 
 2. **Data Persistence:**
-   - All PocketBase data is stored in the `pb_data` folder.
+   - All PocketBase data is stored in the `services/pocketbase/pb_data` folder.
    - This ensures your collections, users, and records are NOT lost when the container restarts or is removed.
 
-3. **Stop PocketBase:**
+3. **Stop all services:**
 
    ```bash
    docker-compose down
@@ -26,7 +26,7 @@ This folder contains the configuration to run [PocketBase](https://pocketbase.io
    Data will remain safe in `pb_data`.
 
 4. **Access Admin UI:**
-   - Open [http://127.0.0.1:8090/\_/#/login](http://127.0.0.1:8090/_/#/login) in your browser.
+   - Open [http://127.0.0.1:8090/_/#/login](http://127.0.0.1:8090/_/#/login) in your browser.
 
 ## Notes
 

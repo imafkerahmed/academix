@@ -118,12 +118,13 @@ export default function StudentPaymentsPage() {
       // Fetch enrollments for the student
       const enrollmentRecords = await pb.collection("enrollments").getFullList({
         filter: `student = "${studentId}"`,
-        expand: "course",
+        expand: "course_intake.course",
       });
       // Transform enrollments into course format
       const courseList = enrollmentRecords.map((enrollment: any) => ({
         id: enrollment.id,
-        name: enrollment.expand?.course?.name || enrollment.id,
+        name: enrollment.expand?.course_intake?.expand?.course?.name || enrollment.id,
+        registration_number: enrollment.registration_number,
         icon: BookOpen,
         color: "text-indigo-600",
         bg: "bg-indigo-50",

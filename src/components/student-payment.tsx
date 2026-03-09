@@ -4,17 +4,13 @@ import React, { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CreditCard,
-  Plus,
   FileText,
   CheckCircle,
-  Clock,
-  AlertCircle,
-  Eye,
   Download,
   Printer,
   X,
-  ArrowRight,
 } from "lucide-react";
+import { RaisePaymentModal } from "@/components/student/RaisePaymentModal";
 
 // Types
 type PaymentStatus = "Paid" | "Pending" | "Failed";
@@ -42,6 +38,7 @@ type PaymentHistoryItem = {
   status: PaymentStatus;
   receiptUrl?: string;
   course?: string;
+  reference_Id?: string;
 };
 
 interface StudentPaymentProps {
@@ -62,13 +59,6 @@ export default function StudentPayment({
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [activeCourse, setActiveCourse] = useState<string>("");
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [modalStep, setModalStep] = useState(1); // 1 = choose amount, 2 = upload/remarks
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [fileError, setFileError] = useState<string>("");
-  const [remarks, setRemarks] = useState<string>("");
-  const [processing, setProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
   // Course theme mapping
@@ -108,27 +98,7 @@ export default function StudentPayment({
   // Real data will be fetched from PocketBase via props
   const courseOptions = enrolledCourses.map((c) => c.name);
 
-  const onFilesSelected = (fileList: FileList | null) => {
-    if (!fileList) return;
-    const arr = Array.from(fileList);
-    const urls = arr.map((f) => URL.createObjectURL(f));
-    setFiles(arr);
-    setPreviews(urls);
-    setFileError("");
-  };
-
-  const resetForm = () => {
-    if (!selectedCourse) setActiveCourse("");
-    setFiles([]);
-    setPreviews([]);
-    setFileError("");
-    setRemarks("");
-    setSelectedInvoice(null);
-    setModalStep(1);
-  };
-
   const closePayModal = () => {
-    resetForm();
     setShowPayModal(false);
   };
 
@@ -143,7 +113,6 @@ export default function StudentPayment({
   useEffect(() => {
     const handleOpenPay = (e: any) => {
       if (e.detail?.course) setActiveCourse(e.detail.course);
-      setSelectedInvoice(null);
       setShowPayModal(true);
     };
     const handleOpenHistory = () => setShowHistoryModal(true);
@@ -177,6 +146,7 @@ export default function StudentPayment({
     status: i.status === "paid" ? "Paid" : "Pending",
     course,
     payment_type: i.payment_type || "installment", // Ensure payment_type exists
+    reference_Id: undefined,
   }));
   // Map payments to feed items
   const paymentFeed = coursePayments.map((p) => ({
@@ -188,6 +158,7 @@ export default function StudentPayment({
     status: p.verified ? "Paid" : "Pending",
     course,
     payment_type: p.payment_type,
+    reference_Id: p.reference_Id,
   }));
 
   // derive combined history from installments and payments feeds
@@ -240,6 +211,7 @@ export default function StudentPayment({
         status: p.status,
         course: p.course,
         payment_type: p.payment_type,
+        reference_Id: p.reference_Id,
         label:
           p.payment_type === "registration"
             ? "Registration Fee"
@@ -258,6 +230,7 @@ export default function StudentPayment({
         amount: totalBalance,
         currency: "USD",
         status: "Pending",
+        reference_Id: undefined,
       },
     ];
   }, [pendingThisMonth, totalBalance, paymentFeed]);
@@ -294,26 +267,14 @@ export default function StudentPayment({
     filteredFeed = verifiedPayments.slice(0, 3);
   }
 
-  const handleSubmitReceipt = async () => {
-    if (courseOptions.length > 0 && !activeCourse) {
-      setFileError("Please select a course.");
-      return;
-    }
-    if (!selectedInvoice) {
-      setFileError("Please choose an amount to pay.");
-      return;
-    }
-    if (files.length === 0) {
-      setFileError("Please upload at least one receipt image.");
-      return;
-    }
-    setProcessing(true);
+  const handleSubmitReceipt = async (data: {
+    selectedInvoice: any;
+    files: File[];
+    remarks: string;
+  }) => {
     await new Promise((r) => setTimeout(r, 1500));
-
     // TODO: Integrate with PocketBase payments API
-    setProcessing(false);
     setShowPayModal(false);
-    resetForm();
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
   };
@@ -397,6 +358,12 @@ export default function StudentPayment({
                       <span className={`${theme.text}`}>
                         {item.course || "General"}
                       </span>
+                      {item.reference_Id && (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-200" />
+                          <span className="text-gray-500">Ref: {item.reference_Id}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -438,216 +405,18 @@ export default function StudentPayment({
       </div>
 
       {/* Raise Payment Modal */}
-      <AnimatePresence>
-        {showPayModal && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closePayModal}
-          >
-            <motion.div
-              className="bg-white rounded-[3rem] p-10 w-full max-w-xl shadow-2xl relative overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-              initial={{ y: 50, opacity: 0, scale: 0.95 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 30, opacity: 0, scale: 0.95 }}
-            >
-              <button
-                className="absolute top-8 right-8 w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-all font-bold"
-                onClick={closePayModal}
-              >
-                <X size={24} />
-              </button>
-
-              <div className="text-3xl font-black mb-10 uppercase tracking-tighter text-gray-900">
-                Raise New <span className="text-indigo-600">Payment</span>
-              </div>
-
-              <div className="space-y-8">
-                {/* Course Indicator */}
-                <div
-                  className={`p-8 rounded-[2.5rem] border ${getTheme(activeCourse).bg} ${getTheme(activeCourse).border} relative overflow-hidden group transition-all duration-700`}
-                >
-                  <div className="relative z-10">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">
-                      Manage Payment For
-                    </p>
-                    <h4 className="text-2xl font-black text-gray-900 uppercase tracking-tight">
-                      {activeCourse || "General Account"}
-                    </h4>
-                  </div>
-                </div>
-
-                {activeCourse ? (
-                  <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                    {/* two-step wizard inside modal */}
-                    {modalStep === 1 ? (
-                      <>
-                        <fieldset className="space-y-4">
-                          <legend className="text-sm font-black text-gray-500 uppercase tracking-widest ml-1">
-                            Select Amount to Pay
-                          </legend>
-                          {paymentOptions.map((opt: any) => (
-                            <label
-                              key={opt.id}
-                              className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 hover:shadow-lg cursor-pointer transition-all"
-                            >
-                              <div className="flex items-center gap-4">
-                                <input
-                                  type="radio"
-                                  name="invoice"
-                                  value={opt.id}
-                                  checked={selectedInvoice?.id === opt.id}
-                                  onChange={() => setSelectedInvoice(opt)}
-                                  className="form-radio h-5 w-5 text-indigo-600"
-                                />
-                                <span className="text-sm font-bold text-gray-900">
-                                  {opt.label}
-                                </span>
-                              </div>
-                              <span className="inline-block px-3 py-1 text-xs font-black uppercase tracking-wide bg-gray-100 rounded-full">
-                                {formatCurrency(opt.amount, opt.currency)}
-                              </span>
-                            </label>
-                          ))}
-                        </fieldset>
-
-                        <div className="text-right">
-                          <button
-                            className="mt-4 inline-flex items-center gap-2 bg-indigo-600 text-white font-black py-3 px-6 rounded-[2rem] shadow-lg hover:shadow-indigo-200 transition-all disabled:opacity-50"
-                            disabled={!selectedInvoice}
-                            onClick={() => setModalStep(2)}
-                          >
-                            Continue
-                            <ArrowRight size={18} />
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {selectedInvoice && (
-                          <div className="text-sm font-bold text-gray-700">
-                            Amount to pay:{" "}
-                            {formatCurrency(
-                              selectedInvoice.amount,
-                              selectedInvoice.currency,
-                            )}
-                          </div>
-                        )}
-
-                        <div className="space-y-3">
-                          <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-4">
-                            Upload Multi-receipts
-                          </label>
-                          <div className="relative group">
-                            <input
-                              type="file"
-                              multiple
-                              accept="image/*,.pdf"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                              onChange={(e) => onFilesSelected(e.target.files)}
-                            />
-                            <div className="w-full border-4 border-dashed border-gray-50 bg-gray-50/30 rounded-[2.5rem] p-12 text-center group-hover:border-indigo-100 group-hover:bg-indigo-50/10 transition-all duration-500">
-                              <Plus
-                                className="mx-auto text-gray-300 group-hover:text-indigo-600 mb-4"
-                                size={40}
-                              />
-                              <p className="text-lg font-black text-gray-500 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
-                                Drop files or click
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-4">
-                            Remarks
-                          </label>
-                          <textarea
-                            className="w-full bg-gray-50 border-gray-100 rounded-[2rem] p-8 text-sm font-bold focus:ring-4 focus:ring-indigo-100 focus:bg-white transition-all outline-none min-h-[140px]"
-                            placeholder="Type any instructions..."
-                            value={remarks}
-                            onChange={(e) => setRemarks(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="flex justify-between mt-6">
-                          <button
-                            className="inline-flex items-center gap-2 bg-gray-200 text-gray-700 font-black py-3 px-6 rounded-[2rem] hover:bg-gray-300 transition-all"
-                            onClick={() => setModalStep(1)}
-                          >
-                            Back
-                          </button>
-                          <button
-                            className="inline-flex items-center gap-2 bg-indigo-600 text-white font-black py-3 px-6 rounded-[2rem] shadow-lg hover:shadow-indigo-200 transition-all disabled:opacity-50"
-                            disabled={
-                              processing || !activeCourse || files.length === 0
-                            }
-                            onClick={handleSubmitReceipt}
-                          >
-                            {processing
-                              ? "Uploading Data..."
-                              : "Confirm & Submit"}
-                            {!processing && <ArrowRight size={18} />}
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-20 bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
-                    <AlertCircle
-                      className="mx-auto text-amber-500 mb-4"
-                      size={48}
-                    />
-                    <p className="text-sm font-black text-gray-600 uppercase tracking-widest">
-                      Please select an amount to pay
-                    </p>
-                  </div>
-                )}
-
-                {previews.length > 0 && (
-                  <div className="flex gap-4 overflow-x-auto py-2 px-2 scrollbar-hide">
-                    {previews.map((src, i) => (
-                      <div
-                        key={i}
-                        className="relative flex-shrink-0 w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-lg"
-                      >
-                        <img src={src} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                    <button
-                      onClick={resetForm}
-                      className="flex-shrink-0 w-20 h-20 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center font-black uppercase text-[10px]"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                )}
-
-                {fileError && (
-                  <p className="text-red-600 font-black text-xs text-center">
-                    {fileError}
-                  </p>
-                )}
-
-                <button
-                  className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white font-black py-6 rounded-[2rem] shadow-2xl shadow-indigo-100 hover:shadow-indigo-200 hover:-translate-y-1 transition-all duration-300 uppercase tracking-tighter disabled:opacity-50 disabled:translate-y-0"
-                  disabled={processing || !activeCourse || files.length === 0}
-                  onClick={handleSubmitReceipt}
-                >
-                  {processing
-                    ? "Uploading Data..."
-                    : "Confirm Payment Submission"}
-                  {!processing && <ArrowRight size={20} />}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <RaisePaymentModal
+        isOpen={showPayModal}
+        onClose={closePayModal}
+        activeCourse={activeCourse}
+        registrationNumber={
+          enrolledCourses.find((c) => c.name === activeCourse)
+            ?.registration_number
+        }
+        paymentOptions={paymentOptions}
+        onSubmit={handleSubmitReceipt}
+        theme={getTheme(activeCourse)}
+      />
 
       {/* Success Notification */}
       <AnimatePresence>
@@ -827,6 +596,12 @@ function PaymentHistoryModal({
                       <span className="text-indigo-400">
                         {row.course || "System Fee"}
                       </span>
+                      {row.reference_Id && (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-gray-200" />
+                          <span className="text-gray-500">Ref: {row.reference_Id}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
