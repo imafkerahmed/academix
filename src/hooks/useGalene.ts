@@ -17,34 +17,33 @@ export interface ChatMessage {
   time?: number;
 }
 
-export interface UseGaleneReturn {
-  /** Whether we are currently connected to the Galene group */
-  connected: boolean;
-  /** The local media stream (camera + mic) */
-  localStream: MediaStream | null;
-  /** Map of remote participant streams */
-  remoteStreams: RemoteStream[];
-  /** Connection/stream error */
-  error: string | null;
-  /** Whether we are currently connecting */
-  connecting: boolean;
-  /** Chat messages received */
-  chatMessages: ChatMessage[];
-  /** User's permissions in the group */
+export interface Participant {
+  id: string;
+  username: string;
   permissions: string[];
-  /** Connect to a Galene group and start publishing media */
+  kind: string;
+}
+
+export interface UseGaleneReturn {
+  connected: boolean;
+  localStream: MediaStream | null;
+  remoteStreams: RemoteStream[];
+  error: string | null;
+  connecting: boolean;
+  chatMessages: ChatMessage[];
+  permissions: string[];
+  participants: Participant[];
+  isScreenSharing: boolean;
+  screenShareStream: MediaStream | null;
   connect: (group: string, username: string, password: string) => Promise<void>;
-  /** Disconnect from the group */
   disconnect: () => void;
-  /** Send a chat message */
   sendChat: (message: string) => void;
-  /** Toggle audio mute */
   toggleAudio: () => void;
-  /** Toggle video mute */
   toggleVideo: () => void;
-  /** Whether audio is muted */
+  shareScreen: () => Promise<void>;
+  stopScreenShare: () => void;
+  kickUser: (userId: string) => void;
   audioMuted: boolean;
-  /** Whether video is muted */
   videoMuted: boolean;
 }
 
@@ -57,16 +56,16 @@ export function useGalene(): UseGaleneReturn {
   const [error, setError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [audioMuted, setAudioMuted] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareStream, setScreenShareStream] =
+    useState<MediaStream | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log(
-        "[useGalene] Unmounting useGalene hook, cleaning up client",
-        !!clientRef.current,
-      );
       if (clientRef.current) {
         clientRef.current.disconnect();
         clientRef.current = null;
@@ -80,7 +79,6 @@ export function useGalene(): UseGaleneReturn {
       setError(null);
 
       try {
-        // Get local media
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
           video: {
@@ -91,11 +89,10 @@ export function useGalene(): UseGaleneReturn {
         });
         setLocalStream(stream);
 
-        // Create client
         const client = createGaleneClient();
         clientRef.current = client;
 
-        // Set up event handlers
+        // Connection events
         client.on("connected", (perms: string[]) => {
           setConnected(true);
           setConnecting(false);
@@ -104,18 +101,20 @@ export function useGalene(): UseGaleneReturn {
 
         client.on("disconnected", (code: number, reason: string) => {
           console.warn(
-            `[useGalene] Disconnected from Galene. Code: ${code}, Reason: ${reason}`,
+            `[useGalene] Disconnected. Code: ${code}, Reason: ${reason}`,
           );
           setConnected(false);
           setConnecting(false);
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         client.on("error", (err: any) => {
-          console.error("[useGalene] Galene client error event:", err);
+          console.error("[useGalene] Error:", err);
           setError(err?.message || "Connection error");
           setConnecting(false);
         });
 
+        // Remote streams
         client.on(
           "remoteStream",
           (data: {
@@ -140,23 +139,55 @@ export function useGalene(): UseGaleneReturn {
           setRemoteStreams((prev) => prev.filter((s) => s.id !== data.id));
         });
 
+        // Chat
         client.on("chat", (msg: ChatMessage) => {
           setChatMessages((prev) => [...prev, msg]);
         });
 
-        // Connect to Galene
-        await client.connect(group, username, password);
+        // Participants — filter out self
+        client.on("user", (user: Participant) => {
+          // Skip self — Galene sends user events for the current user too
+          if (user.id === client.id) return;
 
-        // Publish local stream once connected
+          setParticipants((prev) => {
+            if (user.kind === "delete") {
+              return prev.filter((p) => p.id !== user.id);
+            }
+            const existing = prev.findIndex((p) => p.id === user.id);
+            if (existing >= 0) {
+              const updated = [...prev];
+              updated[existing] = user;
+              return updated;
+            }
+            return [...prev, user];
+          });
+        });
+
+        // Screen share events
+        client.on(
+          "screenShareStarted",
+          (data: { id: string; stream: MediaStream }) => {
+            setIsScreenSharing(true);
+            setScreenShareStream(data.stream);
+          },
+        );
+
+        client.on("screenShareStopped", () => {
+          setIsScreenSharing(false);
+          setScreenShareStream(null);
+        });
+
+        // Connect and publish
+        await client.connect(group, username, password);
         await client.publishStream(stream, "camera");
-      } catch (err: any) {
-        let message = err?.message || "Failed to connect to virtual classroom";
-        if (err?.response?.data?.message) {
-          message += ": " + err.response.data.message;
-        }
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Failed to connect to virtual classroom";
         setError(message);
         setConnecting(false);
-        console.error("[useGalene] Connection error:", err, message);
+        console.error("[useGalene] Connection error:", err);
       }
     },
     [],
@@ -174,8 +205,11 @@ export function useGalene(): UseGaleneReturn {
     setConnected(false);
     setRemoteStreams([]);
     setPermissions([]);
+    setParticipants([]);
     setAudioMuted(false);
     setVideoMuted(false);
+    setIsScreenSharing(false);
+    setScreenShareStream(null);
   }, [localStream]);
 
   const sendChat = useCallback((message: string) => {
@@ -202,6 +236,29 @@ export function useGalene(): UseGaleneReturn {
     }
   }, [localStream]);
 
+  const shareScreen = useCallback(async () => {
+    if (clientRef.current) {
+      try {
+        await clientRef.current.publishScreen();
+      } catch (err) {
+        console.error("[useGalene] Screen share error:", err);
+        // User cancelled the screen picker, not a real error
+      }
+    }
+  }, []);
+
+  const stopScreenShare = useCallback(() => {
+    if (clientRef.current) {
+      clientRef.current.stopScreenShare();
+    }
+  }, []);
+
+  const kickUser = useCallback((userId: string) => {
+    if (clientRef.current) {
+      clientRef.current.userAction("kick", userId);
+    }
+  }, []);
+
   return {
     connected,
     localStream,
@@ -210,11 +267,17 @@ export function useGalene(): UseGaleneReturn {
     connecting,
     chatMessages,
     permissions,
+    participants,
+    isScreenSharing,
+    screenShareStream,
     connect,
     disconnect,
     sendChat,
     toggleAudio,
     toggleVideo,
+    shareScreen,
+    stopScreenShare,
+    kickUser,
     audioMuted,
     videoMuted,
   };

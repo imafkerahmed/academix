@@ -50,6 +50,9 @@ export class GaleneClient {
   /** The connection ID sent in the handshake */
   private connectionId: string = "";
   private localStream: MediaStream | null = null;
+  private screenStream: MediaStream | null = null;
+  /** The stream ID of the active screen share upstream */
+  private _screenShareStreamId: string | null = null;
 
   private upStreams: Map<
     string,
@@ -84,6 +87,14 @@ export class GaleneClient {
 
   get permissions(): GalenePermission[] {
     return this._permissions;
+  }
+
+  get screenShareStreamId(): string | null {
+    return this._screenShareStreamId;
+  }
+
+  get id(): string {
+    return this.connectionId;
   }
 
   private getWsUrl(): string {
@@ -576,6 +587,108 @@ export class GaleneClient {
       this.downStreams.delete(msg.id);
       this.emit("remoteStreamRemoved", { id: msg.id });
     }
+  }
+
+  /**
+   * Publish screen share to the group.
+   * Uses getDisplayMedia to capture the screen.
+   */
+  async publishScreen(): Promise<string> {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+    });
+    this.screenStream = stream;
+
+    const id = newRandomId();
+    const pc = new RTCPeerConnection(this.getRTCConfiguration());
+
+    const upEntry = {
+      pc,
+      id,
+      localDescriptionSent: false,
+      localIceCandidates: [] as RTCIceCandidate[],
+    };
+    this.upStreams.set(id, upEntry);
+    this._screenShareStreamId = id;
+
+    pc.onicecandidate = (event) => {
+      if (!event.candidate) return;
+      if (upEntry.localDescriptionSent) {
+        this.send({ type: "ice", id, candidate: event.candidate });
+      } else {
+        upEntry.localIceCandidates.push(event.candidate);
+      }
+    };
+
+    stream.getTracks().forEach((track) => {
+      pc.addTrack(track, stream);
+      // Auto-stop when user clicks browser's "Stop sharing" button
+      track.onended = () => {
+        this.stopScreenShare();
+      };
+    });
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    this.send({
+      type: "offer",
+      source: this.connectionId,
+      username: this.username,
+      kind: "",
+      id,
+      label: "screenshare",
+      sdp: pc.localDescription!.sdp,
+    });
+
+    upEntry.localDescriptionSent = true;
+    for (const candidate of upEntry.localIceCandidates) {
+      this.send({ type: "ice", id, candidate });
+    }
+    upEntry.localIceCandidates = [];
+
+    this.emit("screenShareStarted", { id, stream });
+    return id;
+  }
+
+  /**
+   * Stop screen sharing.
+   */
+  stopScreenShare(): void {
+    if (this._screenShareStreamId) {
+      const up = this.upStreams.get(this._screenShareStreamId);
+      if (up) {
+        try {
+          this.send({ type: "close", id: this._screenShareStreamId });
+        } catch {
+          // ignore
+        }
+        up.pc.close();
+        this.upStreams.delete(this._screenShareStreamId);
+      }
+    }
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach((t) => t.stop());
+      this.screenStream = null;
+    }
+    this._screenShareStreamId = null;
+    this.emit("screenShareStopped");
+  }
+
+  /**
+   * Perform a user action (op, unop, kick, present, unpresent).
+   * Only works if the user has "op" permission.
+   */
+  userAction(kind: string, dest: string, value?: string): void {
+    this.send({
+      type: "useraction",
+      source: this.connectionId,
+      dest,
+      username: this.username,
+      kind,
+      value: value || "",
+    });
   }
 
   /**
