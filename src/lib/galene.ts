@@ -321,7 +321,7 @@ export class GaleneClient {
       }
 
       default:
-        console.log("[Galene] Unhandled message type:", msg.type, msg);
+        console.warn("[Galene] Unhandled message type:", msg.type, msg);
     }
   }
 
@@ -688,6 +688,20 @@ export class GaleneClient {
       username: this.username,
       kind,
       value: value || "",
+    });
+  }
+
+  /**
+   * Send a generic user message (for whiteboard, remote mute, hand raise, etc.).
+   */
+  sendUserMessage(kind: string, dest: string = "", value: string = ""): void {
+    this.send({
+      type: "usermessage",
+      source: this.connectionId,
+      dest,
+      username: this.username,
+      kind,
+      value,
     });
   }
 

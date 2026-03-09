@@ -18,8 +18,12 @@ import {
   Shield,
   LogOut,
   X,
+  Hand,
+  Pencil,
+  VolumeX,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import Whiteboard from "@/components/classroom/Whiteboard";
 
 export default function VirtualClassroom() {
   const { classId } = useParams();
@@ -46,6 +50,13 @@ export default function VirtualClassroom() {
     kickUser,
     audioMuted,
     videoMuted,
+    muteUser,
+    raiseHand,
+    lowerHand,
+    raisedHands,
+    whiteboardEvents,
+    whiteboardActive,
+    sendUserMessage,
   } = useGalene();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,9 +72,30 @@ export default function VirtualClassroom() {
   const [joinTime, setJoinTime] = useState<Date | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
+  const [whiteboardOpen, setWhiteboardOpen] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+  const autoJoinAttempted = useRef(false);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-lower hand after 15 seconds
+  useEffect(() => {
+    if (handRaised) {
+      const timer = setTimeout(() => {
+        lowerHand();
+        setHandRaised(false);
+      }, 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [handRaised, lowerHand]);
+
+  // Sync whiteboard state from host
+  useEffect(() => {
+    if (!isHost) {
+      setWhiteboardOpen(whiteboardActive);
+    }
+  }, [whiteboardActive, isHost]);
 
   // Fetch class and user data
   useEffect(() => {
@@ -110,6 +142,40 @@ export default function VirtualClassroom() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  // Auto-rejoin on page refresh
+  useEffect(() => {
+    if (autoJoinAttempted.current || connected || connecting) return;
+    if (!classData || !currentUser) return;
+
+    const sessionKey = `galene-session-${classId}`;
+    const saved = sessionStorage.getItem(sessionKey);
+    if (!saved) return;
+
+    autoJoinAttempted.current = true;
+
+    try {
+      const session = JSON.parse(saved);
+      setIsHost(session.isHost);
+      setAttendanceId(session.attendanceId);
+      setJoinTime(session.joinTime ? new Date(session.joinTime) : new Date());
+
+      // Auto-rejoin
+      setIsJoining(true);
+      connect(session.groupName, session.username, session.password)
+        .then(() => {
+          setIsJoining(false);
+          setLocalError(null);
+        })
+        .catch(() => {
+          // If auto-rejoin fails, clear session so user can manually join
+          sessionStorage.removeItem(sessionKey);
+          setIsJoining(false);
+        });
+    } catch {
+      sessionStorage.removeItem(sessionKey);
+    }
+  }, [classData, currentUser, classId, connected, connecting, connect]);
+
   const handleJoin = async () => {
     if (!classData || !currentUser) {
       setLocalError(
@@ -151,6 +217,20 @@ export default function VirtualClassroom() {
         status: "active",
       });
       setAttendanceId(attendance.id);
+
+      // Save session for auto-rejoin on refresh
+      const sessionKey = `galene-session-${classId}`;
+      sessionStorage.setItem(
+        sessionKey,
+        JSON.stringify({
+          groupName,
+          username,
+          password,
+          isHost: hostMode,
+          attendanceId: attendance.id,
+          joinTime: now.toISOString(),
+        }),
+      );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       let errorMsg = "Join failed. Please check your connection and try again.";
@@ -180,6 +260,8 @@ export default function VirtualClassroom() {
         console.error("Failed to update attendance on leave:", err);
       }
     }
+    // Clear saved session so we don't auto-rejoin
+    sessionStorage.removeItem(`galene-session-${classId}`);
     disconnect();
     router.back();
   };
@@ -344,6 +426,23 @@ export default function VirtualClassroom() {
 
           {(connected || connecting) && (
             <div className="flex-1 flex flex-col gap-3 min-h-0">
+              {/* Whiteboard Overlay */}
+              {whiteboardOpen && (
+                <Whiteboard
+                  isHost={isHost}
+                  incomingDrawEvents={whiteboardEvents}
+                  onDraw={(evt) =>
+                    sendUserMessage("whiteboard", "", JSON.stringify(evt))
+                  }
+                  onClose={() => {
+                    setWhiteboardOpen(false);
+                    if (isHost) {
+                      sendUserMessage("whiteboard-toggle", "", "false");
+                    }
+                  }}
+                />
+              )}
+
               {/* Spotlight Area */}
               <div className="flex-1 min-h-0 relative">
                 {spotlightStream ? (
@@ -494,6 +593,40 @@ export default function VirtualClassroom() {
               </button>
             )}
 
+            {/* Whiteboard toggle (Host only) */}
+            {isHost && (
+              <button
+                onClick={() => {
+                  const newState = !whiteboardOpen;
+                  setWhiteboardOpen(newState);
+                  sendUserMessage("whiteboard-toggle", "", String(newState));
+                }}
+                className={`p-4 rounded-xl transition-all active:scale-90 ${whiteboardOpen ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" : "bg-white/5 text-gray-300 hover:bg-white/10"}`}
+                title={whiteboardOpen ? "Close whiteboard" : "Open whiteboard"}
+              >
+                <Pencil size={20} />
+              </button>
+            )}
+
+            {/* Hand Raise (non-host) */}
+            {!isHost && (
+              <button
+                onClick={() => {
+                  if (handRaised) {
+                    lowerHand();
+                    setHandRaised(false);
+                  } else {
+                    raiseHand();
+                    setHandRaised(true);
+                  }
+                }}
+                className={`p-4 rounded-xl transition-all active:scale-90 ${handRaised ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20 animate-pulse" : "bg-white/5 text-gray-300 hover:bg-white/10"}`}
+                title={handRaised ? "Lower hand" : "Raise hand"}
+              >
+                <Hand size={20} />
+              </button>
+            )}
+
             <button
               onClick={() =>
                 setSidebarMode(sidebarMode === "chat" ? null : "chat")
@@ -548,29 +681,34 @@ export default function VirtualClassroom() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-                {chatMessages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex flex-col ${msg.username === (currentUser?.name || currentUser?.username) || msg.username === "lecturer" ? "items-end" : "items-start"}`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1 px-1">
-                      <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">
-                        {msg.username}
-                      </span>
-                    </div>
+                {chatMessages.map((msg, i) => {
+                  const displayUsername = isHost
+                    ? "lecturer"
+                    : currentUser?.name || currentUser?.username || "Guest";
+                  const isMyMessage = msg.username === displayUsername;
+
+                  return (
                     <div
-                      className={`px-3 py-2 rounded-xl max-w-[85%] text-sm font-medium leading-relaxed ${
-                        msg.username ===
-                          (currentUser?.name || currentUser?.username) ||
-                        msg.username === "lecturer"
-                          ? "bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/10"
-                          : "bg-white/5 text-gray-200 rounded-tl-none ring-1 ring-white/5"
-                      }`}
+                      key={i}
+                      className={`flex flex-col ${isMyMessage ? "items-end" : "items-start"}`}
                     >
-                      {msg.value}
+                      <div className="flex items-center gap-1.5 mb-1 px-1">
+                        <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">
+                          {msg.username}
+                        </span>
+                      </div>
+                      <div
+                        className={`px-3 py-2 rounded-xl max-w-[85%] text-sm font-medium leading-relaxed ${
+                          isMyMessage
+                            ? "bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/10"
+                            : "bg-white/5 text-gray-200 rounded-tl-none ring-1 ring-white/5"
+                        }`}
+                      >
+                        {msg.value}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={chatEndRef} />
               </div>
 
@@ -655,9 +793,26 @@ export default function VirtualClassroom() {
                         </div>
                       </div>
 
+                      {/* Hand raise badge */}
+                      {raisedHands.has(p.id) && (
+                        <span
+                          className="text-yellow-400 animate-bounce"
+                          title="Hand raised"
+                        >
+                          <Hand size={16} />
+                        </span>
+                      )}
+
                       {/* Host controls */}
                       {isHost && !isParticipantHost && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => muteUser(p.id)}
+                            className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                            title="Mute participant"
+                          >
+                            <VolumeX size={14} />
+                          </button>
                           <button
                             onClick={() => {
                               if (

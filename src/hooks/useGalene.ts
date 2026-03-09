@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { GaleneClient, createGaleneClient } from "@/lib/galene";
+import { toast } from "sonner";
 
 export interface RemoteStream {
   id: string;
@@ -45,6 +46,15 @@ export interface UseGaleneReturn {
   kickUser: (userId: string) => void;
   audioMuted: boolean;
   videoMuted: boolean;
+  // New capabilities
+  muteUser: (userId: string) => void;
+  raiseHand: () => void;
+  lowerHand: () => void;
+  raisedHands: Set<string>;
+  whiteboardEvents: any[];
+  whiteboardActive: boolean;
+  sendUserMessage: (kind: string, dest?: string, value?: string) => void;
+  ownId: string;
 }
 
 export function useGalene(): UseGaleneReturn {
@@ -62,6 +72,17 @@ export function useGalene(): UseGaleneReturn {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenShareStream, setScreenShareStream] =
     useState<MediaStream | null>(null);
+  // Own client ID (used for identifying self in messages)
+  const [ownId, setOwnId] = useState<string>("");
+  // New state for hand raise and whiteboard events
+  const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set());
+  const [whiteboardEvents, setWhiteboardEvents] = useState<any[]>([]);
+  const [whiteboardActive, setWhiteboardActive] = useState(false);
+
+  // Refs for callbacks
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const participantsRef = useRef<Participant[]>([]);
+  const permissionsRef = useRef<string[]>([]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -77,6 +98,8 @@ export function useGalene(): UseGaleneReturn {
     async (group: string, username: string, password: string) => {
       setConnecting(true);
       setError(null);
+      // Reset ownId before new connection
+      setOwnId("");
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -91,12 +114,16 @@ export function useGalene(): UseGaleneReturn {
 
         const client = createGaleneClient();
         clientRef.current = client;
+        // Store our own client ID for reference (used for mute, hand raise, etc.)
+        setOwnId(client.id);
+        localStreamRef.current = stream;
 
         // Connection events
         client.on("connected", (perms: string[]) => {
           setConnected(true);
           setConnecting(false);
           setPermissions(perms || []);
+          permissionsRef.current = perms || [];
         });
 
         client.on("disconnected", (code: number, reason: string) => {
@@ -150,17 +177,74 @@ export function useGalene(): UseGaleneReturn {
           if (user.id === client.id) return;
 
           setParticipants((prev) => {
+            let next;
             if (user.kind === "delete") {
-              return prev.filter((p) => p.id !== user.id);
+              next = prev.filter((p) => p.id !== user.id);
+            } else {
+              const existing = prev.findIndex((p) => p.id === user.id);
+              if (existing >= 0) {
+                const updated = [...prev];
+                updated[existing] = user;
+                next = updated;
+              } else {
+                next = [...prev, user];
+              }
             }
-            const existing = prev.findIndex((p) => p.id === user.id);
-            if (existing >= 0) {
-              const updated = [...prev];
-              updated[existing] = user;
-              return updated;
-            }
-            return [...prev, user];
+            participantsRef.current = next;
+            return next;
           });
+        });
+
+        // Listen for generic user messages (whiteboard, mute, hand raise)
+        client.on("usermessage", (msg: any) => {
+          const { kind, dest, value } = msg;
+          // Remote mute
+          if (kind === "remote-mute" && dest === client.id) {
+            // Host requested mute of this client
+            const ls = localStreamRef.current;
+            if (ls) {
+              ls.getAudioTracks().forEach((track) => {
+                track.enabled = false;
+              });
+              setAudioMuted(true);
+              toast.error("The host has muted your microphone.", {
+                icon: "🔇",
+              });
+            }
+          }
+          // Hand raise
+          if (kind === "hand-raise") {
+            const userId = msg.source; // source is the user who raised hand
+            setRaisedHands((prev) => {
+              const newSet = new Set(prev);
+              if (value === "up") {
+                newSet.add(userId);
+                // If we are host, show toast notification
+                if (permissionsRef.current.includes("op")) {
+                  const p = participantsRef.current.find(
+                    (u) => u.id === userId,
+                  );
+                  const name = p ? p.username : "A student";
+                  toast.info(`${name} has raised their hand.`, { icon: "✋" });
+                }
+              } else if (value === "down") {
+                newSet.delete(userId);
+              }
+              return newSet;
+            });
+          }
+          // Whiteboard events
+          if (kind === "whiteboard") {
+            try {
+              const data = JSON.parse(value);
+              setWhiteboardEvents((prev) => [...prev, data]);
+            } catch (e) {
+              console.warn("Failed to parse whiteboard event", e);
+            }
+          }
+          if (kind === "whiteboard-toggle") {
+            setWhiteboardActive(value === "true");
+          }
         });
 
         // Screen share events
@@ -198,8 +282,14 @@ export function useGalene(): UseGaleneReturn {
       clientRef.current.disconnect();
       clientRef.current = null;
     }
-    if (localStream) {
-      localStream.getTracks().forEach((t) => t.stop());
+    // Clear transient UI states
+    setRaisedHands(new Set());
+    setWhiteboardEvents([]);
+    setWhiteboardActive(false);
+    setOwnId("");
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
     }
     setLocalStream(null);
     setConnected(false);
@@ -218,23 +308,55 @@ export function useGalene(): UseGaleneReturn {
     }
   }, []);
 
+  // Generic wrapper to send user messages
+  const sendUserMessage = useCallback(
+    (kind: string, dest: string = "", value: string = "") => {
+      if (clientRef.current) {
+        clientRef.current.sendUserMessage(kind, dest, value);
+      }
+    },
+    [],
+  );
+
+  // Host-only mute user (remote mute)
+  const muteUser = useCallback(
+    (userId: string) => {
+      // Only send if we have op permission (host)
+      if (permissions.includes("op")) {
+        sendUserMessage("remote-mute", userId);
+      }
+    },
+    [permissions, sendUserMessage],
+  );
+
+  // Hand raise actions for current user
+  const raiseHand = useCallback(() => {
+    sendUserMessage("hand-raise", "", "up");
+  }, [sendUserMessage]);
+
+  const lowerHand = useCallback(() => {
+    sendUserMessage("hand-raise", "", "down");
+  }, [sendUserMessage]);
+
   const toggleAudio = useCallback(() => {
-    if (localStream) {
-      localStream.getAudioTracks().forEach((track) => {
+    const ls = localStreamRef.current;
+    if (ls) {
+      ls.getAudioTracks().forEach((track) => {
         track.enabled = !track.enabled;
       });
       setAudioMuted((prev) => !prev);
     }
-  }, [localStream]);
+  }, []);
 
   const toggleVideo = useCallback(() => {
-    if (localStream) {
-      localStream.getVideoTracks().forEach((track) => {
+    const ls = localStreamRef.current;
+    if (ls) {
+      ls.getVideoTracks().forEach((track) => {
         track.enabled = !track.enabled;
       });
       setVideoMuted((prev) => !prev);
     }
-  }, [localStream]);
+  }, []);
 
   const shareScreen = useCallback(async () => {
     if (clientRef.current) {
@@ -280,5 +402,14 @@ export function useGalene(): UseGaleneReturn {
     kickUser,
     audioMuted,
     videoMuted,
+    // New capabilities
+    muteUser,
+    raiseHand,
+    lowerHand,
+    raisedHands,
+    whiteboardEvents,
+    whiteboardActive,
+    sendUserMessage,
+    ownId,
   };
 }
