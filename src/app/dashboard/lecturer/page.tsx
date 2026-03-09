@@ -123,38 +123,34 @@ const mockIntakes: Intake[] = [
   },
 ];
 
-const mockUpcomingClasses: UpcomingClass[] = [
-  {
-    id: "class-1",
-    intakeName: "January 2024 Intake",
-    courseName: "Computer Science Fundamentals",
-    classTitle: "Introduction to Programming - Lecture 5",
-    startTime: "2026-02-07 10:00 AM",
-    duration: 90,
-    status: "scheduled",
-    zoomJoinUrl: "https://zoom.us/j/mock-meeting-1",
-  },
-  {
-    id: "class-2",
-    intakeName: "January 2024 Intake",
-    courseName: "Web Development",
-    classTitle: "React Components Deep Dive",
-    startTime: "2026-02-08 02:00 PM",
-    duration: 120,
-    status: "scheduled",
-    zoomJoinUrl: "https://zoom.us/j/mock-meeting-2",
-  },
-  {
-    id: "class-3",
-    intakeName: "March 2024 Intake",
-    courseName: "Mathematics",
-    classTitle: "Limits and Continuity",
-    startTime: "2026-02-09 09:00 AM",
-    duration: 60,
-    status: "scheduled",
-    zoomJoinUrl: "https://zoom.us/j/mock-meeting-3",
-  },
-];
+// Data fetching for real classes
+const fetchUpcomingClasses = async (lecturerId: string): Promise<UpcomingClass[]> => {
+  try {
+    const records = await pb.collection("classes").getFullList({
+      filter: `course_subject.lecturer = "${lecturerId}"`,
+      expand: "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
+      sort: "start_time",
+    });
+
+    return records.map((record: any) => ({
+      id: record.id,
+      intakeName: record.expand?.course_subject?.expand?.course_intake?.expand?.intake?.code || "N/A",
+      courseName: record.expand?.course_subject?.expand?.course_intake?.expand?.course?.name || "N/A",
+      classTitle: record.title,
+      startTime: new Date(record.start_time).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      duration: record.duration,
+      status: record.status as any,
+    }));
+  } catch (error) {
+    console.error("Error fetching classes:", error);
+    return [];
+  }
+};
 
 function DateTimeStatCard() {
   const [now, setNow] = useState<Date | null>(null);
@@ -207,7 +203,17 @@ export default function LecturerDashboard() {
       return;
     }
     setUser(currentUser);
+    if (currentUser?.id) {
+      loadClasses(currentUser.id);
+    }
   }, [router]);
+
+  const [upcomingClasses, setUpcomingClasses] = useState<UpcomingClass[]>([]);
+
+  const loadClasses = async (lecturerId: string) => {
+    const classes = await fetchUpcomingClasses(lecturerId);
+    setUpcomingClasses(classes);
+  };
 
   // Show disabled account message if account is disabled
   if (user?.accountStatus === "disabled") {
@@ -270,7 +276,7 @@ export default function LecturerDashboard() {
         ),
       0,
     ),
-    upcomingClasses: mockUpcomingClasses.length,
+    upcomingClasses: upcomingClasses.length,
     assignmentsToMark: 0,
   };
 
@@ -389,7 +395,7 @@ export default function LecturerDashboard() {
             </div>
 
             <div className="flex-1 overflow-hidden">
-              <UpcomingClasses classes={mockUpcomingClasses} />
+              <UpcomingClasses classes={upcomingClasses} />
             </div>
           </div>
         </div>
@@ -423,7 +429,7 @@ export default function LecturerDashboard() {
         <AllSchedulesModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          classes={mockUpcomingClasses}
+          classes={upcomingClasses}
         />
       )}
     </>

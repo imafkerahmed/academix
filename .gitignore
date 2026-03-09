@@ -47,3 +47,8 @@ services/pocketbase/pb_migrations/*
 !services/pocketbase/pb_migrations/.gitkeep
 services/pocketbase/pb_hooks/*
 !services/pocketbase/pb_hooks/.gitkeep
+
+# Galene
+services/galene/data/*
+!services/galene/data/config.json
+services/galene/recordings/*

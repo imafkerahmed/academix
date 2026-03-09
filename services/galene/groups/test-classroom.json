@@ -1,0 +1,7 @@
+{
+  "op": [{"username": "lecturer", "password": "lecturer123"}],
+  "presenter": [{"password": "student123"}],
+  "codecs": ["vp8", "opus"],
+  "autolock": false,
+  "max-history-age": 14400
+}

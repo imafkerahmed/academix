@@ -10,8 +10,7 @@ export interface UpcomingClass {
   classTitle: string;
   startTime: string; // ISO string or displayable date/time
   duration: number; // minutes
-  status: "scheduled" | "ongoing" | "completed";
-  zoomJoinUrl: string;
+  status: "scheduled" | "in_progress" | "completed";
 }
 
 interface UpcomingClassesProps {
@@ -29,7 +28,7 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
     switch (status) {
       case "scheduled":
         return "bg-blue-100 text-blue-700 border-blue-200";
-      case "ongoing":
+      case "in_progress":
         return "bg-green-100 text-green-700 border-green-200";
       case "completed":
         return "bg-gray-100 text-gray-700 border-gray-200";
@@ -38,8 +37,8 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
     }
   };
 
-  const handleQuickJoin = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+  const handleQuickJoin = (id: string) => {
+    window.location.href = `/dashboard/classroom/${id}`;
   };
 
   if (classes.length === 0) {
@@ -57,7 +56,7 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
     <div className="max-h-[500px] overflow-y-auto pr-2 no-scrollbar">
       <div className="space-y-4">
         {classes.map((classItem) => {
-          const isOngoing = classItem.status === "ongoing";
+          const isOngoing = classItem.status === "in_progress";
           const themeClass = isOngoing
             ? "border-indigo-200 bg-indigo-50/30 ring-2 ring-indigo-50/50"
             : "border-gray-100 bg-gray-50/20";
@@ -108,14 +107,12 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
                     </span>
                   </div>
 
-                  {classItem.zoomJoinUrl && (
-                    <button
-                      onClick={() => handleQuickJoin(classItem.zoomJoinUrl)}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 transition-all"
-                    >
-                      Quick Join
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleQuickJoin(classItem.id)}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 transition-all"
+                  >
+                    Quick Join
+                  </button>
                 </div>
               </div>
             </div>
