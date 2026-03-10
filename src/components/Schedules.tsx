@@ -52,6 +52,15 @@ export default function Section5Schedules() {
 
   useEffect(() => {
     fetchSchedules();
+
+    // Real-time subscription: re-fetch when any class changes
+    pb.collection("classes").subscribe("*", () => {
+      fetchSchedules();
+    });
+
+    return () => {
+      pb.collection("classes").unsubscribe("*");
+    };
   }, []);
 
   const fetchSchedules = async () => {
@@ -75,12 +84,16 @@ export default function Section5Schedules() {
         return;
       }
 
-      // 2. Fetch classes for these intakes
+      // 2. Fetch classes for these intakes (include today's completed)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayISO = todayStart.toISOString();
+
       const filter = intakeIds
         .map((id: string) => `course_subject.course_intake = "${id}"`)
         .join(" || ");
       const classes = await pb.collection("classes").getFullList({
-        filter: `(${filter}) && status != "completed" && status != "cancelled"`,
+        filter: `(${filter}) && status != "cancelled" && (status != "completed" || start_time >= "${todayISO}")`,
         expand: "course_subject.subject,course_subject.course_intake.course",
         sort: "start_time",
       });
@@ -163,6 +176,11 @@ export default function Section5Schedules() {
                       Live Now
                     </div>
                   )}
+                  {ev.status === "completed" && (
+                    <div className="absolute -top-2 -right-2 bg-gray-400 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
+                      Class Ended
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-4">
@@ -196,16 +214,26 @@ export default function Section5Schedules() {
                         </span>
                       </div>
 
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/dashboard/classroom/${ev.id}?role=attendee`,
-                          )
-                        }
-                        className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 transition-all"
-                      >
-                        Join
-                      </button>
+                      {ev.status === "completed" ? (
+                        <span className="px-4 py-2 rounded-xl bg-gray-100 text-gray-400 text-[10px] font-black uppercase tracking-widest">
+                          Ended
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            router.push(
+                              `/dashboard/classroom/${ev.id}?role=attendee`,
+                            )
+                          }
+                          className={`px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all ${
+                            ev.status === "in_progress"
+                              ? "bg-green-600 shadow-green-100 hover:bg-green-700"
+                              : "bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700"
+                          }`}
+                        >
+                          Join
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -285,16 +313,28 @@ export default function Section5Schedules() {
                           </div>
 
                           <div className="shrink-0 flex gap-3">
-                            <button
-                              onClick={() =>
-                                router.push(
-                                  `/dashboard/classroom/${ev.id}?role=attendee`,
-                                )
-                              }
-                              className="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all"
-                            >
-                              Join Session
-                            </button>
+                            {ev.status === "completed" ? (
+                              <span className="px-6 py-3 rounded-2xl bg-gray-100 text-gray-400 text-xs font-black uppercase tracking-[0.1em]">
+                                Class Ended
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  router.push(
+                                    `/dashboard/classroom/${ev.id}?role=attendee`,
+                                  )
+                                }
+                                className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl hover:scale-105 active:scale-95 transition-all ${
+                                  ev.status === "in_progress"
+                                    ? "bg-green-600 shadow-green-100 hover:bg-green-700"
+                                    : "bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700"
+                                }`}
+                              >
+                                {ev.status === "in_progress"
+                                  ? "Join Live"
+                                  : "Join Session"}
+                              </button>
+                            )}
                           </div>
                         </div>
 

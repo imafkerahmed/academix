@@ -47,6 +47,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface ZoomClass {
   id: string;
@@ -116,9 +124,33 @@ export default function ClassManagement() {
     description: "",
     course_intake: "",
     course_subject: "",
-    start_time: "",
-    duration: 60,
   });
+  const [durationHour, setDurationHour] = useState<string>("1");
+  const [durationMinute, setDurationMinute] = useState<string>("0");
+  // Compute nearest hour for default time
+  const getNearestHourDefaults = () => {
+    const now = new Date();
+    let h = now.getHours();
+    if (now.getMinutes() > 0) h += 1; // round up
+    if (h >= 24) h = 0;
+    const amPm = h >= 12 ? "PM" : "AM";
+    let h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return { hour: String(h12).padStart(2, "0"), amPm };
+  };
+
+  const nearestDefaults = getNearestHourDefaults();
+
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(
+    new Date(),
+  );
+  const [scheduleHour, setScheduleHour] = useState<string>(
+    nearestDefaults.hour,
+  );
+  const [scheduleMinute, setScheduleMinute] = useState<string>("00");
+  const [scheduleAmPm, setScheduleAmPm] = useState<string>(
+    nearestDefaults.amPm,
+  );
 
   const fetchCourseIntakes = async () => {
     try {
@@ -146,6 +178,21 @@ export default function ClassManagement() {
   const handleCreateClass = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
+      if (!scheduleDate) {
+        toast.error("Please select a date.");
+        return;
+      }
+
+      let hourNum = parseInt(scheduleHour);
+      if (scheduleAmPm === "PM" && hourNum !== 12) hourNum += 12;
+      if (scheduleAmPm === "AM" && hourNum === 12) hourNum = 0;
+
+      const finalDate = new Date(scheduleDate);
+      finalDate.setHours(hourNum, parseInt(scheduleMinute), 0, 0);
+
+      const totalDuration =
+        parseInt(durationHour) * 60 + parseInt(durationMinute);
+
       // Filter out course_intake and format start_time
       const { course_intake, ...submitData } = formData;
 
@@ -154,7 +201,8 @@ export default function ClassManagement() {
 
       await pb.collection("classes").create({
         ...submitData,
-        start_time: new Date(formData.start_time).toISOString(),
+        duration: totalDuration,
+        start_time: finalDate.toISOString(),
         status: "scheduled",
         galene_group: galeneGroup,
       });
@@ -167,7 +215,7 @@ export default function ClassManagement() {
           classId: galeneGroup,
           passwordHost: "lecturer123",
           passwordAttendee: "student123",
-          duration: formData.duration || 60,
+          duration: totalDuration || 60,
         }),
       });
 
@@ -178,9 +226,14 @@ export default function ClassManagement() {
         description: "",
         course_intake: "",
         course_subject: "",
-        start_time: "",
-        duration: 60,
       });
+      setDurationHour("1");
+      setDurationMinute("0");
+      setScheduleDate(new Date());
+      const resetDefaults = getNearestHourDefaults();
+      setScheduleHour(resetDefaults.hour);
+      setScheduleMinute("00");
+      setScheduleAmPm(resetDefaults.amPm);
       fetchData();
     } catch (error) {
       console.error("Error creating class:", error);
@@ -313,151 +366,332 @@ export default function ClassManagement() {
                 SCHEDULE CLASS
               </button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] bg-white rounded-[2.5rem] p-8 border-none overflow-hidden ring-1 ring-gray-950/[0.05]">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight uppercase">
-                  Schedule New <span className="text-indigo-600">Class</span>
-                </DialogTitle>
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">
-                  Setup virtual session parameters
-                </p>
-              </DialogHeader>
+            <DialogContent className="sm:max-w-fit w-[95vw] max-h-[90vh] overflow-y-auto bg-white rounded-t-[32px] sm:rounded-3xl p-0 border-none">
+              <div className="p-8 space-y-6">
+                {/* Accessibility-only labels */}
+                <DialogHeader className="sr-only">
+                  <DialogTitle>Schedule New Class</DialogTitle>
+                </DialogHeader>
 
-              <form onSubmit={handleCreateClass} className="space-y-6 mt-6">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
-                    Class Title
-                  </Label>
-                  <Input
-                    required
-                    className="rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 py-6 transition-all"
-                    placeholder="e.g. Intro to Data Structures"
-                    value={formData.title}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
-                  />
+                {/* Visual Header - matches ModernModal */}
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black">
+                    <Plus size={20} />
+                  </div>
+                  <div>
+                    <h2 className="font-black text-gray-900 uppercase tracking-tight">
+                      Schedule New Class
+                    </h2>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Setup virtual session parameters
+                    </p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
-                      Course Intake
-                    </Label>
-                    <Select
-                      required
-                      onValueChange={(val) => {
-                        setFormData({
-                          ...formData,
-                          course_intake: val,
-                          course_subject: "",
-                        });
-                        fetchSubjectsForIntake(val);
-                      }}
+                <form onSubmit={handleCreateClass} className="space-y-4">
+                  <div className="flex flex-col md:flex-row gap-8">
+                    {/* Left Column: General Info */}
+                    <div className="flex-1 space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                          Class Title
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Intro to Data Structures"
+                          value={formData.title}
+                          onChange={(e) =>
+                            setFormData({ ...formData, title: e.target.value })
+                          }
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                          Course Intake
+                        </label>
+                        <Select
+                          required
+                          onValueChange={(val) => {
+                            setFormData({
+                              ...formData,
+                              course_intake: val,
+                              course_subject: "",
+                            });
+                            fetchSubjectsForIntake(val);
+                          }}
+                        >
+                          <SelectTrigger className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold transition-all h-auto">
+                            <SelectValue placeholder="Select Intake" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-gray-100">
+                            {courseIntakes.map((ci) => (
+                              <SelectItem
+                                key={ci.id}
+                                value={ci.id}
+                                className="rounded-lg"
+                              >
+                                {ci.expand?.course?.name} -{" "}
+                                {ci.expand?.intake?.code}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                          Subject
+                        </label>
+                        <Select
+                          required
+                          disabled={!formData.course_intake}
+                          onValueChange={(val) =>
+                            setFormData({ ...formData, course_subject: val })
+                          }
+                        >
+                          <SelectTrigger className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold transition-all h-auto">
+                            <SelectValue placeholder="Select Subject" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-gray-100">
+                            {availableSubjects.map((cs) => (
+                              <SelectItem
+                                key={cs.id}
+                                value={cs.id}
+                                className="rounded-lg"
+                              >
+                                {cs.expand?.subject?.[0]?.name ||
+                                  cs.expand?.subject?.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                          Description (Optional)
+                        </label>
+                        <textarea
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all min-h-[80px] resize-none"
+                          placeholder="Brief overview of session topics..."
+                          value={formData.description}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              description: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Column: Timing */}
+                    <div className="flex-1 space-y-4">
+                      <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 space-y-5">
+                        <h3 className="text-[11px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                          <Clock size={14} /> Class Timing
+                        </h3>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                            Date
+                          </label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className={cn(
+                                  "w-full flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold text-sm text-left transition-all hover:bg-gray-50 hover:text-indigo-600",
+                                  !scheduleDate && "text-gray-400",
+                                )}
+                              >
+                                <Calendar className="h-4 w-4 text-indigo-500 shrink-0" />
+                                {scheduleDate ? (
+                                  format(scheduleDate, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-auto p-0 rounded-2xl border-gray-100 shadow-xl"
+                              align="start"
+                            >
+                              <CalendarComponent
+                                mode="single"
+                                selected={scheduleDate}
+                                onSelect={setScheduleDate}
+                                initialFocus
+                                className="p-3"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                            Time
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={scheduleHour}
+                              onValueChange={setScheduleHour}
+                            >
+                              <SelectTrigger className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold transition-all h-auto">
+                                <SelectValue placeholder="HH" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-gray-100">
+                                {Array.from({ length: 12 }).map((_, i) => {
+                                  const v = String(i + 1).padStart(2, "0");
+                                  return (
+                                    <SelectItem
+                                      key={v}
+                                      value={v}
+                                      className="rounded-lg font-bold"
+                                    >
+                                      {v}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-gray-300 font-black text-lg">
+                              :
+                            </span>
+                            <Select
+                              value={scheduleMinute}
+                              onValueChange={setScheduleMinute}
+                            >
+                              <SelectTrigger className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold transition-all h-auto">
+                                <SelectValue placeholder="MM" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-gray-100">
+                                {["00", "15", "30", "45"].map((v) => (
+                                  <SelectItem
+                                    key={v}
+                                    value={v}
+                                    className="rounded-lg font-bold"
+                                  >
+                                    {v}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={scheduleAmPm}
+                              onValueChange={setScheduleAmPm}
+                            >
+                              <SelectTrigger className="w-[80px] px-3 py-3 bg-indigo-50 border border-indigo-100 rounded-xl font-black text-indigo-600 uppercase tracking-widest transition-all h-auto text-xs">
+                                <SelectValue placeholder="AM" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-gray-100">
+                                <SelectItem
+                                  value="AM"
+                                  className="rounded-lg font-black uppercase text-xs"
+                                >
+                                  AM
+                                </SelectItem>
+                                <SelectItem
+                                  value="PM"
+                                  className="rounded-lg font-black uppercase text-xs"
+                                >
+                                  PM
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                            Duration
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={durationHour}
+                              onValueChange={setDurationHour}
+                            >
+                              <SelectTrigger className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold transition-all h-auto">
+                                <SelectValue placeholder="0" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-gray-100 max-h-[200px]">
+                                {Array.from({ length: 25 }).map((_, i) => (
+                                  <SelectItem
+                                    key={i}
+                                    value={String(i)}
+                                    className="rounded-lg font-bold"
+                                  >
+                                    {i}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest shrink-0">
+                              hr
+                            </span>
+                            <Select
+                              value={durationMinute}
+                              onValueChange={setDurationMinute}
+                            >
+                              <SelectTrigger className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold transition-all h-auto">
+                                <SelectValue placeholder="0" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-gray-100">
+                                <SelectItem
+                                  value="0"
+                                  className="rounded-lg font-bold"
+                                >
+                                  0
+                                </SelectItem>
+                                <SelectItem
+                                  value="15"
+                                  className="rounded-lg font-bold"
+                                >
+                                  15
+                                </SelectItem>
+                                <SelectItem
+                                  value="30"
+                                  className="rounded-lg font-bold"
+                                >
+                                  30
+                                </SelectItem>
+                                <SelectItem
+                                  value="45"
+                                  className="rounded-lg font-bold"
+                                >
+                                  45
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest shrink-0">
+                              min
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 pt-6 border-t border-gray-50">
+                    <button
+                      type="submit"
+                      className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-widest"
                     >
-                      <SelectTrigger className="rounded-2xl border-gray-100 bg-gray-50 py-6 transition-all">
-                        <SelectValue placeholder="Select Intake" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-gray-100">
-                        {courseIntakes.map((ci) => (
-                          <SelectItem
-                            key={ci.id}
-                            value={ci.id}
-                            className="rounded-xl"
-                          >
-                            {ci.expand?.course?.name} -{" "}
-                            {ci.expand?.intake?.code}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
-                      Subject
-                    </Label>
-                    <Select
-                      required
-                      disabled={!formData.course_intake}
-                      onValueChange={(val) =>
-                        setFormData({ ...formData, course_subject: val })
-                      }
+                      SCHEDULE SESSION
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="w-full py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider"
                     >
-                      <SelectTrigger className="rounded-2xl border-gray-100 bg-gray-50 py-6 transition-all">
-                        <SelectValue placeholder="Select Subject" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-gray-100">
-                        {availableSubjects.map((cs) => (
-                          <SelectItem
-                            key={cs.id}
-                            value={cs.id}
-                            className="rounded-xl"
-                          >
-                            {cs.expand?.subject?.[0]?.name ||
-                              cs.expand?.subject?.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      CANCEL
+                    </button>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
-                      Start Time
-                    </Label>
-                    <Input
-                      required
-                      type="datetime-local"
-                      className="rounded-2xl border-gray-100 bg-gray-50 py-6"
-                      value={formData.start_time}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setFormData({ ...formData, start_time: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
-                      Duration (Min)
-                    </Label>
-                    <Input
-                      required
-                      type="number"
-                      className="rounded-2xl border-gray-100 bg-gray-50 py-6"
-                      value={formData.duration}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setFormData({
-                          ...formData,
-                          duration: parseInt(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">
-                    Description (Optional)
-                  </Label>
-                  <Textarea
-                    className="rounded-2xl border-gray-100 bg-gray-50 focus:bg-white min-h-[100px]"
-                    placeholder="Brief overview of session topics..."
-                    value={formData.description}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs tracking-widest py-8 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-95 uppercase"
-                >
-                  Schedule session
-                </Button>
-              </form>
+                </form>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
