@@ -10,6 +10,7 @@ export interface UpcomingClass {
   courseName: string;
   classTitle: string;
   startTime: string; // ISO string or displayable date/time
+  rawStartTime?: string;
   duration: number; // minutes
   status: "scheduled" | "in_progress" | "completed";
 }
@@ -19,8 +20,8 @@ interface UpcomingClassesProps {
 }
 
 export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
-  const getWeekdayLabel = (startTime: string) => {
-    const date = new Date(startTime);
+  const getWeekdayLabel = (dateString: string) => {
+    const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) return "";
     return date.toLocaleDateString("en-US", { weekday: "short" });
   };
@@ -82,11 +83,23 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
                   Active Now
                 </div>
               )}
-              {classItem.status === "completed" && (
-                <div className="absolute -top-2 -right-2 bg-gray-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
-                  Ended
-                </div>
-              )}
+              {classItem.status === "completed" &&
+                (() => {
+                  const startTimeStr =
+                    classItem.rawStartTime || classItem.startTime;
+                  const scheduledEnd =
+                    new Date(startTimeStr).getTime() +
+                    classItem.duration * 60000;
+                  const isWithinTimeWindow = Date.now() < scheduledEnd;
+                  if (!isWithinTimeWindow) {
+                    return (
+                      <div className="absolute -top-2 -right-2 bg-gray-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
+                        Ended
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
               <div className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-4">
@@ -123,14 +136,39 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
                     </span>
                   </div>
 
-                  <button
-                    onClick={() =>
-                      handleQuickJoin(classItem.id, classItem.status)
+                  {(() => {
+                    const isCompleted = classItem.status === "completed";
+                    const startTimeStr =
+                      classItem.rawStartTime || classItem.startTime;
+                    const scheduledEnd =
+                      new Date(startTimeStr).getTime() +
+                      classItem.duration * 60000;
+                    const isWithinTimeWindow = Date.now() < scheduledEnd;
+                    const isReallyEnded = isCompleted && !isWithinTimeWindow;
+
+                    if (isReallyEnded) {
+                      return (
+                        <span className="px-4 py-2 rounded-xl bg-gray-100 text-gray-400 text-[10px] font-black uppercase tracking-widest">
+                          Class Ended
+                        </span>
+                      );
                     }
-                    className={`px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest shadow-lg transition-all hover:scale-105 ${classItem.status === "completed" ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"}`}
-                  >
-                    {classItem.status === "completed" ? "Reopen" : "Quick Join"}
-                  </button>
+
+                    return (
+                      <button
+                        onClick={() =>
+                          handleQuickJoin(classItem.id, classItem.status)
+                        }
+                        className={`px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest shadow-lg transition-all hover:scale-105 ${
+                          isCompleted
+                            ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100"
+                            : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+                        }`}
+                      >
+                        {isCompleted ? "Rejoin" : "Quick Join"}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

@@ -162,6 +162,7 @@ const fetchUpcomingClasses = async (
           hour: "2-digit",
           minute: "2-digit",
         }),
+        rawStartTime: record.start_time,
         duration: record.duration,
         status: record.status as any,
       }));
@@ -222,9 +223,6 @@ export default function LecturerDashboard() {
       return;
     }
     setUser(currentUser);
-    if (currentUser?.id) {
-      loadClasses(currentUser.id);
-    }
   }, [router]);
 
   const [upcomingClasses, setUpcomingClasses] = useState<UpcomingClass[]>([]);
@@ -233,6 +231,30 @@ export default function LecturerDashboard() {
     const classes = await fetchUpcomingClasses(lecturerId);
     setUpcomingClasses(classes);
   };
+
+  useEffect(() => {
+    if (user?.id) {
+      loadClasses(user.id);
+
+      // Listen for real-time updates
+      const subscribeToClasses = async () => {
+        try {
+          await pb.collection("classes").subscribe("*", (e) => {
+            console.log("Class update received:", e.action, e.record);
+            loadClasses(user.id);
+          });
+        } catch (error) {
+          console.error("Failed to subscribe to classes:", error);
+        }
+      };
+
+      subscribeToClasses();
+
+      return () => {
+        pb.collection("classes").unsubscribe("*");
+      };
+    }
+  }, [user]);
 
   // Show disabled account message if account is disabled
   if (user?.accountStatus === "disabled") {

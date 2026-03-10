@@ -328,10 +328,18 @@ export default function ClassManagement() {
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
 
+    const scheduledEnd =
+      new Date(classItem.start_time).getTime() + classItem.duration * 60000;
+    const isWithinTimeWindow = Date.now() < scheduledEnd;
+    const isEndedEarly = classItem.status === "completed" && isWithinTimeWindow;
+
+    // Treat 'ended early' classes as 'scheduled' for tab filtering
+    const effectiveStatus = isEndedEarly ? "scheduled" : classItem.status;
+
     const matchesFilter =
       filter === "scheduled"
-        ? classItem.status === "scheduled" || classItem.status === "in_progress"
-        : classItem.status === filter;
+        ? effectiveStatus === "scheduled" || effectiveStatus === "in_progress"
+        : effectiveStatus === filter;
 
     return matchesSearch && matchesFilter;
   });
@@ -797,19 +805,37 @@ export default function ClassManagement() {
                       {classItem.title}
                     </h3>
                     <div className="flex items-center gap-2">
-                      <Badge
-                        className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-                          classItem.status === "scheduled"
-                            ? "bg-blue-600"
-                            : classItem.status === "in_progress"
-                              ? "bg-green-600"
-                              : classItem.status === "cancelled"
-                                ? "bg-red-600"
-                                : "bg-gray-400"
-                        } text-white`}
-                      >
-                        {classItem.status.replace("_", " ")}
-                      </Badge>
+                      {(() => {
+                        const scheduledEnd =
+                          new Date(classItem.start_time).getTime() +
+                          classItem.duration * 60000;
+                        const isWithinTimeWindow = Date.now() < scheduledEnd;
+                        const isEndedEarly =
+                          classItem.status === "completed" &&
+                          isWithinTimeWindow;
+
+                        let bgColor = "bg-gray-400";
+                        let label = classItem.status.replace("_", " ");
+
+                        if (isEndedEarly) {
+                          bgColor = "bg-amber-500";
+                          label = "ended early";
+                        } else if (classItem.status === "scheduled") {
+                          bgColor = "bg-blue-600";
+                        } else if (classItem.status === "in_progress") {
+                          bgColor = "bg-green-600";
+                        } else if (classItem.status === "cancelled") {
+                          bgColor = "bg-red-600";
+                        }
+
+                        return (
+                          <Badge
+                            className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${bgColor} text-white`}
+                          >
+                            {label}
+                          </Badge>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

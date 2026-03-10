@@ -23,7 +23,7 @@ export default function AllSchedulesModal({
     const monthMap = new Map<string, string>();
 
     classes.forEach((classItem) => {
-      const date = new Date(classItem.startTime);
+      const date = new Date(classItem.rawStartTime || classItem.startTime);
       if (Number.isNaN(date.getTime())) return;
 
       const year = date.getFullYear();
@@ -48,7 +48,7 @@ export default function AllSchedulesModal({
     if (!selectedMonth) return classes;
 
     return classes.filter((classItem) => {
-      const date = new Date(classItem.startTime);
+      const date = new Date(classItem.rawStartTime || classItem.startTime);
       if (Number.isNaN(date.getTime())) return false;
 
       const year = date.getFullYear();
@@ -69,7 +69,7 @@ export default function AllSchedulesModal({
     const currentMonthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
 
     const hasCurrentMonthClasses = classes.some((classItem) => {
-      const date = new Date(classItem.startTime);
+      const date = new Date(classItem.rawStartTime || classItem.startTime);
       if (Number.isNaN(date.getTime())) return false;
       const itemYear = date.getFullYear();
       const itemMonthIndex = date.getMonth();
@@ -119,8 +119,8 @@ export default function AllSchedulesModal({
     }
   };
 
-  const getWeekdayLabel = (startTime: string) => {
-    const date = new Date(startTime);
+  const getWeekdayLabel = (dateString: string) => {
+    const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) return "";
     return date.toLocaleDateString("en-US", { weekday: "short" });
   };
@@ -206,6 +206,14 @@ export default function AllSchedulesModal({
             <div className="space-y-4">
               {filteredClasses.map((classItem) => {
                 const isOngoing = classItem.status === "in_progress";
+                const isCompleted = classItem.status === "completed";
+                const startTimeStr =
+                  classItem.rawStartTime || classItem.startTime;
+                const scheduledEnd =
+                  new Date(startTimeStr).getTime() + classItem.duration * 60000;
+                const isWithinTimeWindow = Date.now() < scheduledEnd;
+                const isReallyEnded = isCompleted && !isWithinTimeWindow;
+
                 return (
                   <div
                     key={classItem.id}
@@ -220,7 +228,7 @@ export default function AllSchedulesModal({
                         Active Now
                       </div>
                     )}
-                    {classItem.status === "completed" && (
+                    {isReallyEnded && (
                       <div className="absolute top-6 right-8 bg-gray-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
                         Ended
                       </div>
@@ -244,24 +252,34 @@ export default function AllSchedulesModal({
                       </div>
 
                       <div className="shrink-0">
-                        <button
-                          onClick={() =>
-                            handleQuickJoin(classItem.id, classItem.status)
-                          }
-                          className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl transition-all hover:scale-105 active:scale-95 ${classItem.status === "completed" ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"}`}
-                        >
-                          {classItem.status === "completed"
-                            ? "Reopen Session"
-                            : "Join Class"}
-                        </button>
+                        {isReallyEnded ? (
+                          <span className="px-6 py-3 rounded-2xl bg-gray-100 text-gray-400 text-xs font-black uppercase tracking-[0.1em] inline-block text-center border border-gray-100">
+                            Class Ended
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              handleQuickJoin(classItem.id, classItem.status)
+                            }
+                            className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl transition-all hover:scale-105 active:scale-95 ${
+                              isCompleted
+                                ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100"
+                                : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+                            }`}
+                          >
+                            {isCompleted ? "Rejoin Session" : "Join Class"}
+                          </button>
+                        )}
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 relative z-10 pt-4 border-t border-gray-50">
                       <span className="flex items-center gap-2">
                         <Clock size={14} className="text-gray-300" />{" "}
-                        {getWeekdayLabel(classItem.startTime)} •{" "}
-                        {classItem.startTime}
+                        {getWeekdayLabel(
+                          classItem.rawStartTime || classItem.startTime,
+                        )}{" "}
+                        • {classItem.startTime}
                       </span>
                       <span className="flex items-center gap-2">
                         <Timer size={14} className="text-gray-300" />{" "}
