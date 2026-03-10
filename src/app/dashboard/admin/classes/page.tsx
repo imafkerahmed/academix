@@ -112,6 +112,15 @@ export default function ClassManagement() {
   useEffect(() => {
     fetchData();
     fetchCourseIntakes();
+
+    // Real-time subscription: auto-refresh when any class changes
+    pb.collection("classes").subscribe("*", () => {
+      fetchData();
+    });
+
+    return () => {
+      pb.collection("classes").unsubscribe("*");
+    };
   }, [router]);
 
   const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);

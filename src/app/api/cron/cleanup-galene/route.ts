@@ -34,15 +34,32 @@ export async function GET(request: Request) {
           console.log(`[Cron] Cleaned up Galene group: ${record.galene_group}`);
         }
       }
+    }
 
-      // We keep the class as "completed" in the DB.
-      // If the user wants to truly archive them so they don't get processed again, we could
-      // set a flag like is_archived: true, but Pocketbase has a daily record limit so we'll just check if the file exists.
+    // Clean up uploaded chat documents
+    let chatFilesDeleted = 0;
+    const chatUploadsDir = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      "chat",
+    );
+
+    if (fs.existsSync(chatUploadsDir)) {
+      const chatFiles = fs.readdirSync(chatUploadsDir);
+      for (const file of chatFiles) {
+        const filePath = path.join(chatUploadsDir, file);
+        if (fs.statSync(filePath).isFile()) {
+          fs.unlinkSync(filePath);
+          chatFilesDeleted++;
+          console.log(`[Cron] Cleaned up chat upload: ${file}`);
+        }
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: `Nightly cleanup finished. Deleted ${deletedCount} Galene groups from server.`,
+      message: `Nightly cleanup finished. Deleted ${deletedCount} Galene groups and ${chatFilesDeleted} chat uploads.`,
     });
   } catch (error: any) {
     console.error("Cron Cleanup Error:", error);

@@ -116,6 +116,8 @@ export default function Section5Schedules() {
         course:
           c.expand?.course_subject?.expand?.course_intake?.expand?.course?.name,
         status: c.status,
+        rawStartTime: c.start_time,
+        duration: c.duration,
       }));
 
       setUpcoming(formatted);
@@ -162,6 +164,12 @@ export default function Section5Schedules() {
             {upcoming.slice(0, 2).map((ev: any, idx: number) => {
               const themeClass = "border-indigo-100 bg-indigo-50/20";
               const isToday = ev.date === today;
+              const scheduledEnd =
+                new Date(ev.rawStartTime).getTime() +
+                (ev.duration || 60) * 60000;
+              const isWithinTimeWindow = Date.now() < scheduledEnd;
+              const isReallyEnded =
+                ev.status === "completed" && !isWithinTimeWindow;
 
               return (
                 <motion.div
@@ -176,7 +184,7 @@ export default function Section5Schedules() {
                       Live Now
                     </div>
                   )}
-                  {ev.status === "completed" && (
+                  {isReallyEnded && (
                     <div className="absolute -top-2 -right-2 bg-gray-400 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
                       Class Ended
                     </div>
@@ -214,7 +222,7 @@ export default function Section5Schedules() {
                         </span>
                       </div>
 
-                      {ev.status === "completed" ? (
+                      {isReallyEnded ? (
                         <span className="px-4 py-2 rounded-xl bg-gray-100 text-gray-400 text-[10px] font-black uppercase tracking-widest">
                           Ended
                         </span>
@@ -288,6 +296,13 @@ export default function Section5Schedules() {
               <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-gray-50/30 no-scrollbar">
                 {upcoming.length > 0 ? (
                   upcoming.map((ev: any) => {
+                    const scheduledEnd =
+                      new Date(ev.rawStartTime).getTime() +
+                      (ev.duration || 60) * 60000;
+                    const isWithinTimeWindow = Date.now() < scheduledEnd;
+                    const isReallyEnded =
+                      ev.status === "completed" && !isWithinTimeWindow;
+
                     return (
                       <motion.div
                         key={ev.id}
@@ -313,7 +328,7 @@ export default function Section5Schedules() {
                           </div>
 
                           <div className="shrink-0 flex gap-3">
-                            {ev.status === "completed" ? (
+                            {isReallyEnded ? (
                               <span className="px-6 py-3 rounded-2xl bg-gray-100 text-gray-400 text-xs font-black uppercase tracking-[0.1em]">
                                 Class Ended
                               </span>
