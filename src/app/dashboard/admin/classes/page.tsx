@@ -22,10 +22,13 @@ import {
   Activity,
   User,
   Hash,
-  Trash2,
+  Trash2 as LucideTrash2,
   ExternalLink,
   Archive,
   RotateCcw,
+  Search,
+  Check,
+  CalendarDays as CalendarIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -48,7 +51,7 @@ import {
 import { Textarea } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
@@ -68,9 +71,13 @@ interface ZoomClass {
   is_recurring: boolean;
   recurrence_day?: string;
   expand?: {
-    host?: any;
-    zoom_account?: any;
-    course_subject?: {
+    lecturer?: {
+      id: string;
+      name: string;
+      username: string;
+      avatar?: string;
+    };
+    course_subject?: Array<{
       expand?: {
         subject?: any;
         course_intake?: {
@@ -81,7 +88,7 @@ interface ZoomClass {
         };
         lecturer?: any;
       };
-    };
+    }>;
   };
 }
 
@@ -95,6 +102,8 @@ interface CourseIntake {
 
 interface CourseSubject {
   id: string;
+  course_intake?: string;
+  lecturer?: string;
   expand?: {
     subject?: any;
     lecturer?: any;
@@ -111,7 +120,8 @@ export default function ClassManagement() {
 
   useEffect(() => {
     fetchData();
-    fetchCourseIntakes();
+    fetchLecturers();
+    fetchOngoingSubjects();
 
     // Real-time subscription: auto-refresh when any class changes
     pb.collection("classes").subscribe("*", () => {
@@ -123,17 +133,22 @@ export default function ClassManagement() {
     };
   }, [router]);
 
+  const [currentStep, setCurrentStep] = useState(1);
   const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);
   const [availableSubjects, setAvailableSubjects] = useState<CourseSubject[]>(
     [],
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    title: "",
     description: "",
-    course_intake: "",
-    course_subject: "",
+    lecturer: "",
   });
+
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [subjectSearchTerm, setSubjectSearchTerm] = useState("");
+  const [lecturers, setLecturers] = useState<any[]>([]);
+  const [ongoingSubjects, setOngoingSubjects] = useState<any[]>([]);
+
   const [durationHour, setDurationHour] = useState<string>("1");
   const [durationMinute, setDurationMinute] = useState<string>("0");
   // Compute nearest hour for default time
@@ -161,26 +176,26 @@ export default function ClassManagement() {
     nearestDefaults.amPm,
   );
 
-  const fetchCourseIntakes = async () => {
+  const fetchLecturers = async () => {
     try {
-      const records = await pb.collection("course_intakes").getFullList({
-        expand: "course,intake",
+      const records = await pb.collection("users").getFullList({
+        filter: 'role = "lecturer"',
       });
-      setCourseIntakes(records as any);
+      setLecturers(records);
     } catch (error) {
-      console.error("Error fetching course intakes:", error);
+      console.error("Error fetching lecturers:", error);
     }
   };
 
-  const fetchSubjectsForIntake = async (courseIntakeId: string) => {
+  const fetchOngoingSubjects = async () => {
     try {
       const records = await pb.collection("course_subjects").getFullList({
-        filter: `course_intake = "${courseIntakeId}"`,
-        expand: "subject,lecturer",
+        filter: 'course_intake.course_status = "ongoing"',
+        expand: "subject,course_intake.course,course_intake.intake",
       });
-      setAvailableSubjects(records as any);
+      setOngoingSubjects(records);
     } catch (error) {
-      console.error("Error fetching subjects:", error);
+      console.error("Error fetching ongoing subjects:", error);
     }
   };
 
@@ -202,14 +217,36 @@ export default function ClassManagement() {
       const totalDuration =
         parseInt(durationHour) * 60 + parseInt(durationMinute);
 
-      // Filter out course_intake and format start_time
-      const { course_intake, ...submitData } = formData;
+      if (selectedSubjectIds.length === 0) {
+        toast.error("Please select at least one subject.");
+        return;
+      }
+
+      if (!formData.lecturer) {
+        toast.error("Please assign a lecturer.");
+        return;
+      }
 
       // Generate unique galene_group for each class
       const galeneGroup = `class-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
+      // Resolve subject names for the title
+      const selectedSubjectsData = ongoingSubjects.filter((s) =>
+        selectedSubjectIds.includes(s.id),
+      );
+      const generatedTitle = Array.from(
+        new Set(
+          selectedSubjectsData
+            .map((s) => s.expand?.subject?.[0]?.name || s.expand?.subject?.name)
+            .filter(Boolean),
+        ),
+      ).join(" & ");
+
       await pb.collection("classes").create({
-        ...submitData,
+        title: generatedTitle || "Untitled Class",
+        description: formData.description,
+        lecturer: formData.lecturer,
+        course_subject: selectedSubjectIds,
         duration: totalDuration,
         start_time: finalDate.toISOString(),
         status: "scheduled",
@@ -230,12 +267,13 @@ export default function ClassManagement() {
 
       toast.success("Class scheduled successfully!");
       setIsModalOpen(false);
+      setCurrentStep(1);
       setFormData({
-        title: "",
         description: "",
-        course_intake: "",
-        course_subject: "",
+        lecturer: "",
       });
+      setSelectedSubjectIds([]);
+      setSubjectSearchTerm("");
       setDurationHour("1");
       setDurationMinute("0");
       setScheduleDate(new Date());
@@ -299,7 +337,7 @@ export default function ClassManagement() {
         .getFullList({
           sort: "-start_time",
           expand:
-            "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
+            "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,lecturer",
         })
         .catch(() => []);
 
@@ -390,323 +428,405 @@ export default function ClassManagement() {
                   <DialogTitle>Schedule New Class</DialogTitle>
                 </DialogHeader>
 
-                {/* Visual Header - matches ModernModal */}
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black">
-                    <Plus size={20} />
+                    {currentStep === 1 ? (
+                      <Search size={20} />
+                    ) : (
+                      <Plus size={20} />
+                    )}
                   </div>
                   <div>
                     <h2 className="font-black text-gray-900 uppercase tracking-tight">
-                      Schedule New Class
+                      {currentStep === 1
+                        ? "Step 1: Select Subjects"
+                        : "Step 2: Session Details"}
                     </h2>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      Setup virtual session parameters
+                      {currentStep === 1
+                        ? "Search and pick subjects for this session"
+                        : "Setup timing and assign host"}
                     </p>
                   </div>
                 </div>
 
-                <form onSubmit={handleCreateClass} className="space-y-4">
-                  <div className="flex flex-col md:flex-row gap-8">
-                    {/* Left Column: General Info */}
-                    <div className="flex-1 space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                          Class Title
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Intro to Data Structures"
-                          value={formData.title}
-                          onChange={(e) =>
-                            setFormData({ ...formData, title: e.target.value })
-                          }
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                          Course Intake
-                        </label>
-                        <Select
-                          required
-                          onValueChange={(val) => {
-                            setFormData({
-                              ...formData,
-                              course_intake: val,
-                              course_subject: "",
-                            });
-                            fetchSubjectsForIntake(val);
-                          }}
-                        >
-                          <SelectTrigger className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold transition-all h-auto">
-                            <SelectValue placeholder="Select Intake" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-gray-100">
-                            {courseIntakes.map((ci) => (
-                              <SelectItem
-                                key={ci.id}
-                                value={ci.id}
-                                className="rounded-lg"
-                              >
-                                {ci.expand?.course?.name} -{" "}
-                                {ci.expand?.intake?.code}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                          Subject
-                        </label>
-                        <Select
-                          required
-                          disabled={!formData.course_intake}
-                          onValueChange={(val) =>
-                            setFormData({ ...formData, course_subject: val })
-                          }
-                        >
-                          <SelectTrigger className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold transition-all h-auto">
-                            <SelectValue placeholder="Select Subject" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-gray-100">
-                            {availableSubjects.map((cs) => (
-                              <SelectItem
-                                key={cs.id}
-                                value={cs.id}
-                                className="rounded-lg"
-                              >
-                                {cs.expand?.subject?.[0]?.name ||
-                                  cs.expand?.subject?.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                          Description (Optional)
-                        </label>
-                        <textarea
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all min-h-[80px] resize-none"
-                          placeholder="Brief overview of session topics..."
-                          value={formData.description}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              description: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    {/* Right Column: Timing */}
-                    <div className="flex-1 space-y-4">
-                      <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 space-y-5">
-                        <h3 className="text-[11px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
-                          <Clock size={14} /> Class Timing
-                        </h3>
-
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (currentStep === 1) {
+                      if (selectedSubjectIds.length > 0) {
+                        setCurrentStep(2);
+                      } else {
+                        toast.error("Please select at least one subject");
+                      }
+                    } else {
+                      handleCreateClass(e);
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  {currentStep === 1 ? (
+                    <div className="min-w-[400px] space-y-4">
+                      {/* Search and Select Subjects */}
+                      <div className="space-y-4">
                         <div>
                           <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                            Date
+                            Search Ongoing Subjects
                           </label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button
-                                type="button"
-                                className={cn(
-                                  "w-full flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold text-sm text-left transition-all hover:bg-gray-50 hover:text-indigo-600",
-                                  !scheduleDate && "text-gray-400",
-                                )}
-                              >
-                                <Calendar className="h-4 w-4 text-indigo-500 shrink-0" />
-                                {scheduleDate ? (
-                                  format(scheduleDate, "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-auto p-0 rounded-2xl border-gray-100 shadow-xl"
-                              align="start"
-                            >
-                              <CalendarComponent
-                                mode="single"
-                                selected={scheduleDate}
-                                onSelect={setScheduleDate}
-                                initialFocus
-                                className="p-3"
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <div className="relative">
+                            <Search
+                              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                              size={16}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Type to search (subject, course, intake)..."
+                              value={subjectSearchTerm}
+                              onChange={(e) =>
+                                setSubjectSearchTerm(e.target.value)
+                              }
+                              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all text-sm"
+                            />
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                            Time
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={scheduleHour}
-                              onValueChange={setScheduleHour}
+                        {subjectSearchTerm.length > 0 ? (
+                          <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar border border-gray-50 rounded-2xl p-2 bg-gray-50/30">
+                            {ongoingSubjects
+                              .filter((item) => {
+                                const subjectName = Array.isArray(
+                                  item.expand?.subject,
+                                )
+                                  ? item.expand?.subject[0]?.name
+                                  : item.expand?.subject?.name;
+
+                                const searchStr =
+                                  `${subjectName} ${item.expand?.course_intake?.expand?.course?.name} ${item.expand?.course_intake?.expand?.intake?.code}`.toLowerCase();
+                                return searchStr.includes(
+                                  subjectSearchTerm.toLowerCase(),
+                                );
+                              })
+                              .map((cs) => {
+                                const isSelected = selectedSubjectIds.includes(
+                                  cs.id,
+                                );
+                                return (
+                                  <button
+                                    key={cs.id}
+                                    type="button"
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        setSelectedSubjectIds(
+                                          selectedSubjectIds.filter(
+                                            (id) => id !== cs.id,
+                                          ),
+                                        );
+                                      } else {
+                                        setSelectedSubjectIds([
+                                          ...selectedSubjectIds,
+                                          cs.id,
+                                        ]);
+                                      }
+                                    }}
+                                    className={cn(
+                                      "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left group",
+                                      isSelected
+                                        ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200"
+                                        : "bg-white border-gray-100 text-gray-700 hover:border-indigo-300",
+                                    )}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="text-xs font-black uppercase tracking-tight">
+                                        {cs.expand?.subject?.name ||
+                                          cs.expand?.subject?.[0]?.name}
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          "text-[10px] font-bold uppercase tracking-widest mt-1",
+                                          isSelected
+                                            ? "text-indigo-100"
+                                            : "text-gray-400",
+                                        )}
+                                      >
+                                        {
+                                          cs.expand?.course_intake?.expand
+                                            ?.course?.name
+                                        }{" "}
+                                        •{" "}
+                                        {
+                                          cs.expand?.course_intake?.expand
+                                            ?.intake?.code
+                                        }
+                                      </span>
+                                    </div>
+                                    {isSelected && (
+                                      <Check size={16} className="text-white" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                          </div>
+                        ) : (
+                          <div className="py-12 flex flex-col items-center justify-center bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl text-center">
+                            <Search size={32} className="text-gray-300 mb-2" />
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                              Search to see subjects
+                            </p>
+                          </div>
+                        )}
+
+                        {selectedSubjectIds.length > 0 && (
+                          <div className="p-3 bg-indigo-50 rounded-xl flex items-center justify-between border border-indigo-100">
+                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                              {selectedSubjectIds.length} Subjects Selected
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSubjectIds([])}
+                              className="text-indigo-400 hover:text-indigo-600"
                             >
-                              <SelectTrigger className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold transition-all h-auto">
-                                <SelectValue placeholder="HH" />
+                              <LucideTrash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-4 border-t border-gray-50 flex justify-end">
+                        <button
+                          type="submit"
+                          className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2"
+                        >
+                          Next Step <ArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="min-w-[500px] space-y-6">
+                      <div className="flex flex-col md:flex-row gap-8">
+                        {/* Session Config */}
+                        <div className="flex-1 space-y-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                              Assign Lecturer (Host)
+                            </label>
+                            <Select
+                              required
+                              value={formData.lecturer}
+                              onValueChange={(val) =>
+                                setFormData({ ...formData, lecturer: val })
+                              }
+                            >
+                              <SelectTrigger className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold transition-all h-auto text-sm">
+                                <SelectValue placeholder="Select Lecturer" />
                               </SelectTrigger>
                               <SelectContent className="rounded-xl border-gray-100">
-                                {Array.from({ length: 12 }).map((_, i) => {
-                                  const v = String(i + 1).padStart(2, "0");
-                                  return (
-                                    <SelectItem
-                                      key={v}
-                                      value={v}
-                                      className="rounded-lg font-bold"
+                                {lecturers.map((lec) => (
+                                  <SelectItem
+                                    key={lec.id}
+                                    value={lec.id}
+                                    className="rounded-lg"
+                                  >
+                                    {lec.name} (@{lec.username})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Selected Subjects Review */}
+                          <div className="p-4 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl space-y-3">
+                            <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                              <Hash size={12} /> Selected Subjects (
+                              {selectedSubjectIds.length})
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                              {ongoingSubjects
+                                .filter((s) =>
+                                  selectedSubjectIds.includes(s.id),
+                                )
+                                .map((s) => (
+                                  <Badge
+                                    key={s.id}
+                                    className="bg-white text-indigo-700 border-indigo-100 text-[10px] font-bold px-3 py-1 rounded-xl lowercase tracking-tight shadow-sm"
+                                  >
+                                    {s.expand?.subject?.[0]?.name ||
+                                      s.expand?.subject?.name}
+                                    <span className="text-gray-400 ml-1 font-medium">
+                                      (
+                                      {
+                                        s.expand?.course_intake?.expand?.intake
+                                          ?.code
+                                      }
+                                      )
+                                    </span>
+                                  </Badge>
+                                ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                              Description (Optional)
+                            </label>
+                            <textarea
+                              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all min-h-[120px] resize-none text-sm"
+                              placeholder="Brief overview of session topics..."
+                              value={formData.description}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  description: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        {/* Timing Column */}
+                        <div className="flex-1 space-y-4">
+                          <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 space-y-5">
+                            <h3 className="text-[11px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                              <Clock size={14} /> Class Timing
+                            </h3>
+
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                  Date
+                                </label>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className={cn(
+                                        "w-full flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold text-sm text-left transition-all hover:bg-gray-50 hover:text-indigo-600",
+                                        !scheduleDate && "text-gray-400",
+                                      )}
                                     >
-                                      {v}
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-gray-300 font-black text-lg">
-                              :
-                            </span>
-                            <Select
-                              value={scheduleMinute}
-                              onValueChange={setScheduleMinute}
-                            >
-                              <SelectTrigger className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold transition-all h-auto">
-                                <SelectValue placeholder="MM" />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-xl border-gray-100">
-                                {["00", "15", "30", "45"].map((v) => (
-                                  <SelectItem
-                                    key={v}
-                                    value={v}
-                                    className="rounded-lg font-bold"
-                                  >
-                                    {v}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={scheduleAmPm}
-                              onValueChange={setScheduleAmPm}
-                            >
-                              <SelectTrigger className="w-[80px] px-3 py-3 bg-indigo-50 border border-indigo-100 rounded-xl font-black text-indigo-600 uppercase tracking-widest transition-all h-auto text-xs">
-                                <SelectValue placeholder="AM" />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-xl border-gray-100">
-                                <SelectItem
-                                  value="AM"
-                                  className="rounded-lg font-black uppercase text-xs"
-                                >
-                                  AM
-                                </SelectItem>
-                                <SelectItem
-                                  value="PM"
-                                  className="rounded-lg font-black uppercase text-xs"
-                                >
-                                  PM
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
+                                      <CalendarIcon className="h-4 w-4 text-indigo-500 shrink-0" />
+                                      {scheduleDate ? (
+                                        format(scheduleDate, "PPP")
+                                      ) : (
+                                        <span>Pick a date</span>
+                                      )}
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0 rounded-2xl border-gray-100 overflow-hidden shadow-2xl">
+                                    <CalendarPicker
+                                      mode="single"
+                                      selected={scheduleDate}
+                                      onSelect={(date) => setScheduleDate(date)}
+                                      initialFocus
+                                      className="p-3"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
 
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                            Duration
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={durationHour}
-                              onValueChange={setDurationHour}
-                            >
-                              <SelectTrigger className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold transition-all h-auto">
-                                <SelectValue placeholder="0" />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-xl border-gray-100 max-h-[200px]">
-                                {Array.from({ length: 25 }).map((_, i) => (
-                                  <SelectItem
-                                    key={i}
-                                    value={String(i)}
-                                    className="rounded-lg font-bold"
+                              <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Hour
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="12"
+                                    value={scheduleHour}
+                                    onChange={(e) =>
+                                      setScheduleHour(e.target.value)
+                                    }
+                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Min
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="59"
+                                    value={scheduleMinute}
+                                    onChange={(e) =>
+                                      setScheduleMinute(e.target.value)
+                                    }
+                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    AM/PM
+                                  </label>
+                                  <Select
+                                    value={scheduleAmPm}
+                                    onValueChange={setScheduleAmPm}
                                   >
-                                    {i}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest shrink-0">
-                              hr
-                            </span>
-                            <Select
-                              value={durationMinute}
-                              onValueChange={setDurationMinute}
-                            >
-                              <SelectTrigger className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold transition-all h-auto">
-                                <SelectValue placeholder="0" />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-xl border-gray-100">
-                                <SelectItem
-                                  value="0"
-                                  className="rounded-lg font-bold"
-                                >
-                                  0
-                                </SelectItem>
-                                <SelectItem
-                                  value="15"
-                                  className="rounded-lg font-bold"
-                                >
-                                  15
-                                </SelectItem>
-                                <SelectItem
-                                  value="30"
-                                  className="rounded-lg font-bold"
-                                >
-                                  30
-                                </SelectItem>
-                                <SelectItem
-                                  value="45"
-                                  className="rounded-lg font-bold"
-                                >
-                                  45
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest shrink-0">
-                              min
-                            </span>
+                                    <SelectTrigger className="px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold h-auto">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl border-gray-100 min-w-[80px]">
+                                      <SelectItem value="AM">AM</SelectItem>
+                                      <SelectItem value="PM">PM</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Dur (Hours)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="12"
+                                    value={durationHour}
+                                    onChange={(e) =>
+                                      setDurationHour(e.target.value)
+                                    }
+                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Dur (Mins)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="59"
+                                    value={durationMinute}
+                                    onChange={(e) =>
+                                      setDurationMinute(e.target.value)
+                                    }
+                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="flex flex-col gap-3 pt-6 border-t border-gray-50">
-                    <button
-                      type="submit"
-                      className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-widest"
-                    >
-                      SCHEDULE SESSION
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsModalOpen(false)}
-                      className="w-full py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider"
-                    >
-                      CANCEL
-                    </button>
-                  </div>
+                      <div className="pt-6 border-t border-gray-50 flex justify-between items-center">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentStep(1)}
+                          className="px-6 py-3 bg-gray-50 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition-all flex items-center gap-2"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                          Schedule Class <Play size={14} className="ml-1" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </form>
               </div>
             </DialogContent>
@@ -893,8 +1013,7 @@ export default function ClassManagement() {
                     <User size={12} className="text-indigo-400" /> Host
                   </span>
                   <span className="text-sm font-bold text-gray-900 truncate">
-                    {classItem.expand?.course_subject?.expand?.lecturer?.name ||
-                      "Administrator"}
+                    {classItem.expand?.lecturer?.name || "Administrator"}
                   </span>
                 </div>
               </div>
@@ -907,14 +1026,23 @@ export default function ClassManagement() {
                       {classItem.duration} MIN
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-xl">
-                    <Users size={12} />
-                    <span className="text-[10px] font-black tracking-widest font-mono">
-                      {
-                        classItem.expand?.course_subject?.expand?.course_intake
-                          ?.expand?.intake?.code
-                      }
-                    </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-xl">
+                      <Users size={12} />
+                      <span className="text-[10px] font-black tracking-widest font-mono">
+                        {Array.isArray(classItem.expand?.course_subject)
+                          ? classItem.expand?.course_subject
+                              .map(
+                                (cs: any) =>
+                                  cs.expand?.course_intake?.expand?.intake
+                                    ?.code,
+                              )
+                              .filter(Boolean)
+                              .join(", ")
+                          : (classItem.expand?.course_subject as any)?.expand
+                              ?.course_intake?.expand?.intake?.code}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

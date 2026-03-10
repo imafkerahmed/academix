@@ -84,47 +84,104 @@ export default function Section5Schedules() {
         return;
       }
 
-      // 2. Fetch classes for these intakes (include today's completed)
+      // 2. Fetch the actual course_subject IDs that match these intakes
+      const csFilter = intakeIds
+        .map((id: string) => `course_intake = "${id}"`)
+        .join(" || ");
+
+      const matchingCourseSubjects = await pb
+        .collection("course_subjects")
+        .getFullList({
+          filter: csFilter,
+          fields: "id,course_intake",
+        });
+
+      const csIds = matchingCourseSubjects.map((cs) => cs.id);
+
+      if (csIds.length === 0) {
+        setUpcoming([]);
+        setLoading(false);
+        return;
+      }
+
+      // 3. Fetch classes that contain any of these course_subject IDs
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const todayISO = todayStart.toISOString();
 
-      const filter = intakeIds
-        .map((id: string) => `course_subject.course_intake = "${id}"`)
+      const classFilter = csIds
+        .map((id: string) => `course_subject ~ "${id}"`)
         .join(" || ");
+
       const classes = await pb.collection("classes").getFullList({
-        filter: `(${filter}) && status != "cancelled" && (status != "completed" || start_time >= "${todayISO}")`,
+        filter: `(${classFilter}) && status != "cancelled" && (status != "completed" || start_time >= "${todayISO}")`,
         expand:
-          "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,course_subject.lecturer",
+          "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,lecturer",
         sort: "start_time",
       });
 
-      const formatted = classes.map((c: any) => ({
-        id: c.id,
-        title: c.title,
-        type: "Class",
-        date: new Date(c.start_time).toISOString().slice(0, 10),
-        startTime: new Date(c.start_time).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        endTime: new Date(
-          new Date(c.start_time).getTime() + c.duration * 60000,
-        ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        subject:
-          c.expand?.course_subject?.expand?.subject?.[0]?.name ||
-          c.expand?.course_subject?.expand?.subject?.name,
-        course:
-          c.expand?.course_subject?.expand?.course_intake?.expand?.course?.name,
-        intakeCode:
-          c.expand?.course_subject?.expand?.course_intake?.expand?.intake
-            ?.code || "N/A",
-        lecturer:
-          c.expand?.course_subject?.expand?.lecturer?.name || "Lecturer",
-        status: c.status,
-        rawStartTime: c.start_time,
-        duration: c.duration,
-      }));
+      const formatted = classes.map((c: any) => {
+        const subjectsArr = Array.isArray(c.expand?.course_subject)
+          ? c.expand.course_subject
+          : [c.expand?.course_subject].filter(Boolean);
+
+        // Find all matching subject records for this student's enrollment
+        const mySubjectRecords = subjectsArr.filter((cs: any) => {
+          const csIntakeId =
+            typeof cs.course_intake === "string"
+              ? cs.course_intake
+              : cs.course_intake?.id;
+          return intakeIds.includes(csIntakeId);
+        });
+
+        // Use the first match as primary, but collect all unique names if multiple
+        const mySubjectName = Array.from(
+          new Set(
+            mySubjectRecords
+              .map(
+                (cs: any) =>
+                  cs.expand?.subject?.[0]?.name || cs.expand?.subject?.name,
+              )
+              .filter(Boolean),
+          ),
+        ).join(" & ");
+
+        const myCourseName = Array.from(
+          new Set(
+            mySubjectRecords
+              .map((cs: any) => cs.expand?.course_intake?.expand?.course?.name)
+              .filter(Boolean),
+          ),
+        ).join(" & ");
+
+        const myIntakeCode = Array.from(
+          new Set(
+            mySubjectRecords
+              .map((cs: any) => cs.expand?.course_intake?.expand?.intake?.code)
+              .filter(Boolean),
+          ),
+        ).join(", ");
+
+        return {
+          id: c.id,
+          title: mySubjectName, // User requested to show only their subject, not merged title
+          type: "Class",
+          date: new Date(c.start_time).toISOString().slice(0, 10),
+          startTime: new Date(c.start_time).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          endTime: new Date(
+            new Date(c.start_time).getTime() + c.duration * 60000,
+          ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          course: myCourseName || "Course",
+          intakeCode: myIntakeCode || "N/A",
+          lecturer: c.expand?.lecturer?.name || "Lecturer",
+          status: c.status,
+          rawStartTime: c.start_time,
+          duration: c.duration,
+        };
+      });
 
       const now = Date.now();
       const activeUpcoming: any[] = [];
@@ -187,7 +244,7 @@ export default function Section5Schedules() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {activeClasses.slice(0, 1).map((ev: any, idx: number) => {
+            {activeClasses.map((ev: any, idx: number) => {
               const themeClass = "border-indigo-100 bg-indigo-50/20";
               const isToday = ev.date === today;
               const scheduledEnd =

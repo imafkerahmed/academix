@@ -14,6 +14,7 @@ export interface UpcomingClass {
   rawStartTime?: string;
   duration: number; // minutes
   status: "scheduled" | "in_progress" | "completed";
+  isMerged?: boolean;
 }
 
 interface UpcomingClassesProps {
@@ -120,6 +121,11 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
                           </span>
                         );
                       })()}
+                      {classItem.isMerged && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-lg border border-purple-100 bg-purple-50 text-purple-700 font-black uppercase tracking-widest animate-pulse">
+                          Merged Session
+                        </span>
+                      )}
                       <span className="text-[9px] font-black text-indigo-700 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
                         {classItem.subjectName || "SUBJECT"}
                       </span>

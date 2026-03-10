@@ -17,9 +17,9 @@ export async function GET(request: Request) {
 
     // Fetch classes specifically for this lecturer with fully expanded relationships
     const records = await adminPb.collection("classes").getFullList({
-      filter: `course_subject.lecturer ?= "${lecturerId}" && status != "cancelled"`,
+      filter: `lecturer = "${lecturerId}" && status != "cancelled"`,
       expand:
-        "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
+        "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,lecturer",
       sort: "start_time",
     });
 

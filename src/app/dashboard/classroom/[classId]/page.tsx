@@ -159,9 +159,57 @@ export default function VirtualClassroom() {
             .collection("classes")
             .getOne(classId as string, {
               expand:
-                "course_subject.subject,course_subject.course_intake.course",
+                "course_subject.subject,course_subject.course_intake.course,lecturer",
             });
           setClassData(record);
+
+          // If student, fetch enrollments to personalize the title
+          if (user?.role === "student") {
+            try {
+              const token = pb.authStore.token;
+              const resp = await fetch("/api/student/enrollments", {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (resp.ok) {
+                const { enrollments } = await resp.json();
+                const intakeIds = enrollments.map((e: any) => e.course_intake);
+
+                const subjectsArr = Array.isArray(record.expand?.course_subject)
+                  ? record.expand.course_subject
+                  : [record.expand?.course_subject].filter(Boolean);
+
+                const mySubjectRecords = subjectsArr.filter((cs: any) => {
+                  const csIntakeId =
+                    typeof cs.course_intake === "string"
+                      ? cs.course_intake
+                      : cs.course_intake?.id;
+                  return intakeIds.includes(csIntakeId);
+                });
+
+                if (mySubjectRecords.length > 0) {
+                  const mySubjectName = Array.from(
+                    new Set(
+                      mySubjectRecords
+                        .map(
+                          (cs: any) =>
+                            cs.expand?.subject?.[0]?.name ||
+                            cs.expand?.subject?.name,
+                        )
+                        .filter(Boolean),
+                    ),
+                  ).join(" & ");
+
+                  // Override title for student view only
+                  record.personalizedTitle = mySubjectName;
+                }
+              }
+            } catch (error) {
+              console.error(
+                "Error fetching student enrollments for personalization:",
+                error,
+              );
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to fetch class data:", err);
@@ -172,10 +220,8 @@ export default function VirtualClassroom() {
   }, [classId]);
 
   // Determine host mode
-  const lecturerData = classData?.expand?.course_subject?.lecturer;
-  const isOwner = Array.isArray(lecturerData)
-    ? lecturerData.includes(currentUser?.id)
-    : lecturerData === currentUser?.id;
+  const lecturerData = classData?.lecturer;
+  const isOwner = lecturerData === currentUser?.id;
   const isAdmin =
     currentUser?.role === "admin" || currentUser?.role === "superuser";
   const hostMode = (isAdmin && requestedRole === "host") || isOwner;
@@ -533,8 +579,7 @@ export default function VirtualClassroom() {
   };
 
   // Determine the actual lecturer from Pocketbase data
-  const actualLecturerName =
-    classData?.expand?.course_subject?.expand?.lecturer?.username;
+  const actualLecturerName = classData?.expand?.lecturer?.username;
 
   const lecturerStream = remoteStreams.find(
     (s) =>
@@ -557,12 +602,29 @@ export default function VirtualClassroom() {
     (s) => s.id !== spotlightStream?.id,
   );
 
-  const subjectName =
-    classData?.expand?.course_subject?.expand?.subject?.[0]?.name ||
-    classData?.expand?.course_subject?.expand?.subject?.name;
-  const courseName =
-    classData?.expand?.course_subject?.expand?.course_intake?.expand?.course
-      ?.name;
+  const subjectName = Array.isArray(classData?.expand?.course_subject)
+    ? classData.expand.course_subject
+        .map(
+          (cs: any) =>
+            cs.expand?.subject?.[0]?.name || cs.expand?.subject?.name,
+        )
+        .filter(Boolean)
+        .join(" & ")
+    : classData?.expand?.course_subject?.expand?.subject?.[0]?.name ||
+      classData?.expand?.course_subject?.expand?.subject?.name;
+
+  const courseName = Array.isArray(classData?.expand?.course_subject)
+    ? Array.from(
+        new Set(
+          classData.expand.course_subject.map(
+            (cs: any) => cs.expand?.course_intake?.expand?.course?.name,
+          ),
+        ),
+      )
+        .filter(Boolean)
+        .join(" & ")
+    : classData?.expand?.course_subject?.expand?.course_intake?.expand?.course
+        ?.name;
 
   if (!classData) {
     return (
@@ -589,7 +651,7 @@ export default function VirtualClassroom() {
             </div>
             <div>
               <h1 className="text-sm font-black tracking-tight uppercase leading-none">
-                {classData.title}
+                {classData.personalizedTitle || classData.title}
               </h1>
               <div className="flex items-center gap-2 mt-0.5">
                 <Badge className="bg-green-500/20 text-green-400 border-none text-[8px] font-black tracking-widest px-1.5 py-0 h-4">

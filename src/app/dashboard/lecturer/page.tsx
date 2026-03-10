@@ -148,21 +148,54 @@ const fetchUpcomingClasses = async (
         return true;
       })
       .map((record: any) => {
-        // Handle PocketBase converting relation to array or single object
-        const courseSubject = Array.isArray(record.expand?.course_subject)
-          ? record.expand.course_subject[0]
-          : record.expand?.course_subject;
+        const csExpand = record.expand?.course_subject;
+        const subjectsArr = Array.isArray(csExpand)
+          ? csExpand
+          : [csExpand].filter(Boolean);
+        const isMerged = subjectsArr.length > 1;
 
         return {
           id: record.id,
           intakeName:
-            courseSubject?.expand?.course_intake?.expand?.intake?.code || "N/A",
+            subjectsArr.length > 0
+              ? Array.from(
+                  new Set(
+                    subjectsArr.map(
+                      (cs: any) =>
+                        cs.expand?.course_intake?.expand?.intake?.code,
+                    ),
+                  ),
+                )
+                  .filter(Boolean)
+                  .join(", ") || "N/A"
+              : "N/A",
           courseName:
-            courseSubject?.expand?.course_intake?.expand?.course?.name || "N/A",
+            subjectsArr.length > 0
+              ? Array.from(
+                  new Set(
+                    subjectsArr.map(
+                      (cs: any) =>
+                        cs.expand?.course_intake?.expand?.course?.name,
+                    ),
+                  ),
+                )
+                  .filter(Boolean)
+                  .join(" & ") || "N/A"
+              : "N/A",
           subjectName:
-            courseSubject?.expand?.subject?.[0]?.name ||
-            courseSubject?.expand?.subject?.name ||
-            "N/A",
+            subjectsArr.length > 0
+              ? Array.from(
+                  new Set(
+                    subjectsArr.map(
+                      (cs: any) =>
+                        cs.expand?.subject?.[0]?.name ||
+                        cs.expand?.subject?.name,
+                    ),
+                  ),
+                )
+                  .filter(Boolean)
+                  .join(" & ") || "N/A"
+              : "N/A",
           classTitle: record.title,
           startTime: new Date(record.start_time).toLocaleString("en-US", {
             month: "short",
@@ -173,6 +206,8 @@ const fetchUpcomingClasses = async (
           rawStartTime: record.start_time,
           duration: record.duration,
           status: record.status as any,
+          lecturerName: record.expand?.lecturer?.name || "Lecturer",
+          isMerged,
         };
       });
 
