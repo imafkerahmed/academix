@@ -94,7 +94,8 @@ export default function Section5Schedules() {
         .join(" || ");
       const classes = await pb.collection("classes").getFullList({
         filter: `(${filter}) && status != "cancelled" && (status != "completed" || start_time >= "${todayISO}")`,
-        expand: "course_subject.subject,course_subject.course_intake.course",
+        expand:
+          "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,course_subject.lecturer",
         sort: "start_time",
       });
 
@@ -115,12 +116,31 @@ export default function Section5Schedules() {
           c.expand?.course_subject?.expand?.subject?.name,
         course:
           c.expand?.course_subject?.expand?.course_intake?.expand?.course?.name,
+        intakeCode:
+          c.expand?.course_subject?.expand?.course_intake?.expand?.intake
+            ?.code || "N/A",
+        lecturer:
+          c.expand?.course_subject?.expand?.lecturer?.name || "Lecturer",
         status: c.status,
         rawStartTime: c.start_time,
         duration: c.duration,
       }));
 
-      setUpcoming(formatted);
+      const now = Date.now();
+      const activeUpcoming: any[] = [];
+      const ended: any[] = [];
+
+      formatted.forEach((item: any) => {
+        const scheduledEnd =
+          new Date(item.rawStartTime).getTime() + item.duration * 60000;
+        if (now >= scheduledEnd) {
+          ended.push(item);
+        } else {
+          activeUpcoming.push(item);
+        }
+      });
+
+      setUpcoming([...activeUpcoming, ...ended]);
     } catch (err) {
       console.error("Error fetching schedules:", err);
       toast.error("Failed to load schedules");
@@ -149,10 +169,16 @@ export default function Section5Schedules() {
     );
   }
 
+  const activeClasses = upcoming.filter((item: any) => {
+    const scheduledEnd =
+      new Date(item.rawStartTime).getTime() + (item.duration || 60) * 60000;
+    return Date.now() < scheduledEnd;
+  });
+
   return (
     <div className="w-full h-full flex flex-col bg-transparent">
       <div className="flex-1 overflow-y-auto mb-6 pr-2 -mr-2 no-scrollbar">
-        {upcoming.length === 0 ? (
+        {activeClasses.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 opacity-40">
             <Clock className="text-gray-300 mb-2" size={32} />
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -160,8 +186,8 @@ export default function Section5Schedules() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {upcoming.slice(0, 2).map((ev: any, idx: number) => {
+          <div className="flex flex-col gap-4">
+            {activeClasses.slice(0, 1).map((ev: any, idx: number) => {
               const themeClass = "border-indigo-100 bg-indigo-50/20";
               const isToday = ev.date === today;
               const scheduledEnd =
@@ -180,12 +206,12 @@ export default function Section5Schedules() {
                   className={`relative p-5 rounded-[2rem] border transition-all duration-300 group hover:shadow-xl hover:shadow-indigo-100/30 hover:-translate-y-1 ${isToday ? "border-indigo-200 bg-indigo-50/30 ring-2 ring-indigo-50/50" : themeClass}`}
                 >
                   {isToday && ev.status === "in_progress" && (
-                    <div className="absolute -top-2 -right-2 bg-green-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10 animate-pulse">
+                    <div className="absolute top-5 right-5 bg-green-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10 animate-pulse">
                       Live Now
                     </div>
                   )}
                   {isReallyEnded && (
-                    <div className="absolute -top-2 -right-2 bg-gray-400 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
+                    <div className="absolute top-5 right-5 bg-gray-400 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
                       Class Ended
                     </div>
                   )}
@@ -196,9 +222,15 @@ export default function Section5Schedules() {
                         <h4 className="font-black text-gray-900 text-base tracking-tight leading-tight group-hover:text-indigo-600 transition-colors uppercase">
                           {ev.title}
                         </h4>
-                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <div className="flex flex-wrap items-center gap-2 mt-2 pr-16 border-b border-transparent">
                           <span className="text-[9px] px-2 py-0.5 rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-700 font-black uppercase tracking-widest">
                             {ev.subject}
+                          </span>
+                          <span className="text-[9px] font-black text-gray-500 bg-gray-50 px-2 py-0.5 rounded-lg uppercase tracking-widest">
+                            {ev.lecturer}
+                          </span>
+                          <span className="text-[9px] font-black text-gray-400 bg-gray-50 px-2 py-0.5 rounded-lg uppercase tracking-widest border border-gray-100">
+                            {ev.intakeCode}
                           </span>
                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
                             {ev.course}
@@ -216,9 +248,9 @@ export default function Section5Schedules() {
                             day: "numeric",
                           })}
                         </span>
-                        <span className="flex items-center gap-1.5">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                           <Clock size={12} className="text-gray-300" />{" "}
-                          {ev.startTime}
+                          {ev.startTime} - {ev.endTime}
                         </span>
                       </div>
 
@@ -317,9 +349,15 @@ export default function Section5Schedules() {
                             <h4 className="font-black text-gray-900 text-xl tracking-tight group-hover:text-indigo-600 transition-colors uppercase leading-tight">
                               {ev.title}
                             </h4>
-                            <div className="flex items-center gap-3 mt-3">
+                            <div className="flex flex-wrap items-center gap-3 mt-3">
                               <span className="text-[10px] px-3 py-1 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700 font-black uppercase tracking-widest">
                                 {ev.subject}
+                              </span>
+                              <span className="text-[10px] font-black text-gray-500 bg-gray-50 px-3 py-1 rounded-xl uppercase tracking-widest">
+                                {ev.lecturer}
+                              </span>
+                              <span className="text-[10px] font-black text-gray-500 bg-gray-50 px-3 py-1 rounded-xl uppercase tracking-widest border border-gray-100">
+                                {ev.intakeCode}
                               </span>
                               <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 bg-gray-50 px-3 py-1 rounded-xl uppercase tracking-widest">
                                 <Info size={12} /> {ev.course}

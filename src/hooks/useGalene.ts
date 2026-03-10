@@ -26,6 +26,12 @@ export interface Participant {
   kind: string;
 }
 
+export interface InClassNotification {
+  message: string;
+  icon: string;
+  type: "error" | "success" | "info" | "warning";
+}
+
 export interface UseGaleneReturn {
   connected: boolean;
   localStream: MediaStream | null;
@@ -49,6 +55,9 @@ export interface UseGaleneReturn {
   videoMuted: boolean;
   // New capabilities
   muteUser: (userId: string) => void;
+  disableUserVideo: (userId: string) => void;
+  makeHost: (userId: string) => void;
+  removeHost: (userId: string) => void;
   raiseHand: () => void;
   lowerHand: () => void;
   raisedHands: Set<string>;
@@ -56,6 +65,8 @@ export interface UseGaleneReturn {
   whiteboardActive: boolean;
   sendUserMessage: (kind: string, dest?: string, value?: string) => void;
   ownId: string;
+  inClassNotification: InClassNotification | null;
+  clearNotification: () => void;
 }
 
 export function useGalene(): UseGaleneReturn {
@@ -73,8 +84,36 @@ export function useGalene(): UseGaleneReturn {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenShareStream, setScreenShareStream] =
     useState<MediaStream | null>(null);
-  // Own client ID (used for identifying self in messages)
   const [ownId, setOwnId] = useState<string>("");
+  // New state for custom in-class notifications
+  const [inClassNotification, setInClassNotification] =
+    useState<InClassNotification | null>(null);
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearNotification = useCallback(() => {
+    setInClassNotification(null);
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+  }, []);
+
+  const triggerNotification = useCallback(
+    (
+      message: string,
+      icon: string,
+      type: "error" | "success" | "info" | "warning",
+    ) => {
+      setInClassNotification({ message, icon, type });
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+      notificationTimeoutRef.current = setTimeout(() => {
+        setInClassNotification(null);
+      }, 5000);
+    },
+    [],
+  );
+
   // New state for hand raise and whiteboard events
   const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set());
   // Initialize whiteboard state from sessionStorage if it exists
@@ -223,6 +262,9 @@ export function useGalene(): UseGaleneReturn {
           setRemoteStreams((prev) => {
             const existing = prev.findIndex((s) => s.id === id);
             if (existing >= 0) {
+              if (prev[existing].videoMuted === !hasVideo) {
+                return prev; // Ignore rapid events if truth value hasn't changed
+              }
               const updated = [...prev];
               updated[existing] = {
                 ...updated[existing],
@@ -239,10 +281,22 @@ export function useGalene(): UseGaleneReturn {
           setChatMessages((prev) => [...prev, msg]);
         });
 
-        // Participants — filter out self
+        // Participants — filter out self from participants list, but sync permissions
         client.on("user", (user: Participant) => {
-          // Skip self — Galene sends user events for the current user too
-          if (user.id === client.id) return;
+          if (user.id === client.id) {
+            if (user.permissions) {
+              setPermissions((prev) => {
+                const prevStr = JSON.stringify(prev);
+                const currStr = JSON.stringify(user.permissions);
+                if (prevStr !== currStr) {
+                  permissionsRef.current = user.permissions!;
+                  return user.permissions!;
+                }
+                return prev;
+              });
+            }
+            return;
+          }
 
           setParticipants((prev) => {
             let next;
@@ -251,8 +305,18 @@ export function useGalene(): UseGaleneReturn {
             } else {
               const existing = prev.findIndex((p) => p.id === user.id);
               if (existing >= 0) {
+                const prevUser = prev[existing];
+                // Check if meaningful fields changed. Ignore volume/VAD spam to prevent critical lag.
+                if (
+                  prevUser.username === user.username &&
+                  JSON.stringify(prevUser.permissions) ===
+                    JSON.stringify(user.permissions)
+                ) {
+                  return prev;
+                }
+
                 const updated = [...prev];
-                updated[existing] = user;
+                updated[existing] = { ...prev[existing], ...user };
                 next = updated;
               } else {
                 next = [...prev, user];
@@ -275,10 +339,43 @@ export function useGalene(): UseGaleneReturn {
                 track.enabled = false;
               });
               setAudioMuted(true);
-              toast.error("The host has muted your microphone.", {
-                icon: "🔇",
-              });
+              triggerNotification(
+                "The host has muted your microphone.",
+                "🔇",
+                "error",
+              );
             }
+          }
+          // Remote video off
+          if (kind === "remote-video-off" && dest === client.id) {
+            const ls = localStreamRef.current;
+            if (ls) {
+              ls.getVideoTracks().forEach((track) => {
+                track.enabled = false;
+              });
+              setVideoMuted(true);
+              triggerNotification(
+                "The host has disabled your camera.",
+                "📷",
+                "error",
+              );
+            }
+          }
+          // Promote/Demote Host
+          if (kind === "promote-host" && dest === client.id) {
+            triggerNotification(
+              "You have been promoted to Host.",
+              "👑",
+              "success",
+            );
+          }
+          if (kind === "demote-host" && dest === client.id) {
+            triggerNotification(
+              "Your Host privileges have been removed.",
+              "ℹ️",
+              "info",
+            );
+            clientRef.current?.stopScreenShare();
           }
           // Hand raise
           if (kind === "hand-raise") {
@@ -287,6 +384,17 @@ export function useGalene(): UseGaleneReturn {
               const newSet = new Set(prev);
               if (value === "up") {
                 newSet.add(userId);
+                // Trigger notification for hand raise
+                const user = participantsRef.current.find(
+                  (p) => p.id === userId,
+                );
+                if (user) {
+                  triggerNotification(
+                    `${user.username} raised their hand`,
+                    "✋",
+                    "info",
+                  );
+                }
               } else if (value === "down") {
                 newSet.delete(userId);
               }
@@ -431,6 +539,50 @@ export function useGalene(): UseGaleneReturn {
     sendUserMessage("hand-raise", "", "down");
   }, [sendUserMessage]);
 
+  const disableUserVideo = useCallback(
+    (userId: string) => {
+      // Only send if we have op permission (host)
+      if (permissions.includes("op")) {
+        sendUserMessage("remote-video-off", userId);
+      }
+    },
+    [permissions, sendUserMessage],
+  );
+
+  const makeHost = useCallback(
+    (userId: string) => {
+      if (permissions.includes("op") && clientRef.current) {
+        // Find existing student hosts and demote them first
+        const currentStudentHosts = participantsRef.current.filter(
+          (p) =>
+            p.permissions.includes("op") &&
+            !["lecturer", "admin"].includes(p.username) &&
+            p.id !== userId,
+        );
+
+        currentStudentHosts.forEach((host) => {
+          clientRef.current?.userAction("unop", host.id);
+          sendUserMessage("demote-host", host.id);
+        });
+
+        // Promote the new user
+        clientRef.current.userAction("op", userId);
+        sendUserMessage("promote-host", userId);
+      }
+    },
+    [permissions, sendUserMessage],
+  );
+
+  const removeHost = useCallback(
+    (userId: string) => {
+      if (permissions.includes("op") && clientRef.current) {
+        clientRef.current.userAction("unop", userId);
+        sendUserMessage("demote-host", userId);
+      }
+    },
+    [permissions, sendUserMessage],
+  );
+
   const toggleAudio = useCallback(() => {
     const ls = localStreamRef.current;
     if (ls) {
@@ -508,6 +660,9 @@ export function useGalene(): UseGaleneReturn {
     videoMuted,
     // New capabilities
     muteUser,
+    disableUserVideo,
+    makeHost,
+    removeHost,
     raiseHand,
     lowerHand,
     raisedHands,
@@ -515,5 +670,7 @@ export function useGalene(): UseGaleneReturn {
     whiteboardActive,
     sendUserMessage,
     ownId,
+    inClassNotification,
+    clearNotification,
   };
 }

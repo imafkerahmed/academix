@@ -128,16 +128,16 @@ const fetchUpcomingClasses = async (
   lecturerId: string,
 ): Promise<UpcomingClass[]> => {
   try {
-    const records = await pb.collection("classes").getFullList({
-      filter: `course_subject.lecturer ?= "${lecturerId}" && status != "cancelled"`,
-      expand:
-        "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
-      sort: "start_time",
-    });
+    const res = await fetch(`/api/lecturer/classes?lecturerId=${lecturerId}`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch: ${res.statusText}`);
+    }
+    const data = await res.json();
+    const records = data.records || [];
 
     const today = new Date().toISOString().slice(0, 10);
 
-    return records
+    const mappedRecords = records
       .filter((record: any) => {
         if (record.status === "completed") {
           const recordDate = new Date(record.start_time)
@@ -147,25 +147,50 @@ const fetchUpcomingClasses = async (
         }
         return true;
       })
-      .map((record: any) => ({
-        id: record.id,
-        intakeName:
-          record.expand?.course_subject?.expand?.course_intake?.expand?.intake
-            ?.code || "N/A",
-        courseName:
-          record.expand?.course_subject?.expand?.course_intake?.expand?.course
-            ?.name || "N/A",
-        classTitle: record.title,
-        startTime: new Date(record.start_time).toLocaleString("en-US", {
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        rawStartTime: record.start_time,
-        duration: record.duration,
-        status: record.status as any,
-      }));
+      .map((record: any) => {
+        // Handle PocketBase converting relation to array or single object
+        const courseSubject = Array.isArray(record.expand?.course_subject)
+          ? record.expand.course_subject[0]
+          : record.expand?.course_subject;
+
+        return {
+          id: record.id,
+          intakeName:
+            courseSubject?.expand?.course_intake?.expand?.intake?.code || "N/A",
+          courseName:
+            courseSubject?.expand?.course_intake?.expand?.course?.name || "N/A",
+          subjectName:
+            courseSubject?.expand?.subject?.[0]?.name ||
+            courseSubject?.expand?.subject?.name ||
+            "N/A",
+          classTitle: record.title,
+          startTime: new Date(record.start_time).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          rawStartTime: record.start_time,
+          duration: record.duration,
+          status: record.status as any,
+        };
+      });
+
+    const now = Date.now();
+    const activeUpcoming: UpcomingClass[] = [];
+    const ended: UpcomingClass[] = [];
+
+    mappedRecords.forEach((item: any) => {
+      const scheduledEnd =
+        new Date(item.rawStartTime).getTime() + item.duration * 60000;
+      if (now >= scheduledEnd) {
+        ended.push(item);
+      } else {
+        activeUpcoming.push(item);
+      }
+    });
+
+    return [...activeUpcoming, ...ended];
   } catch (error) {
     console.error("Error fetching classes:", error);
     return [];

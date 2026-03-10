@@ -14,6 +14,10 @@ const generateGroupConfig = (
         password: passwordHost,
         permissions: ["op", "present", "message", "record"],
       },
+      admin: {
+        password: passwordHost,
+        permissions: ["op", "present", "message", "record"],
+      },
     },
     "wildcard-user": {
       password: passwordAttendee,

@@ -1,0 +1,88 @@
+import { NextResponse } from "next/server";
+import PocketBase from "pocketbase";
+import fs from "fs";
+import path from "path";
+
+export async function POST(request: Request) {
+  try {
+    const { classId, username, demote } = await request.json();
+
+    if (!classId || !username) {
+      return NextResponse.json(
+        { error: "Missing classId or username" },
+        { status: 400 },
+      );
+    }
+
+    const pb = new PocketBase(process.env.NEXT_PUBLIC_POCKETBASE_URL);
+
+    // Auth as superuser to bypass rules
+    await pb.admins.authWithPassword(
+      process.env.POCKETBASE_ADMIN_EMAIL || "afkerahmad@gmail.com",
+      process.env.POCKETBASE_ADMIN_PASSWORD || "Afker1234",
+    );
+
+    const classRecord = await pb.collection("classes").getOne(classId);
+
+    if (!classRecord.galene_group) {
+      return NextResponse.json(
+        { error: "No Galene group found for this class" },
+        { status: 404 },
+      );
+    }
+
+    const groupsDir = path.join(process.cwd(), "services", "galene", "groups");
+    const filePath = path.join(groupsDir, `${classRecord.galene_group}.json`);
+
+    if (!fs.existsSync(filePath)) {
+      return NextResponse.json(
+        { error: "Galene configuration file not found" },
+        { status: 404 },
+      );
+    }
+
+    // Read and parse current configuration
+    const config = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+
+    // Extract wildcard password (which students use)
+    const attendeePassword = config["wildcard-user"]?.password;
+
+    if (!attendeePassword) {
+      return NextResponse.json(
+        { error: "Cannot determine attendee password" },
+        { status: 500 },
+      );
+    }
+
+    // Initialize users object if undefined
+    if (!config.users) config.users = {};
+
+    // Inject the specific username as an OP with the attendee password.
+    if (demote) {
+      if (config.users[username]) {
+        delete config.users[username];
+        fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
+        console.log(
+          `[Classroom] Permanently demoted ${username} from host in group ${classRecord.galene_group}`,
+        );
+      }
+    } else {
+      config.users[username] = {
+        password: attendeePassword,
+        permissions: ["op", "present", "message", "record"],
+      };
+      fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
+      console.log(
+        `[Classroom] Permanently promoted ${username} to host in group ${classRecord.galene_group}`,
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Error promoting user:", error);
+    return NextResponse.json(
+      { error: error?.message || "Failed to promote user" },
+      { status: 500 },
+    );
+  }
+}

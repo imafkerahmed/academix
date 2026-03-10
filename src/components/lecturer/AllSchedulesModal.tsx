@@ -228,25 +228,42 @@ export default function AllSchedulesModal({
                         Active Now
                       </div>
                     )}
-                    {isReallyEnded && (
-                      <div className="absolute top-6 right-8 bg-gray-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
-                        Ended
-                      </div>
-                    )}
 
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 relative z-10">
                       <div className="flex-1">
                         <h4 className="font-black text-gray-900 text-xl tracking-tight group-hover:text-indigo-600 transition-colors uppercase leading-tight">
                           {classItem.classTitle}
                         </h4>
-                        <div className="flex items-center gap-3 mt-3">
-                          <span
-                            className={`text-[10px] px-3 py-1 rounded-xl border font-black uppercase tracking-widest ${getStatusColor(classItem.status)}`}
-                          >
-                            {classItem.status.toUpperCase()}
+                        <div className="flex flex-wrap items-center gap-3 mt-3">
+                          {(() => {
+                            let badgeLabel = classItem.status.toUpperCase();
+                            let badgeColor = getStatusColor(classItem.status);
+
+                            if (
+                              classItem.status === "completed" &&
+                              !isReallyEnded
+                            ) {
+                              badgeLabel = "ENDED EARLY";
+                              badgeColor =
+                                "border-amber-100 bg-amber-50 text-amber-700";
+                            }
+
+                            return (
+                              <span
+                                className={`text-[10px] px-3 py-1 rounded-xl border font-black uppercase tracking-widest ${badgeColor}`}
+                              >
+                                {badgeLabel}
+                              </span>
+                            );
+                          })()}
+                          <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-xl uppercase tracking-widest">
+                            {classItem.subjectName || "SUBJECT"}
                           </span>
                           <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-xl uppercase tracking-widest">
                             {classItem.intakeName}
+                          </span>
+                          <span className="text-[10px] font-black text-gray-500 bg-gray-50 px-3 py-1 rounded-xl uppercase tracking-widest">
+                            {classItem.courseName}
                           </span>
                         </div>
                       </div>
@@ -274,16 +291,21 @@ export default function AllSchedulesModal({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 relative z-10 pt-4 border-t border-gray-50">
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-2 whitespace-nowrap">
                         <Clock size={14} className="text-gray-300" />{" "}
                         {getWeekdayLabel(
                           classItem.rawStartTime || classItem.startTime,
                         )}{" "}
-                        • {classItem.startTime}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <Timer size={14} className="text-gray-300" />{" "}
-                        {classItem.duration} min
+                        • {classItem.startTime} -{" "}
+                        {new Date(
+                          new Date(
+                            classItem.rawStartTime || classItem.startTime,
+                          ).getTime() +
+                            classItem.duration * 60000,
+                        ).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
                     </div>
                   </div>

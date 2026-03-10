@@ -20,6 +20,7 @@ import {
   LogOut,
   X,
   Hand,
+  Crown,
   Pencil,
   VolumeX,
   Paperclip,
@@ -58,12 +59,18 @@ export default function VirtualClassroom() {
     audioMuted,
     videoMuted,
     muteUser,
+    disableUserVideo,
+    makeHost,
+    removeHost,
     raiseHand,
     lowerHand,
     raisedHands,
     whiteboardEvents,
     whiteboardActive,
     sendUserMessage,
+    ownId,
+    inClassNotification,
+    clearNotification,
   } = useGalene();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,6 +179,8 @@ export default function VirtualClassroom() {
   const isAdmin =
     currentUser?.role === "admin" || currentUser?.role === "superuser";
   const hostMode = (isAdmin && requestedRole === "host") || isOwner;
+  const isOriginalHost = hostMode;
+  const isStudentHost = !hostMode && permissions.includes("op");
 
   // Use a ref to hold mutable state values to prevent rapid re-subscription 404s in PocketBase
   const autoJoinRefs = useRef({ hostMode, connected, connecting });
@@ -310,7 +319,10 @@ export default function VirtualClassroom() {
     const password = hostMode ? "lecturer123" : "student123";
 
     if (hostMode) {
-      username = "lecturer";
+      username =
+        currentUser.role === "admin" || currentUser.role === "superuser"
+          ? "admin"
+          : "lecturer";
     }
 
     try {
@@ -381,6 +393,29 @@ export default function VirtualClassroom() {
         console.error("Failed to update attendance on leave:", err);
       }
     }
+
+    // Revoke host privileges if a student host leaves
+    const activeUsername =
+      currentUser?.name || currentUser?.username || "Guest";
+    if (isStudentHost && activeUsername) {
+      try {
+        await fetch("/api/classroom/promote-host", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            classId,
+            username: activeUsername,
+            demote: true,
+          }),
+        });
+      } catch (err) {
+        console.error(
+          "Failed to revoke student host privileges on leave:",
+          err,
+        );
+      }
+    }
+
     // Clear saved session so we don't auto-rejoin
     sessionStorage.removeItem(`galene-session-${classId}`);
     disconnect();
@@ -407,7 +442,7 @@ export default function VirtualClassroom() {
     }
   };
 
-  // Update attendance on window close
+  // Cleanup on unmount/unload
   useEffect(() => {
     const updateAttendanceOnUnmount = async () => {
       if (attendanceId && joinTime) {
@@ -428,10 +463,35 @@ export default function VirtualClassroom() {
       }
     };
 
+    const revokeHostPrivilegesOnUnmount = () => {
+      const activeUsername =
+        currentUser?.name || currentUser?.username || "Guest";
+      if (isStudentHost && activeUsername) {
+        const payload = JSON.stringify({
+          classId,
+          username: activeUsername,
+          demote: true,
+        });
+        navigator.sendBeacon(
+          "/api/classroom/promote-host",
+          new Blob([payload], { type: "application/json" }),
+        );
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      revokeHostPrivilegesOnUnmount();
+      updateAttendanceOnUnmount(); // Async may cancel, but we initiate it anyway
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      revokeHostPrivilegesOnUnmount();
       updateAttendanceOnUnmount();
     };
-  }, [attendanceId, joinTime]);
+  }, [attendanceId, joinTime, isStudentHost, currentUser, classId]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -472,19 +532,25 @@ export default function VirtualClassroom() {
     }
   };
 
-  // Determine spotlight stream
-  // For students: Priority is screen share > lecturer stream
-  // For host: Priority is *only* screen share (forcing local video to spotlight otherwise)
+  // Determine the actual lecturer from Pocketbase data
+  const actualLecturerName =
+    classData?.expand?.course_subject?.expand?.lecturer?.username;
+
   const lecturerStream = remoteStreams.find(
-    (s) => s.username === "lecturer" || s.label === "camera",
+    (s) =>
+      s.username === actualLecturerName ||
+      (s.label === "camera" && s.username === "lecturer"),
   );
+
+  const adminStream = remoteStreams.find((s) => s.username === "admin");
+
   const screenShareRemote = remoteStreams.find(
     (s) => s.label === "screenshare" && !(isHost && isScreenSharing),
   );
 
   const spotlightStream = isHost
     ? screenShareRemote
-    : screenShareRemote || lecturerStream;
+    : screenShareRemote || lecturerStream || adminStream;
 
   // Filter out the spotlighted stream from the filmstrip
   const filmstripStreams = remoteStreams.filter(
@@ -625,12 +691,57 @@ export default function VirtualClassroom() {
             </div>
           )}
 
-          {(localError || error) && (
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-red-500/10 border border-red-500/20 backdrop-blur-md px-5 py-3 rounded-xl flex items-center gap-3">
-              <Badge className="bg-red-500 text-white text-[8px]">ERROR</Badge>
-              <p className="text-xs font-bold text-red-200">
-                {localError || error}
+          {(localError || error || inClassNotification) && (
+            <div
+              className={`absolute top-20 left-1/2 -translate-x-1/2 z-50 backdrop-blur-md px-5 py-3 rounded-xl flex items-center gap-3 border shadow-2xl transition-all ${
+                localError || error || inClassNotification?.type === "error"
+                  ? "bg-red-500/10 border-red-500/20 shadow-red-500/10"
+                  : inClassNotification?.type === "success"
+                    ? "bg-emerald-500/10 border-emerald-500/20 shadow-emerald-500/10"
+                    : inClassNotification?.type === "info"
+                      ? "bg-indigo-500/10 border-indigo-500/20 shadow-indigo-500/10"
+                      : "bg-amber-500/10 border-amber-500/20 shadow-amber-500/10"
+              }`}
+            >
+              <Badge
+                className={`${
+                  localError || error || inClassNotification?.type === "error"
+                    ? "bg-red-500 text-white"
+                    : inClassNotification?.type === "success"
+                      ? "bg-emerald-500 text-white"
+                      : inClassNotification?.type === "info"
+                        ? "bg-indigo-500 text-white"
+                        : "bg-amber-500 text-black"
+                } text-[10px] flex items-center gap-1.5 px-2.5 py-0.5 border-none`}
+              >
+                {inClassNotification?.icon && (
+                  <span className="text-sm">{inClassNotification.icon}</span>
+                )}
+                {localError || error
+                  ? "ERROR"
+                  : inClassNotification?.type.toUpperCase()}
+              </Badge>
+              <p
+                className={`text-xs font-bold tracking-wide ${
+                  localError || error || inClassNotification?.type === "error"
+                    ? "text-red-200"
+                    : inClassNotification?.type === "success"
+                      ? "text-emerald-200"
+                      : inClassNotification?.type === "info"
+                        ? "text-indigo-200"
+                        : "text-amber-200"
+                }`}
+              >
+                {localError || error || inClassNotification?.message}
               </p>
+              {inClassNotification && (
+                <button
+                  onClick={clearNotification}
+                  className="ml-2 hover:bg-white/10 p-1 rounded-lg transition-colors block"
+                >
+                  <X size={12} className="text-white/70" />
+                </button>
+              )}
             </div>
           )}
 
@@ -677,11 +788,13 @@ export default function VirtualClassroom() {
                       <span className="text-[10px] font-black tracking-widest uppercase">
                         {spotlightStream.label === "screenshare"
                           ? `${spotlightStream.username || "Screen"} — Presenting`
-                          : spotlightStream.username || "Lecturer"}
+                          : spotlightStream.username ||
+                            actualLecturerName ||
+                            "Host"}
                       </span>
                     </div>
                   </div>
-                ) : isHost ? (
+                ) : !spotlightStream && isHost ? (
                   // Host spotlight: show own camera in spotlight when no remote streams
                   <div className="h-full bg-gray-900 rounded-2xl overflow-hidden border border-white/5 shadow-2xl relative">
                     <video
@@ -734,15 +847,21 @@ export default function VirtualClassroom() {
                       <LocalVideoTile
                         stream={localStream}
                         videoMuted={videoMuted}
+                        audioMuted={audioMuted}
+                        username="You (Host)"
+                        isHost={true}
                       />
                     ) : (
                       <LocalVideoTile
                         ref={!isHost ? localVideoRef : undefined}
                         stream={localStream}
                         videoMuted={videoMuted}
+                        audioMuted={audioMuted}
+                        username="You"
+                        isHost={false}
                       />
                     )}
-                    <div className="absolute bottom-1.5 left-1.5 right-1.5 z-10 bg-black/60 backdrop-blur px-2 py-0.5 rounded-md">
+                    <div className="absolute bottom-1.5 left-1.5 right-1.5 z-10 bg-black/60 backdrop-blur px-2 py-0.5 rounded-md flex items-center gap-1.5">
                       <span className="text-[8px] font-black tracking-widest uppercase block truncate">
                         You
                       </span>
@@ -835,7 +954,7 @@ export default function VirtualClassroom() {
             <div className="w-px h-6 bg-white/10 mx-1" />
 
             {/* Screen Share (host only) */}
-            {isHost && (
+            {(isOriginalHost || isStudentHost) && (
               <button
                 onClick={isScreenSharing ? stopScreenShare : shareScreen}
                 className={`p-4 rounded-xl transition-all active:scale-90 ${isScreenSharing ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" : "bg-white/5 text-gray-300 hover:bg-white/10"}`}
@@ -849,8 +968,8 @@ export default function VirtualClassroom() {
               </button>
             )}
 
-            {/* Whiteboard toggle (Host only) */}
-            {isHost && (
+            {/* Whiteboard toggle (Original Host only) */}
+            {isOriginalHost && (
               <button
                 onClick={() => {
                   const newState = !whiteboardOpen;
@@ -864,8 +983,8 @@ export default function VirtualClassroom() {
               </button>
             )}
 
-            {/* Hand Raise (non-host) */}
-            {!isHost && (
+            {/* Hand Raise (non-original host) */}
+            {!isOriginalHost && (
               <button
                 onClick={() => {
                   if (handRaised) {
@@ -914,7 +1033,7 @@ export default function VirtualClassroom() {
 
             <button
               onClick={() => {
-                if (isHost) {
+                if (isOriginalHost) {
                   setShowLeaveModal(true);
                 } else {
                   handleLeave();
@@ -1088,7 +1207,11 @@ export default function VirtualClassroom() {
                         {currentUser?.name || currentUser?.username} (You)
                       </p>
                       <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">
-                        {isHost ? "Host" : "Student"}
+                        {isOriginalHost
+                          ? "Host"
+                          : isStudentHost
+                            ? "Student (Presenter)"
+                            : "Student"}
                       </p>
                     </div>
                   </div>
@@ -1096,8 +1219,15 @@ export default function VirtualClassroom() {
 
                 {/* Other participants */}
                 {participants.map((p) => {
-                  const isParticipantHost =
-                    p.permissions?.includes("op") || p.username === "lecturer";
+                  const isParticipantLecturerOrAdmin = [
+                    "lecturer",
+                    "admin",
+                  ].includes(p.username.toLowerCase());
+                  const isParticipantStudentHost =
+                    p.permissions?.includes("op") &&
+                    !isParticipantLecturerOrAdmin;
+                  const isParticipantHost = p.permissions?.includes("op");
+
                   return (
                     <div
                       key={p.id}
@@ -1105,7 +1235,7 @@ export default function VirtualClassroom() {
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black ${isParticipantHost ? "bg-amber-500" : "bg-gray-700"}`}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black ${isParticipantLecturerOrAdmin ? "bg-amber-500" : isParticipantStudentHost ? "bg-emerald-500" : "bg-gray-700"}`}
                         >
                           {(p.username || "?")[0].toUpperCase()}
                         </div>
@@ -1114,7 +1244,11 @@ export default function VirtualClassroom() {
                             {p.username}
                           </p>
                           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">
-                            {isParticipantHost ? "Host" : "Student"}
+                            {isParticipantLecturerOrAdmin
+                              ? "Host"
+                              : isParticipantStudentHost
+                                ? "Student (Presenter)"
+                                : "Student"}
                           </p>
                         </div>
                       </div>
@@ -1130,15 +1264,90 @@ export default function VirtualClassroom() {
                       )}
 
                       {/* Host controls */}
-                      {isHost && !isParticipantHost && (
+                      {isOriginalHost && !isParticipantLecturerOrAdmin && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => muteUser(p.id)}
                             className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
-                            title="Mute participant"
+                            title="Mute participant audio"
                           >
                             <VolumeX size={14} />
                           </button>
+                          <button
+                            onClick={() => disableUserVideo(p.id)}
+                            className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
+                            title="Stop participant camera"
+                          >
+                            <VideoOff size={14} />
+                          </button>
+                          {isParticipantStudentHost ? (
+                            <button
+                              onClick={async () => {
+                                if (
+                                  window.confirm(
+                                    `Remove Host priviledges from ${p.username}?`,
+                                  )
+                                ) {
+                                  try {
+                                    await fetch("/api/classroom/promote-host", {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      body: JSON.stringify({
+                                        classId,
+                                        username: p.username,
+                                        demote: true,
+                                      }),
+                                    });
+                                  } catch (e) {
+                                    console.error(
+                                      "Failed to persist host demotion",
+                                      e,
+                                    );
+                                  }
+                                  removeHost(p.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                              title="Remove Host"
+                            >
+                              <X size={14} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                if (
+                                  window.confirm(
+                                    `Promote ${p.username} to Host?`,
+                                  )
+                                ) {
+                                  try {
+                                    await fetch("/api/classroom/promote-host", {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      body: JSON.stringify({
+                                        classId,
+                                        username: p.username,
+                                      }),
+                                    });
+                                  } catch (e) {
+                                    console.error(
+                                      "Failed to persist host promotion",
+                                      e,
+                                    );
+                                  }
+                                  makeHost(p.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                              title="Make Host"
+                            >
+                              <Crown size={14} />
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               if (
@@ -1165,8 +1374,8 @@ export default function VirtualClassroom() {
         </div>
       )}
 
-      {/* Custom Leave Modal (Host Only) */}
-      {showLeaveModal && isHost && (
+      {/* Custom Leave Modal (Original Host Only) */}
+      {showLeaveModal && isOriginalHost && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -1178,26 +1387,33 @@ export default function VirtualClassroom() {
             </div>
 
             <h2 className="text-2xl font-black text-center text-white mb-3 tracking-tight">
-              End Class Session?
+              Leave or End Session?
             </h2>
 
             <p className="text-gray-400 text-center text-sm font-medium mb-8 leading-relaxed">
-              This will immediately close the room and disconnect all currently
-              active students. This action cannot be reversed.
+              Do you want to leave the room open for students, or end the
+              session for everyone?
             </p>
 
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleEndClassForEveryone}
                 disabled={isEndingClass}
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-sm tracking-widest uppercase py-4 rounded-xl transition-all shadow-xl shadow-red-900/20 active:scale-95 disabled:opacity-50 flex items-center justify-center disabled:active:scale-100"
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl transition-all shadow-xl shadow-red-900/20 active:scale-95 flex items-center justify-center"
               >
                 {isEndingClass ? "Ending Session..." : "End Class For All"}
               </button>
               <button
+                onClick={handleLeave}
+                disabled={isEndingClass}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl transition-all shadow-xl shadow-amber-900/20 active:scale-95 flex items-center justify-center"
+              >
+                Leave Session (Keep Open)
+              </button>
+              <button
                 onClick={() => setShowLeaveModal(false)}
                 disabled={isEndingClass}
-                className="w-full bg-white/5 hover:bg-white/10 text-white font-bold text-sm tracking-widest uppercase py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+                className="w-full bg-white/5 hover:bg-white/10 text-white font-bold text-xs tracking-widest uppercase py-4 rounded-xl transition-all active:scale-95"
               >
                 Cancel
               </button>

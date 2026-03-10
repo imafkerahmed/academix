@@ -8,6 +8,7 @@ export interface UpcomingClass {
   id: string;
   intakeName: string;
   courseName: string;
+  subjectName?: string;
   classTitle: string;
   startTime: string; // ISO string or displayable date/time
   rawStartTime?: string;
@@ -83,23 +84,6 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
                   Active Now
                 </div>
               )}
-              {classItem.status === "completed" &&
-                (() => {
-                  const startTimeStr =
-                    classItem.rawStartTime || classItem.startTime;
-                  const scheduledEnd =
-                    new Date(startTimeStr).getTime() +
-                    classItem.duration * 60000;
-                  const isWithinTimeWindow = Date.now() < scheduledEnd;
-                  if (!isWithinTimeWindow) {
-                    return (
-                      <div className="absolute -top-2 -right-2 bg-gray-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
-                        Ended
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
 
               <div className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-4">
@@ -108,10 +92,36 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
                       {classItem.classTitle}
                     </h4>
                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <span
-                        className={`text-[9px] px-2 py-0.5 rounded-lg border font-black uppercase tracking-widest ${getStatusColor(classItem.status)}`}
-                      >
-                        {classItem.status.toUpperCase()}
+                      {(() => {
+                        const startTimeStr =
+                          classItem.rawStartTime || classItem.startTime;
+                        const scheduledEnd =
+                          new Date(startTimeStr).getTime() +
+                          classItem.duration * 60000;
+                        const isWithinTimeWindow = Date.now() < scheduledEnd;
+                        const isEndedEarly =
+                          classItem.status === "completed" &&
+                          isWithinTimeWindow;
+
+                        let badgeLabel = classItem.status.toUpperCase();
+                        let badgeColor = getStatusColor(classItem.status);
+
+                        if (isEndedEarly) {
+                          badgeLabel = "ENDED EARLY";
+                          badgeColor =
+                            "border-amber-100 bg-amber-50 text-amber-700";
+                        }
+
+                        return (
+                          <span
+                            className={`text-[9px] px-2 py-0.5 rounded-lg border font-black uppercase tracking-widest ${badgeColor}`}
+                          >
+                            {badgeLabel}
+                          </span>
+                        );
+                      })()}
+                      <span className="text-[9px] font-black text-indigo-700 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                        {classItem.subjectName || "SUBJECT"}
                       </span>
                       <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-lg">
                         {classItem.intakeName}
@@ -125,14 +135,21 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
 
                 <div className="flex items-center justify-between mt-1">
                   <div className="flex items-center gap-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
                       <Clock size={12} className="text-gray-300" />{" "}
-                      {getWeekdayLabel(classItem.startTime)} •{" "}
-                      {classItem.startTime}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Timer size={12} className="text-gray-300" />{" "}
-                      {classItem.duration} min
+                      {getWeekdayLabel(
+                        classItem.rawStartTime || classItem.startTime,
+                      )}{" "}
+                      • {classItem.startTime} -{" "}
+                      {new Date(
+                        new Date(
+                          classItem.rawStartTime || classItem.startTime,
+                        ).getTime() +
+                          classItem.duration * 60000,
+                      ).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </span>
                   </div>
 
