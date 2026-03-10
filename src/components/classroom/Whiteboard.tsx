@@ -48,7 +48,34 @@ export default function Whiteboard({
   const historyRef = useRef<ImageData[]>([]);
   const processedEventsRef = useRef(0);
 
-  // Initialize canvas
+  // Helper to redraw a set of events
+  const drawEvents = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      canvas: HTMLCanvasElement,
+      events: any[],
+    ) => {
+      for (const evt of events) {
+        if (evt.type === "draw" && evt.prevX != null && evt.x != null) {
+          ctx.beginPath();
+          ctx.strokeStyle =
+            evt.tool === "eraser" ? "#1a1a2e" : evt.color || "#ffffff";
+          ctx.lineWidth = evt.thickness || 3;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.moveTo(evt.prevX * canvas.width, evt.prevY * canvas.height);
+          ctx.lineTo(evt.x * canvas.width, evt.y * canvas.height);
+          ctx.stroke();
+        } else if (evt.type === "clear") {
+          ctx.fillStyle = "#1a1a2e";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    },
+    [],
+  );
+
+  // Initialize canvas & handle resize
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -61,14 +88,16 @@ export default function Whiteboard({
       if (ctx) {
         ctx.fillStyle = "#1a1a2e";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Redraw EVERYTHING because the canvas was cleared by resize
+        drawEvents(ctx, canvas, incomingDrawEvents);
       }
     };
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, []);
+  }, [incomingDrawEvents, drawEvents]);
 
-  // Process incoming draw events from remote
+  // Process ONLY incoming draw events incrementally
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -76,24 +105,9 @@ export default function Whiteboard({
     if (!ctx) return;
 
     const newEvents = incomingDrawEvents.slice(processedEventsRef.current);
-    for (const evt of newEvents) {
-      if (evt.type === "draw" && evt.prevX != null && evt.x != null) {
-        ctx.beginPath();
-        ctx.strokeStyle =
-          evt.tool === "eraser" ? "#1a1a2e" : evt.color || "#ffffff";
-        ctx.lineWidth = evt.thickness || 3;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.moveTo(evt.prevX * canvas.width, evt.prevY * canvas.height);
-        ctx.lineTo(evt.x * canvas.width, evt.y * canvas.height);
-        ctx.stroke();
-      } else if (evt.type === "clear") {
-        ctx.fillStyle = "#1a1a2e";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-    }
+    drawEvents(ctx, canvas, newEvents);
     processedEventsRef.current = incomingDrawEvents.length;
-  }, [incomingDrawEvents]);
+  }, [incomingDrawEvents, drawEvents]);
 
   const saveHistory = useCallback(() => {
     const canvas = canvasRef.current;

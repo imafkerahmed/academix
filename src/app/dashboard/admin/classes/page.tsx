@@ -23,6 +23,9 @@ import {
   User,
   Hash,
   Trash2,
+  ExternalLink,
+  Archive,
+  RotateCcw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -94,7 +97,7 @@ export default function ClassManagement() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<ZoomClass[]>([]);
-  const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<string>("scheduled");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -192,41 +195,38 @@ export default function ClassManagement() {
   };
 
   const handleDeleteClass = async (classId: string, galeneGroup?: string) => {
-    if (!window.confirm("Are you sure you want to delete this session?"))
+    if (
+      !window.confirm(
+        "Are you sure you want to end and archive this session? This will preserve attendance but close the live room.",
+      )
+    )
       return;
     try {
-      // First delete all linked attendance records
-      try {
-        const attendanceRecords = await pb
-          .collection("attendance")
-          .getFullList({
-            filter: `class = "${classId}"`,
-          });
+      // Mark the class as completed in PocketBase
+      // We no longer instantly delete the Galene group. It will be cleaned up nightly via a cron job
+      // to allow smooth "Reopen" functionality during the day without "group does not exist" errors.
+      await pb.collection("classes").update(classId, {
+        status: "completed",
+      });
 
-        for (const record of attendanceRecords) {
-          await pb.collection("attendance").delete(record.id);
-        }
-      } catch (attErr) {
-        console.warn(
-          "Could not fetch or delete attendance records prior to deleting class.",
-          attErr,
-        );
-      }
-
-      await pb.collection("classes").delete(classId);
-
-      // Delete the Galene group config file
-      if (galeneGroup) {
-        await fetch(`/api/galene/group?classId=${galeneGroup}`, {
-          method: "DELETE",
-        });
-      }
-
-      toast.success("Class deleted successfully!");
+      toast.success("Class ended and archived successfully!");
       fetchData();
     } catch (error) {
-      console.error("Error deleting class:", error);
-      toast.error("Failed to delete class.");
+      console.error("Error archiving class:", error);
+      toast.error("Failed to archive class.");
+    }
+  };
+
+  const handleReopenClass = async (classId: string) => {
+    try {
+      await pb.collection("classes").update(classId, {
+        status: "scheduled",
+      });
+      toast.success("Class reopened successfully! Status set to Scheduled.");
+      fetchData();
+    } catch (error) {
+      console.error("Error reopening class:", error);
+      toast.error("Failed to reopen class");
     }
   };
 
@@ -265,8 +265,13 @@ export default function ClassManagement() {
     const matchesSearch = classItem.title
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-    if (filter === "all") return matchesSearch;
-    return matchesSearch && classItem.status === filter;
+
+    const matchesFilter =
+      filter === "scheduled"
+        ? classItem.status === "scheduled" || classItem.status === "in_progress"
+        : classItem.status === filter;
+
+    return matchesSearch && matchesFilter;
   });
 
   if (loading) {
@@ -502,9 +507,7 @@ export default function ClassManagement() {
             action={
               <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 {[
-                  { id: "all", label: "ALL", color: "blue" },
                   { id: "scheduled", label: "SCHEDULED", color: "blue" },
-                  { id: "in_progress", label: "LIVE", color: "green" },
                   { id: "completed", label: "HISTORY", color: "gray" },
                 ].map((t) => (
                   <button
@@ -529,7 +532,11 @@ export default function ClassManagement() {
           {filteredClasses.map((classItem) => (
             <div
               key={classItem.id}
-              className="group bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 flex flex-col gap-6 ring-1 ring-gray-950/[0.02]"
+              className={`group bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm transition-all duration-500 flex flex-col gap-6 ring-1 ring-gray-950/[0.02] ${
+                classItem.status === "completed"
+                  ? "opacity-65 grayscale"
+                  : "hover:shadow-xl hover:-translate-y-1"
+              }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
@@ -564,17 +571,33 @@ export default function ClassManagement() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="p-3 bg-gray-50 rounded-xl text-gray-300 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
-                    <Eye size={18} />
-                  </button>
-                  <button
-                    onClick={() =>
-                      handleDeleteClass(classItem.id, classItem.galene_group)
-                    }
-                    className="p-3 bg-red-50 rounded-xl text-red-300 hover:bg-red-600 hover:text-white transition-all duration-500 shadow-sm"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  {classItem.status !== "completed" ? (
+                    <>
+                      <button className="p-3 bg-gray-50 rounded-xl text-gray-300 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                        <Eye size={18} />
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleDeleteClass(
+                            classItem.id,
+                            classItem.galene_group,
+                          )
+                        }
+                        className="p-3 bg-red-50 rounded-xl text-red-500 hover:bg-red-600 hover:text-white transition-all duration-500 shadow-sm"
+                        title="End & Archive Session"
+                      >
+                        <Archive size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => handleReopenClass(classItem.id)}
+                      className="p-3 bg-amber-50 rounded-xl text-amber-500 hover:bg-amber-600 hover:text-white transition-all duration-500 shadow-sm flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                      title="Reopen Session"
+                    >
+                      <RotateCcw size={16} /> Reopen
+                    </button>
+                  )}
                 </div>
               </div>
 

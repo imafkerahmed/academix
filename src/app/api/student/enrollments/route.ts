@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       role: "student", // Assuming student role from token
     };
 
-    pb.authStore.save(token, userModel);
+    pb.authStore.save(token, userModel as any);
 
     console.log(`[API] Fetching enrollments for user ${userId}`);
 

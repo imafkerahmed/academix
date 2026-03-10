@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import pb from "@/lib/pocketbase";
 import {
   Home,
   GraduationCap,

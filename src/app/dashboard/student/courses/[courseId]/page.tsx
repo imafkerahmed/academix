@@ -402,10 +402,10 @@ export default function CoursePage() {
         {course.semesters && course.semesters.length > 0 && (
           <div className="flex gap-3 mb-8 overflow-x-auto pb-2 custom-scrollbar">
             {course.semesters
-              .filter((s) => !disabledSemesters.includes(s.name))
-              .map((semester, index) => {
+              .filter((s: any) => !disabledSemesters.includes(s.name))
+              .map((semester: any, index: number) => {
                 const displayIndex = course.semesters
-                  .filter((s) => !disabledSemesters.includes(s.name))
+                  .filter((s: any) => !disabledSemesters.includes(s.name))
                   .indexOf(semester);
 
                 return (
@@ -439,11 +439,11 @@ export default function CoursePage() {
         {/* Subjects Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {course.semesters
-            .filter((s) => !disabledSemesters.includes(s.name))
+            .filter((s: any) => !disabledSemesters.includes(s.name))
             [activeSemester]?.subjects?.filter(
-              (subject) => !disabledSubjects.includes(subject.code),
+              (subject: any) => !disabledSubjects.includes(subject.code),
             )
-            ?.map((subject) => (
+            ?.map((subject: any) => (
               <RouteLink
                 key={subject.id}
                 href={`/dashboard/student/courses/${courseId}/subjects/${subject.id}`}

@@ -129,30 +129,42 @@ const fetchUpcomingClasses = async (
 ): Promise<UpcomingClass[]> => {
   try {
     const records = await pb.collection("classes").getFullList({
-      filter: `course_subject.lecturer ?= "${lecturerId}"`,
+      filter: `course_subject.lecturer ?= "${lecturerId}" && status != "cancelled"`,
       expand:
         "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake",
       sort: "start_time",
     });
 
-    return records.map((record: any) => ({
-      id: record.id,
-      intakeName:
-        record.expand?.course_subject?.expand?.course_intake?.expand?.intake
-          ?.code || "N/A",
-      courseName:
-        record.expand?.course_subject?.expand?.course_intake?.expand?.course
-          ?.name || "N/A",
-      classTitle: record.title,
-      startTime: new Date(record.start_time).toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      duration: record.duration,
-      status: record.status as any,
-    }));
+    const today = new Date().toISOString().slice(0, 10);
+
+    return records
+      .filter((record: any) => {
+        if (record.status === "completed") {
+          const recordDate = new Date(record.start_time)
+            .toISOString()
+            .slice(0, 10);
+          return recordDate === today;
+        }
+        return true;
+      })
+      .map((record: any) => ({
+        id: record.id,
+        intakeName:
+          record.expand?.course_subject?.expand?.course_intake?.expand?.intake
+            ?.code || "N/A",
+        courseName:
+          record.expand?.course_subject?.expand?.course_intake?.expand?.course
+            ?.name || "N/A",
+        classTitle: record.title,
+        startTime: new Date(record.start_time).toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        duration: record.duration,
+        status: record.status as any,
+      }));
   } catch (error) {
     console.error("Error fetching classes:", error);
     return [];

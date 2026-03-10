@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 import { useGalene, RemoteStream } from "@/hooks/useGalene";
 import {
   Mic,
@@ -21,6 +22,12 @@ import {
   Hand,
   Pencil,
   VolumeX,
+  Paperclip,
+  FileIcon,
+  Download,
+  ExternalLink,
+  ChevronRight,
+  Lock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Whiteboard from "@/components/classroom/Whiteboard";
@@ -63,21 +70,47 @@ export default function VirtualClassroom() {
   const [classData, setClassData] = useState<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [sidebarMode, setSidebarMode] = useState<
     "chat" | "participants" | null
-  >("chat");
+  >(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("galene-sidebar-mode");
+      if (saved) return saved as any;
+    }
+    return "chat";
+  });
+
+  useEffect(() => {
+    if (sidebarMode) {
+      sessionStorage.setItem("galene-sidebar-mode", sidebarMode);
+    } else {
+      sessionStorage.removeItem("galene-sidebar-mode");
+    }
+  }, [sidebarMode]);
   const [chatInput, setChatInput] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [attendanceId, setAttendanceId] = useState<string | null>(null);
   const [joinTime, setJoinTime] = useState<Date | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
-  const [whiteboardOpen, setWhiteboardOpen] = useState(false);
+  const [whiteboardOpen, setWhiteboardOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("galene-wb-active") === "true";
+    }
+    return false;
+  });
   const [handRaised, setHandRaised] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const autoJoinAttempted = useRef(false);
+
+  // Custom Leave Modal
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isEndingClass, setIsEndingClass] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-lower hand after 15 seconds
   useEffect(() => {
@@ -104,6 +137,16 @@ export default function VirtualClassroom() {
         const user = pb.authStore.model;
         setCurrentUser(user);
 
+        // Fetch user avatars
+        const allUsers = await pb.collection("users").getFullList();
+        const avatarMap: Record<string, string> = {};
+        allUsers.forEach((u) => {
+          if (u.avatar) {
+            avatarMap[u.username] = pb.files.getURL(u, u.avatar);
+          }
+        });
+        setUserAvatars(avatarMap);
+
         if (classId) {
           const record = await pb
             .collection("classes")
@@ -121,6 +164,67 @@ export default function VirtualClassroom() {
     fetchInitialData();
   }, [classId]);
 
+  // Determine host mode
+  const lecturerData = classData?.expand?.course_subject?.lecturer;
+  const isOwner = Array.isArray(lecturerData)
+    ? lecturerData.includes(currentUser?.id)
+    : lecturerData === currentUser?.id;
+  const isAdmin =
+    currentUser?.role === "admin" || currentUser?.role === "superuser";
+  const hostMode = (isAdmin && requestedRole === "host") || isOwner;
+
+  // Use a ref to hold mutable state values to prevent rapid re-subscription 404s in PocketBase
+  const autoJoinRefs = useRef({ hostMode, connected, connecting });
+  useEffect(() => {
+    autoJoinRefs.current = { hostMode, connected, connecting };
+  }, [hostMode, connected, connecting]);
+
+  // Real-time subscription to class updates (e.g., status changes)
+  useEffect(() => {
+    if (!classId) return;
+
+    pb.collection("classes").subscribe(classId as string, function (e) {
+      setClassData((prev: any) => {
+        const refs = autoJoinRefs.current;
+
+        // Auto-join for students if the status changes to in_progress while they are waiting
+        if (
+          !refs.hostMode &&
+          !refs.connected &&
+          !refs.connecting &&
+          prev?.status !== "in_progress" &&
+          e.record.status === "in_progress"
+        ) {
+          setTimeout(() => {
+            const joinBtn = document.getElementById("auto-join-btn");
+            if (joinBtn) joinBtn.click();
+          }, 500);
+        }
+
+        // Auto-eject students if the class ends
+        if (
+          !refs.hostMode &&
+          refs.connected &&
+          e.record.status === "completed"
+        ) {
+          setTimeout(() => {
+            const leaveBtn = document.getElementById("auto-leave-btn");
+            if (leaveBtn) leaveBtn.click();
+          }, 500);
+        }
+
+        return {
+          ...prev,
+          ...e.record,
+        };
+      });
+    });
+
+    return () => {
+      pb.collection("classes").unsubscribe(classId as string);
+    };
+  }, [classId]);
+
   // Handle local video element
   useEffect(() => {
     if (localVideoRef.current && localStream) {
@@ -133,9 +237,14 @@ export default function VirtualClassroom() {
       "[VirtualClassroom] Mounted or state changed. Connected:",
       connected,
     );
+    if (connected && !isHost) {
+      setTimeout(() => {
+        sendUserMessage("REQUEST_WHITEBOARD_SYNC");
+      }, 1500);
+    }
     return () =>
       console.log("[VirtualClassroom] Unmounted. Connected:", connected);
-  }, [connected]);
+  }, [connected, isHost, sendUserMessage]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -165,6 +274,14 @@ export default function VirtualClassroom() {
         .then(() => {
           setIsJoining(false);
           setLocalError(null);
+
+          if (sessionStorage.getItem("galene-is-screensharing") === "true") {
+            toast.info(
+              "Screen share stopped due to page reload. Click to share again.",
+              { duration: 6000 },
+            );
+            sessionStorage.removeItem("galene-is-screensharing");
+          }
         })
         .catch(() => {
           // If auto-rejoin fails, clear session so user can manually join
@@ -189,14 +306,6 @@ export default function VirtualClassroom() {
     const groupName = classData.galene_group || "test-classroom";
     let username = currentUser.name || currentUser.username || "Guest";
 
-    const lecturerData = classData.expand?.course_subject?.lecturer;
-    const isOwner = Array.isArray(lecturerData)
-      ? lecturerData.includes(currentUser.id)
-      : lecturerData === currentUser.id;
-    const isAdmin =
-      currentUser.role === "admin" || currentUser.role === "superuser";
-
-    const hostMode = (isAdmin && requestedRole === "host") || isOwner;
     setIsHost(hostMode);
     const password = hostMode ? "lecturer123" : "student123";
 
@@ -205,6 +314,18 @@ export default function VirtualClassroom() {
     }
 
     try {
+      // If host is joining and class isn't in progress, start it FIRST
+      // This is crucial for JIT (Just-In-Time) Galene group recreation
+      if (hostMode && classData.status !== "in_progress") {
+        await fetch("/api/classroom/start-class", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ classId }),
+        });
+      }
+
       await connect(groupName, username, password);
 
       const now = new Date();
@@ -266,6 +387,26 @@ export default function VirtualClassroom() {
     router.back();
   };
 
+  const handleEndClassForEveryone = async () => {
+    setIsEndingClass(true);
+    try {
+      if (hostMode) {
+        // Securely bypass PocketBase rules to set status to 'completed'
+        await fetch("/api/classroom/end-class", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ classId }),
+        });
+      }
+      handleLeave();
+    } catch (err) {
+      console.error("Error ending class", err);
+      setIsEndingClass(false);
+    }
+  };
+
   // Update attendance on window close
   useEffect(() => {
     const updateAttendanceOnUnmount = async () => {
@@ -300,18 +441,52 @@ export default function VirtualClassroom() {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/classroom/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Send a custom formatted message so clients know it's a file
+        sendChat(
+          `[FILE_ATTACHMENT]:${JSON.stringify({ url: data.url, name: data.name, size: data.size })}`,
+        );
+      } else {
+        console.error("Upload failed");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   // Determine spotlight stream
-  // Priority: screen share > lecturer stream > first remote stream
+  // For students: Priority is screen share > lecturer stream
+  // For host: Priority is *only* screen share (forcing local video to spotlight otherwise)
   const lecturerStream = remoteStreams.find(
     (s) => s.username === "lecturer" || s.label === "camera",
   );
-  // For the host, skip own screenshare from spotlight (it echoes back from Galene)
   const screenShareRemote = remoteStreams.find(
     (s) => s.label === "screenshare" && !(isHost && isScreenSharing),
   );
 
+  const spotlightStream = isHost
+    ? screenShareRemote
+    : screenShareRemote || lecturerStream;
+
   // Filter out the spotlighted stream from the filmstrip
-  const spotlightStream = screenShareRemote || lecturerStream;
   const filmstripStreams = remoteStreams.filter(
     (s) => s.id !== spotlightStream?.id,
   );
@@ -390,28 +565,63 @@ export default function VirtualClassroom() {
         {/* Video Area */}
         <div className="flex-1 flex flex-col p-4 pt-20 pb-28 overflow-hidden">
           {!connected && !connecting && (
-            <div className="h-full flex items-center justify-center">
-              <div className="max-w-md w-full bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-10 text-center shadow-2xl">
-                <div className="w-20 h-20 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-500/20 ring-8 ring-indigo-500/10">
-                  <Video size={36} />
+            <div className="h-full flex items-center justify-center p-4">
+              {!hostMode && classData?.status !== "in_progress" ? (
+                // Waiting Room UI
+                <div className="max-w-md w-full bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-10 text-center shadow-2xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 z-0" />
+                  <div className="relative z-10">
+                    <div className="w-24 h-24 bg-gray-800 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-500/10 ring-8 ring-white/5 relative">
+                      <Lock size={40} className="text-gray-400" />
+                      <div className="absolute top-2 right-2 flex space-x-1">
+                        <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                        <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                        <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" />
+                      </div>
+                    </div>
+                    <h2 className="text-2xl font-black mb-3 uppercase tracking-tight text-white">
+                      Waiting Room
+                    </h2>
+                    <p className="text-gray-400 text-sm mb-6 font-medium leading-relaxed">
+                      Waiting for the lecturer to start the meeting...
+                      <br className="my-2" />
+                      The room will automatically unlock when the session
+                      begins.
+                    </p>
+
+                    <div className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10">
+                      <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                        Stand by
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <h2 className="text-xl font-black mb-2 uppercase tracking-tight">
-                  Ready to join?
-                </h2>
-                <p className="text-gray-400 text-sm mb-6 font-medium">
-                  Join as{" "}
-                  <span className="text-white font-bold">
-                    {currentUser?.name || "Attendee"}
-                  </span>
-                </p>
-                <button
-                  onClick={handleJoin}
-                  disabled={isJoining}
-                  className="w-full bg-white text-black font-black text-xs tracking-widest py-4 rounded-xl hover:scale-105 transition-all shadow-xl active:scale-95 disabled:opacity-50 uppercase"
-                >
-                  {isJoining ? "Joining Session..." : "Join Class Now"}
-                </button>
-              </div>
+              ) : (
+                // Normal Join Card UI
+                <div className="max-w-md w-full bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-10 text-center shadow-2xl">
+                  <div className="w-20 h-20 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-500/20 ring-8 ring-indigo-500/10">
+                    <Video size={36} className="text-white" />
+                  </div>
+                  <h2 className="text-xl font-black mb-2 uppercase tracking-tight text-white">
+                    Ready to join?
+                  </h2>
+                  <p className="text-gray-400 text-sm mb-6 font-medium">
+                    Join as{" "}
+                    <span className="text-white font-bold">
+                      {currentUser?.name || "Attendee"}
+                    </span>
+                  </p>
+                  <button
+                    id="auto-join-btn"
+                    onClick={handleJoin}
+                    disabled={isJoining}
+                    className="w-full bg-white text-black font-black text-xs tracking-widest py-4 rounded-xl hover:scale-105 transition-all shadow-xl active:scale-95 disabled:opacity-50 uppercase"
+                  >
+                    {isJoining ? "Joining Session..." : "Join Class Now"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -451,6 +661,12 @@ export default function VirtualClassroom() {
                       stream={spotlightStream.stream}
                       label={spotlightStream.label}
                       username={spotlightStream.username}
+                      videoMuted={spotlightStream.videoMuted}
+                      avatarUrl={
+                        spotlightStream.username
+                          ? userAvatars[spotlightStream.username]
+                          : undefined
+                      }
                     />
                     <div className="absolute top-4 left-4 z-10 bg-black/50 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 flex items-center gap-2">
                       {spotlightStream.label === "screenshare" ? (
@@ -543,9 +759,49 @@ export default function VirtualClassroom() {
                 {filmstripStreams.map((remote) => (
                   <div
                     key={remote.id}
-                    className="relative flex-shrink-0 w-40 h-full bg-gray-900 rounded-xl overflow-hidden border border-white/5"
+                    className="relative flex-shrink-0 w-40 h-full bg-gray-900 rounded-xl overflow-hidden border border-white/5 group"
                   >
-                    <RemoteVideo remote={remote} />
+                    <RemoteVideo
+                      remote={remote}
+                      avatarUrl={
+                        remote.username
+                          ? userAvatars[remote.username]
+                          : undefined
+                      }
+                    />
+
+                    {/* Hover controls for Host */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      {isHost && (
+                        <>
+                          <button
+                            onClick={() => muteUser(remote.id)}
+                            className="p-2 bg-red-500/80 hover:bg-red-500 text-white rounded-lg backdrop-blur-sm transition-colors shadow-lg"
+                            title="Mute user"
+                          >
+                            <MicOff size={16} />
+                          </button>
+                          <button
+                            onClick={() => kickUser(remote.id)}
+                            className="p-2 bg-red-900/80 hover:bg-red-800 text-white rounded-lg backdrop-blur-sm transition-colors shadow-lg"
+                            title="Remove user"
+                          >
+                            <PhoneOff size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Native Hand Raise Overlay */}
+                    {raisedHands.has(remote.id) && (
+                      <div className="absolute top-2 right-2 z-20 bg-amber-500/90 backdrop-blur-md px-2 py-1 rounded-md border border-amber-400/50 flex items-center gap-1 shadow-lg animate-bounce">
+                        <Hand size={12} className="text-white" />
+                        <span className="text-[9px] font-black tracking-widest text-white uppercase">
+                          Raised
+                        </span>
+                      </div>
+                    )}
+
                     <div className="absolute bottom-1.5 left-1.5 right-1.5 z-10 bg-black/60 backdrop-blur px-2 py-0.5 rounded-md">
                       <span className="text-[8px] font-black tracking-widest uppercase block truncate">
                         {remote.label === "screenshare"
@@ -649,8 +905,21 @@ export default function VirtualClassroom() {
 
             <div className="w-px h-6 bg-white/10 mx-1" />
 
+            {/* Invisible auto-leave button for realtime subscriptions acting on student */}
             <button
+              id="auto-leave-btn"
+              style={{ display: "none" }}
               onClick={handleLeave}
+            />
+
+            <button
+              onClick={() => {
+                if (isHost) {
+                  setShowLeaveModal(true);
+                } else {
+                  handleLeave();
+                }
+              }}
               className="p-4 rounded-xl bg-red-600 text-white shadow-xl shadow-red-500/30 hover:bg-red-700 transition-all active:scale-90"
             >
               <PhoneOff size={20} />
@@ -687,6 +956,18 @@ export default function VirtualClassroom() {
                     : currentUser?.name || currentUser?.username || "Guest";
                   const isMyMessage = msg.username === displayUsername;
 
+                  const isFile = msg.value.startsWith("[FILE_ATTACHMENT]:");
+                  let fileData = null;
+                  if (isFile) {
+                    try {
+                      fileData = JSON.parse(
+                        msg.value.replace("[FILE_ATTACHMENT]:", ""),
+                      );
+                    } catch (e) {
+                      console.error("Failed to parse file attachment data", e);
+                    }
+                  }
+
                   return (
                     <div
                       key={i}
@@ -704,7 +985,30 @@ export default function VirtualClassroom() {
                             : "bg-white/5 text-gray-200 rounded-tl-none ring-1 ring-white/5"
                         }`}
                       >
-                        {msg.value}
+                        {isFile && fileData ? (
+                          <a
+                            href={fileData.url}
+                            download={fileData.name}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-3 bg-black/20 hover:bg-black/30 p-2 -mx-1 -my-0.5 rounded-lg transition-colors border border-white/5"
+                          >
+                            <div className="p-2 bg-indigo-500/20 rounded-md text-indigo-300">
+                              <FileIcon size={16} />
+                            </div>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="text-xs font-bold truncate">
+                                {fileData.name}
+                              </span>
+                              <span className="text-[10px] opacity-70">
+                                {(fileData.size / 1024).toFixed(1)} KB
+                              </span>
+                            </div>
+                            <Download size={14} className="opacity-70 mx-1" />
+                          </a>
+                        ) : (
+                          msg.value
+                        )}
                       </div>
                     </div>
                   );
@@ -716,19 +1020,41 @@ export default function VirtualClassroom() {
                 onSubmit={handleSendMessage}
                 className="p-4 bg-black/20 backdrop-blur-2xl border-t border-white/5"
               >
-                <div className="relative">
+                <div className="relative flex items-center gap-2">
                   <input
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Type a message..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/50 transition-all placeholder:text-gray-600"
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    className="hidden"
                   />
                   <button
-                    type="submit"
-                    className="absolute right-2 top-1.5 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-lg"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingFile}
+                    className={`p-3 bg-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all border border-white/10 ${uploadingFile ? "opacity-50 cursor-not-allowed" : ""}`}
+                    title="Upload file (temporary)"
                   >
-                    <Send size={16} />
+                    {uploadingFile ? (
+                      <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Paperclip size={20} />
+                    )}
                   </button>
+                  <div className="relative flex-1">
+                    <input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Type a message..."
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/50 transition-all placeholder:text-gray-600"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!chatInput.trim()}
+                      className="absolute right-2 top-1.5 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
                 </div>
               </form>
             </>
@@ -838,6 +1164,47 @@ export default function VirtualClassroom() {
           )}
         </div>
       )}
+
+      {/* Custom Leave Modal (Host Only) */}
+      {showLeaveModal && isHost && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !isEndingClass && setShowLeaveModal(false)}
+          />
+          <div className="relative bg-gray-900 border border-white/10 p-8 rounded-[2rem] max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 ring-8 ring-red-500/5">
+              <PhoneOff className="text-red-500" size={32} />
+            </div>
+
+            <h2 className="text-2xl font-black text-center text-white mb-3 tracking-tight">
+              End Class Session?
+            </h2>
+
+            <p className="text-gray-400 text-center text-sm font-medium mb-8 leading-relaxed">
+              This will immediately close the room and disconnect all currently
+              active students. This action cannot be reversed.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleEndClassForEveryone}
+                disabled={isEndingClass}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-sm tracking-widest uppercase py-4 rounded-xl transition-all shadow-xl shadow-red-900/20 active:scale-95 disabled:opacity-50 flex items-center justify-center disabled:active:scale-100"
+              >
+                {isEndingClass ? "Ending Session..." : "End Class For All"}
+              </button>
+              <button
+                onClick={() => setShowLeaveModal(false)}
+                disabled={isEndingClass}
+                className="w-full bg-white/5 hover:bg-white/10 text-white font-bold text-sm tracking-widest uppercase py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -847,10 +1214,15 @@ export default function VirtualClassroom() {
 function SpotlightVideo({
   stream,
   label,
+  username,
+  videoMuted,
+  avatarUrl,
 }: {
   stream: MediaStream;
   label?: string;
   username?: string;
+  videoMuted?: boolean;
+  avatarUrl?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -861,17 +1233,27 @@ function SpotlightVideo({
   }, [stream]);
 
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      className={`w-full h-full object-contain bg-black ${label !== "screenshare" ? "mirror" : ""}`}
-    />
+    <>
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className={`w-full h-full object-contain bg-black ${label !== "screenshare" ? "mirror" : ""} ${videoMuted ? "hidden" : ""}`}
+      />
+      {videoMuted && (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 gap-4">
+          <UserAvatar size={80} url={avatarUrl} />
+          <span className="text-gray-400 font-bold uppercase tracking-widest text-xs">
+            {username || "User"} (Video Off)
+          </span>
+        </div>
+      )}
+    </>
   );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const LocalVideoTile = ({ stream, videoMuted, ref }: any) => {
+const LocalVideoTile = ({ stream, videoMuted, avatarUrl, ref }: any) => {
   const internalRef = useRef<HTMLVideoElement>(null);
   const videoRef = ref || internalRef;
 
@@ -892,14 +1274,20 @@ const LocalVideoTile = ({ stream, videoMuted, ref }: any) => {
       />
       {videoMuted && (
         <div className="w-full h-full flex items-center justify-center bg-gray-900">
-          <UserAvatar size={32} />
+          <UserAvatar size={32} url={avatarUrl} />
         </div>
       )}
     </>
   );
 };
 
-function RemoteVideo({ remote }: { remote: RemoteStream }) {
+function RemoteVideo({
+  remote,
+  avatarUrl,
+}: {
+  remote: RemoteStream;
+  avatarUrl?: string;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -909,36 +1297,51 @@ function RemoteVideo({ remote }: { remote: RemoteStream }) {
   }, [remote.stream]);
 
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      className={`w-full h-full object-cover ${remote.label === "screenshare" ? "" : ""}`}
-    />
+    <>
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className={`w-full h-full object-cover ${remote.label === "screenshare" ? "" : ""} ${remote.videoMuted ? "hidden" : ""}`}
+      />
+      {remote.videoMuted && (
+        <div className="w-full h-full flex items-center justify-center bg-gray-900 absolute inset-0">
+          <UserAvatar size={32} url={avatarUrl} />
+        </div>
+      )}
+    </>
   );
 }
 
-function UserAvatar({ size = 48 }: { size?: number }) {
+function UserAvatar({ size = 48, url }: { size?: number; url?: string }) {
   return (
     <div
-      className="bg-gray-800 rounded-full flex items-center justify-center border border-white/5"
+      className="bg-gray-800 rounded-full flex items-center justify-center border border-white/5 overflow-hidden"
       style={{ width: size, height: size }}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width={size * 0.6}
-        height={size * 0.6}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-gray-600"
-      >
-        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
+      {url ? (
+        <img
+          src={url}
+          alt="User Avatar"
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={size * 0.6}
+          height={size * 0.6}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-gray-600"
+        >
+          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      )}
     </div>
   );
 }

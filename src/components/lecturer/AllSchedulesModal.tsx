@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Clock, Timer } from "lucide-react";
 import { UpcomingClass } from "./UpcomingClasses";
+import pb from "@/lib/pocketbase";
 
 interface AllSchedulesModalProps {
   isOpen: boolean;
@@ -124,8 +125,18 @@ export default function AllSchedulesModal({
     return date.toLocaleDateString("en-US", { weekday: "short" });
   };
 
-  const handleQuickJoin = (id: string) => {
-    window.location.href = `/dashboard/classroom/${id}`;
+  const handleQuickJoin = async (id: string, status: string) => {
+    if (status === "completed") {
+      try {
+        await pb.collection("classes").update(id, {
+          status: "scheduled",
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        /* silent */
+      }
+    }
+    window.location.href = `/dashboard/classroom/${id}?role=host`;
   };
 
   if (!isOpen) return null;
@@ -209,6 +220,11 @@ export default function AllSchedulesModal({
                         Active Now
                       </div>
                     )}
+                    {classItem.status === "completed" && (
+                      <div className="absolute top-6 right-8 bg-gray-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
+                        Ended
+                      </div>
+                    )}
 
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 relative z-10">
                       <div className="flex-1">
@@ -229,10 +245,14 @@ export default function AllSchedulesModal({
 
                       <div className="shrink-0">
                         <button
-                          onClick={() => handleQuickJoin(classItem.id)}
-                          className="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all"
+                          onClick={() =>
+                            handleQuickJoin(classItem.id, classItem.status)
+                          }
+                          className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl transition-all hover:scale-105 active:scale-95 ${classItem.status === "completed" ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"}`}
                         >
-                          Join Class
+                          {classItem.status === "completed"
+                            ? "Reopen Session"
+                            : "Join Class"}
                         </button>
                       </div>
                     </div>

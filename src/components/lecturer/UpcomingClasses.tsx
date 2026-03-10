@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Clock, Timer } from "lucide-react";
+import pb from "@/lib/pocketbase";
 
 export interface UpcomingClass {
   id: string;
@@ -37,8 +38,18 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
     }
   };
 
-  const handleQuickJoin = (id: string) => {
-    window.location.href = `/dashboard/classroom/${id}`;
+  const handleQuickJoin = async (id: string, status: string) => {
+    if (status === "completed") {
+      try {
+        await pb.collection("classes").update(id, {
+          status: "scheduled",
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        /* silent */
+      }
+    }
+    window.location.href = `/dashboard/classroom/${id}?role=host`;
   };
 
   if (classes.length === 0) {
@@ -69,6 +80,11 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
               {isOngoing && (
                 <div className="absolute -top-2 -right-2 bg-indigo-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10 animate-pulse">
                   Active Now
+                </div>
+              )}
+              {classItem.status === "completed" && (
+                <div className="absolute -top-2 -right-2 bg-gray-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10">
+                  Ended
                 </div>
               )}
 
@@ -108,10 +124,12 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
                   </div>
 
                   <button
-                    onClick={() => handleQuickJoin(classItem.id)}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 transition-all"
+                    onClick={() =>
+                      handleQuickJoin(classItem.id, classItem.status)
+                    }
+                    className={`px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest shadow-lg transition-all hover:scale-105 ${classItem.status === "completed" ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"}`}
                   >
-                    Quick Join
+                    {classItem.status === "completed" ? "Reopen" : "Quick Join"}
                   </button>
                 </div>
               </div>

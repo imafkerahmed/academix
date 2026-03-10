@@ -9,6 +9,7 @@ export interface RemoteStream {
   stream: MediaStream;
   label?: string;
   username?: string;
+  videoMuted?: boolean;
 }
 
 export interface ChatMessage {
@@ -76,8 +77,37 @@ export function useGalene(): UseGaleneReturn {
   const [ownId, setOwnId] = useState<string>("");
   // New state for hand raise and whiteboard events
   const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set());
-  const [whiteboardEvents, setWhiteboardEvents] = useState<any[]>([]);
-  const [whiteboardActive, setWhiteboardActive] = useState(false);
+  // Initialize whiteboard state from sessionStorage if it exists
+  const [whiteboardEvents, setWhiteboardEvents] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("galene-wb-events");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return [];
+  });
+
+  const [whiteboardActive, setWhiteboardActive] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("galene-wb-active") === "true";
+    }
+    return false;
+  });
+
+  // Save whiteboard changes to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem(
+      "galene-wb-events",
+      JSON.stringify(whiteboardEvents),
+    );
+  }, [whiteboardEvents]);
+
+  useEffect(() => {
+    sessionStorage.setItem("galene-wb-active", String(whiteboardActive));
+  }, [whiteboardActive]);
 
   // Refs for callbacks
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -110,6 +140,23 @@ export function useGalene(): UseGaleneReturn {
             frameRate: { ideal: 30 },
           },
         });
+
+        // Restore muted state from sessionStorage instantly
+        const savedAudioMuted =
+          sessionStorage.getItem("galene-audio-muted") === "true";
+        const savedVideoMuted =
+          sessionStorage.getItem("galene-video-muted") === "true";
+
+        stream
+          .getAudioTracks()
+          .forEach((track) => (track.enabled = !savedAudioMuted));
+        stream
+          .getVideoTracks()
+          .forEach((track) => (track.enabled = !savedVideoMuted));
+
+        setAudioMuted(savedAudioMuted);
+        setVideoMuted(savedVideoMuted);
+
         setLocalStream(stream);
 
         const client = createGaleneClient();
@@ -150,20 +197,41 @@ export function useGalene(): UseGaleneReturn {
             label?: string;
             username?: string;
           }) => {
+            const hasVideo = data.stream
+              .getVideoTracks()
+              .some((t) => t.enabled);
+
             setRemoteStreams((prev) => {
               const existing = prev.findIndex((s) => s.id === data.id);
               if (existing >= 0) {
                 const updated = [...prev];
-                updated[existing] = data;
+                updated[existing] = { ...data, videoMuted: !hasVideo };
                 return updated;
               }
-              return [...prev, data];
+              return [...prev, { ...data, videoMuted: !hasVideo }];
             });
           },
         );
 
         client.on("remoteStreamRemoved", (data: { id: string }) => {
           setRemoteStreams((prev) => prev.filter((s) => s.id !== data.id));
+        });
+
+        // Listen for stream state changes (e.g. video muted/unmuted)
+        client.on("streamState", (id: string, stream: MediaStream) => {
+          const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
+          setRemoteStreams((prev) => {
+            const existing = prev.findIndex((s) => s.id === id);
+            if (existing >= 0) {
+              const updated = [...prev];
+              updated[existing] = {
+                ...updated[existing],
+                videoMuted: !hasVideo,
+              };
+              return updated;
+            }
+            return prev;
+          });
         });
 
         // Chat
@@ -219,14 +287,6 @@ export function useGalene(): UseGaleneReturn {
               const newSet = new Set(prev);
               if (value === "up") {
                 newSet.add(userId);
-                // If we are host, show toast notification
-                if (permissionsRef.current.includes("op")) {
-                  const p = participantsRef.current.find(
-                    (u) => u.id === userId,
-                  );
-                  const name = p ? p.username : "A student";
-                  toast.info(`${name} has raised their hand.`, { icon: "✋" });
-                }
               } else if (value === "down") {
                 newSet.delete(userId);
               }
@@ -244,6 +304,39 @@ export function useGalene(): UseGaleneReturn {
           }
           if (kind === "whiteboard-toggle") {
             setWhiteboardActive(value === "true");
+          }
+          // New: Handle requests for full sync (for late joiners / reloads)
+          if (kind === "REQUEST_WHITEBOARD_SYNC") {
+            // If we are host, send back our full history
+            if (permissionsRef.current.includes("op")) {
+              setWhiteboardEvents((currentEvents) => {
+                const isActive =
+                  sessionStorage.getItem("galene-wb-active") === "true";
+                sendUserMessage(
+                  "WHITEBOARD_SYNC",
+                  msg.source,
+                  JSON.stringify({
+                    events: currentEvents,
+                    active: isActive,
+                  }),
+                );
+                return currentEvents;
+              });
+            }
+          }
+          // New: Handle receiving full sync history
+          if (kind === "WHITEBOARD_SYNC") {
+            try {
+              const data = JSON.parse(value || "{}");
+              if (data.events) {
+                setWhiteboardEvents(data.events);
+              }
+              if (typeof data.active === "boolean") {
+                setWhiteboardActive(data.active);
+              }
+            } catch (e) {
+              console.error("Error parsing whiteboard sync:", e);
+            }
           }
         });
 
@@ -344,7 +437,11 @@ export function useGalene(): UseGaleneReturn {
       ls.getAudioTracks().forEach((track) => {
         track.enabled = !track.enabled;
       });
-      setAudioMuted((prev) => !prev);
+      setAudioMuted((prev) => {
+        const next = !prev;
+        sessionStorage.setItem("galene-audio-muted", String(next));
+        return next;
+      });
     }
   }, []);
 
@@ -354,7 +451,11 @@ export function useGalene(): UseGaleneReturn {
       ls.getVideoTracks().forEach((track) => {
         track.enabled = !track.enabled;
       });
-      setVideoMuted((prev) => !prev);
+      setVideoMuted((prev) => {
+        const next = !prev;
+        sessionStorage.setItem("galene-video-muted", String(next));
+        return next;
+      });
     }
   }, []);
 
@@ -363,8 +464,11 @@ export function useGalene(): UseGaleneReturn {
       try {
         await clientRef.current.publishScreen();
       } catch (err) {
-        console.error("[useGalene] Screen share error:", err);
-        // User cancelled the screen picker, not a real error
+        if (err instanceof Error && err.name === "NotAllowedError") {
+          console.warn("[useGalene] User cancelled screen share picker.");
+        } else {
+          console.warn("[useGalene] Screen share error:", err);
+        }
       }
     }
   }, []);
