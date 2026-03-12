@@ -61,6 +61,14 @@ const CourseList: React.FC<CourseListProps> = ({ courses }) => {
           icon: GraduationCap,
           label: "Certificate Issued",
         };
+      case "processing":
+        return {
+          bg: "bg-violet-50",
+          text: "text-violet-600",
+          border: "border-violet-100",
+          icon: Clock,
+          label: "Processing Certificate",
+        };
       case "not issued":
         return {
           bg: "bg-gray-50",

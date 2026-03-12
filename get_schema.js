@@ -7,12 +7,11 @@ async function run() {
       "imafkerahmed@gmail.com",
       'xsj>~6"Gn2tzeFz',
     );
-    const classesColl = await pb.collections.getOne("classes");
-    console.log("CLASSES KEYS:", Object.keys(classesColl));
-    console.log(
-      "CLASSES SCHEMA/FIELDS:",
-      classesColl.schema || classesColl.fields,
-    );
+    const assignmentsColl = await pb.collections.getOne("assignments");
+    console.log("ASSIGNMENTS SCHEMA:", JSON.stringify(assignmentsColl.fields, null, 2));
+
+    const submissionsColl = await pb.collections.getOne("assignment_submissions");
+    console.log("SUBMISSIONS SCHEMA:", JSON.stringify(submissionsColl.fields, null, 2));
   } catch (err) {
     console.error("error:", err.message);
   }

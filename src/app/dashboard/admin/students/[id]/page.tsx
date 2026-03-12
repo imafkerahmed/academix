@@ -251,11 +251,16 @@ interface StudentDetails {
 interface Enrollment {
   id: string;
   created: string;
+  course_intake: string;
   registration_number?: string;
   installment_amount?: number;
   payment_option?: string;
+  certificate_status?: string;
   expand?: {
     course_intake?: {
+      id: string;
+      course?: string;
+      intake?: string;
       expand?: {
         course?: {
           id: string;
@@ -265,6 +270,34 @@ interface Enrollment {
       };
     };
   };
+}
+
+interface StudentAssignmentSubmission {
+  id: string;
+  assignment: string;
+  submitted_at: string;
+  evaluation_status: string;
+  submission_status: string;
+  mark?: number;
+  grade?: string;
+  feedback?: string;
+  file?: string;
+}
+
+interface StudentAssignment {
+  id: string;
+  title: string;
+  due_date: string;
+  total_marks?: number;
+  course_subject: string;
+  expand?: {
+    course_subject?: {
+      expand?: {
+        subject?: { name: string };
+      };
+    };
+  };
+  submission?: StudentAssignmentSubmission;
 }
 
 interface Payment {
@@ -287,22 +320,60 @@ const DOCUMENT_TYPE_BY_CATEGORY: Record<string, Document["document_type"]> = {
 };
 
 function CertificateStatusControl({
-  initialStatus = "PENDING",
+  initialStatus = "pending",
+  enrollmentId,
+  onUpdated,
 }: {
   initialStatus?: string;
+  enrollmentId: string;
+  onUpdated: () => void;
 }) {
-  const [status, setStatus] = useState(initialStatus);
+  const [status, setStatus] = useState(initialStatus?.toLowerCase() || "pending");
   const [isOpen, setIsOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Sync with initial status if it changes
+  useEffect(() => {
+    if (initialStatus) {
+      setStatus(initialStatus.toLowerCase());
+    }
+  }, [initialStatus]);
+
+  const handleStatusUpdate = async (newStatus: string) => {
+    try {
+      setSaving(true);
+      await pb.collection("enrollments").update(enrollmentId, {
+        certificate_status: newStatus.toLowerCase(),
+      });
+      setStatus(newStatus.toLowerCase());
+      toast.success(`Status updated to ${newStatus.toUpperCase()}`);
+      onUpdated();
+      setIsOpen(false);
+    } catch (error: any) {
+      if (isSuperuserOnlyError(error)) {
+        toast.error("You don't have permission to update status.");
+      } else {
+        toast.error(error?.message || "Failed to update status");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Derive styles based on status
   let statusBg =
     "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100 focus:ring-amber-50/50";
-  if (status === "PROCESSING")
+  if (status === "processing")
     statusBg =
       "bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100 focus:ring-indigo-50/50";
-  if (status === "ISSUED")
+  if (status === "delivered" || status === "issued")
     statusBg =
       "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100 focus:ring-emerald-50/50";
+
+  const displayStatus = (status: string) => {
+    if (status === "delivered") return "ISSUED";
+    return status.toUpperCase();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -310,7 +381,7 @@ function CertificateStatusControl({
         <button
           className={`px-4 py-1.5 rounded-xl border hover:shadow-sm transition-all focus:ring-4 text-[9px] font-black uppercase tracking-widest cursor-pointer ${statusBg}`}
         >
-          {status}
+          {displayStatus(status)}
         </button>
       </DialogTrigger>
       <DialogContent className="max-w-md p-8 rounded-[2.5rem] border-none shadow-2xl">
@@ -321,27 +392,32 @@ function CertificateStatusControl({
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-3">
-          {["PENDING", "PROCESSING", "ISSUED"].map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatus(s)}
-              className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${
-                status === s
-                  ? "border-indigo-600 bg-indigo-50/50 text-indigo-700 shadow-sm"
-                  : "border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <span className="font-black text-xs uppercase tracking-widest">
-                {s}
-              </span>
-              {status === s && (
-                <CheckCircle size={18} className="text-indigo-600" />
-              )}
-            </button>
-          ))}
+          {["PENDING", "PROCESSING", "ISSUED"].map((s) => {
+            const val = s === "ISSUED" ? "delivered" : s.toLowerCase();
+            const isSelected = status === val;
+            return (
+              <button
+                key={s}
+                onClick={() => handleStatusUpdate(val)}
+                disabled={saving}
+                className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                  isSelected
+                    ? "border-indigo-600 bg-indigo-50/50 text-indigo-700 shadow-sm"
+                    : "border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50"
+                } disabled:opacity-50`}
+              >
+                <span className="font-black text-xs uppercase tracking-widest">
+                  {s}
+                </span>
+                {isSelected && (
+                  <CheckCircle size={18} className="text-indigo-600" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {status === "ISSUED" && (
+        {status === "delivered" && (
           <div className="mt-6 pt-6 border-t border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">
               Upload Generated Certificate
@@ -362,9 +438,9 @@ function CertificateStatusControl({
 
         <button
           onClick={() => setIsOpen(false)}
-          className="w-full mt-6 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95"
+          className="w-full mt-6 py-4 rounded-2xl bg-gray-100 text-gray-600 font-black text-[10px] tracking-widest hover:bg-gray-200 transition-all uppercase active:scale-95"
         >
-          {status === "ISSUED" ? "Save & Upload" : "Save Status"}
+          Cancel
         </button>
       </DialogContent>
     </Dialog>
@@ -1000,6 +1076,7 @@ export default function StudentDetail() {
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<StudentDetails | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [studentAssignments, setStudentAssignments] = useState<StudentAssignment[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [financeFilter, setFinanceFilter] = useState("all");
   const [internalNote, setInternalNote] = useState("");
@@ -1056,6 +1133,48 @@ export default function StudentDetail() {
       }
 
       setStudent({ ...(record as any), documents: mappedDocuments } as any);
+      const studentData = record as any;
+      
+      // Fetch Assignments
+      try {
+        const enrollments = studentData.expand?.enrollments_via_student || [];
+        const intakeIds = enrollments.map((e: any) => e.course_intake);
+        
+        if (intakeIds.length > 0) {
+          // 1. Get all subjects for these intakes
+          const subjects = await pb.collection("course_subjects").getFullList({
+            filter: intakeIds.map((id: string) => `course_intake = "${id}"`).join(" || "),
+            expand: "subject"
+          });
+          
+          const subjectIds = subjects.map(s => s.id);
+          
+          if (subjectIds.length > 0) {
+            // 2. Get assignments for these subjects
+            const assignmentsRecords = await pb.collection("assignments").getFullList({
+              filter: subjectIds.map((id: string) => `course_subject = "${id}"`).join(" || "),
+              expand: "course_subject.subject",
+              sort: "-due_date"
+            });
+            
+            // 3. Get student's submissions
+            const studentSubmissions = await pb.collection("assignment_submissions").getFullList({
+              filter: `student = "${studentId}"`
+            });
+            
+            // Map them together
+            const mappedAssignments: StudentAssignment[] = assignmentsRecords.map(a => ({
+              ...(a as any),
+              submission: (studentSubmissions as any[]).find(s => s.assignment === a.id)
+            }));
+            
+            setStudentAssignments(mappedAssignments);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching student assignments:", err);
+      }
+
       const remoteNote = (record as any).internalNote || "";
       const localNote =
         typeof window !== "undefined"
@@ -1140,6 +1259,7 @@ export default function StudentDetail() {
   const tabs = [
     { id: "overview", label: "Overview", icon: User },
     { id: "academic", label: "Academic", icon: BookOpen },
+    { id: "assignments", label: "Assignments", icon: FileText },
     { id: "payments", label: "Payments", icon: CreditCard },
     { id: "documents", label: "Documents", icon: FileText },
   ];
@@ -1453,7 +1573,11 @@ export default function StudentDetail() {
                                 <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
                                   CERTIFICATE STATUS:
                                 </span>
-                                <CertificateStatusControl />
+                                <CertificateStatusControl
+                                  enrollmentId={enrollment.id}
+                                  initialStatus={enrollment.certificate_status}
+                                  onUpdated={fetchStudentDetails}
+                                />
                               </div>
                               <div className="flex items-center gap-2">
                                 <Badge className="bg-emerald-500 text-white border-none px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">
@@ -1479,6 +1603,115 @@ export default function StudentDetail() {
                       />
                       <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
                         No Active Enrollments Found
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "assignments" && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 space-y-8">
+                <div className="flex items-center gap-3 pb-4 border-b border-gray-50">
+                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                    <FileText size={20} />
+                  </div>
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                    Academic Assignments
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {studentAssignments.length > 0 ? (
+                    studentAssignments.map((assign, idx) => (
+                      <div
+                        key={assign.id}
+                        className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 flex flex-col gap-4 group hover:bg-white hover:shadow-xl hover:shadow-indigo-50/50 transition-all duration-300"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                              <FileText size={20} />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight line-clamp-1">
+                                {assign.title}
+                              </h4>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
+                                {assign.expand?.course_subject?.expand?.subject?.name || "Subject Material"}
+                              </p>
+                            </div>
+                          </div>
+                          {!assign.submission ? (
+                            <Badge className="bg-orange-50 text-orange-600 border-none px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">
+                              Not Submitted
+                            </Badge>
+                          ) : assign.submission.evaluation_status === "pending" ? (
+                            <Badge className="bg-blue-50 text-blue-600 border-none px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">
+                              Pending Review
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-emerald-50 text-emerald-600 border-none px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">
+                              Graded
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Due Date</p>
+                            <p className="text-[10px] font-bold text-gray-700">
+                              {new Date(assign.due_date).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Marks Obtained</p>
+                            <p className="text-sm font-black text-indigo-600">
+                              {assign.submission?.mark !== undefined ? `${assign.submission.mark} / ${assign.total_marks || 100}` : `-- / ${assign.total_marks || 100}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {assign.submission && (
+                          <div className="mt-2 flex items-center justify-between gap-3">
+                             <div className="flex items-center gap-2">
+                               {assign.submission.grade && (
+                                 <div className="px-2.5 py-1 bg-indigo-50 rounded-lg text-[10px] font-black text-indigo-600 border border-indigo-100 uppercase tracking-widest">
+                                   GRADE: {assign.submission.grade}
+                                 </div>
+                               )}
+                             </div>
+                             <button
+                               onClick={() => router.push(`/dashboard/admin/assignments/${assign.id}`)}
+                               className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline flex items-center gap-1.5"
+                             >
+                               VIEW RECORD <ExternalLink size={10} />
+                             </button>
+                          </div>
+                        )}
+                        
+                        {assign.submission?.feedback && (
+                           <div className="mt-2 p-3 bg-gray-100/50 rounded-xl border border-gray-100">
+                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                               <Mail size={10} /> Lecturer Feedback
+                             </p>
+                             <p className="text-[10px] font-bold text-gray-600 italic">
+                               "{assign.submission.feedback}"
+                             </p>
+                           </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center py-12 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                      <FileText
+                        size={48}
+                        className="mx-auto text-gray-300 mb-4"
+                      />
+                      <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
+                        No Assignments Found for this student
                       </p>
                     </div>
                   )}

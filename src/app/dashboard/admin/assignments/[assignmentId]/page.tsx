@@ -1,766 +1,520 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import pb, { logout } from "@/lib/pocketbase";
+import AdminSidebar from "@/components/admin/AdminSidebar";
+import StatsCarousel from "@/components/admin/StatsCarousel";
+import AdminActionBar from "@/components/admin/AdminActionBar";
 import {
-  ArrowLeft,
-  CheckCircle2,
-  Clock,
-  FileSpreadsheet,
   FileText,
-  X,
-  RotateCcw,
+  Calendar,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Eye,
+  Download,
+  Menu,
+  Plus,
+  ArrowRight,
+  User,
+  Search,
+  BookOpen,
+  ArrowLeft,
+  Upload,
+  Hash,
+  ChevronRight,
+  ExternalLink,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ModernModal } from "@/components/ui/modern-modal";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+interface Assignment {
+  id: string;
+  title: string;
+  description?: string;
+  issued_at: string;
+  due_date: string;
+  opens_at?: string;
+  open_after_due: boolean;
+  total_marks?: number;
+  file?: string;
+  expand?: {
+    course_subject?: any;
+    marker?: any;
+  };
+}
 
 interface Submission {
   id: string;
-  studentName: string;
-  studentId: string;
-  status: "submitted" | "not_submitted" | "marked";
-  submittedAt?: string;
-  marks?: number;
+  assignment: string;
+  submitted_at: string;
+  evaluation_status: string;
+  submission_status: string;
+  mark?: number;
   grade?: string;
   feedback?: string;
-  filePlaceholder?: string;
-  fileUrl?: string;
-  canResubmit?: boolean;
+  expand?: {
+    student?: any;
+    assignment?: Assignment;
+  };
+  file?: string;
 }
 
-interface AssignmentDetails {
-  id: string;
-  title: string;
-  subjectCode: string;
-  subjectName: string;
-  courseName: string;
-  intakeName: string;
-  dueDate: string;
-  maxMarks: number;
-  description?: string;
-  assignmentSheetName?: string;
-  assignmentSheetUrl?: string;
-  submissions: Submission[];
-}
-
-// Mock data consistency for Admin
-const mockAssignments: AssignmentDetails[] = [
-  {
-    id: "asgn-1",
-    title: "Midterm Project",
-    subjectCode: "CS101",
-    subjectName: "Introduction to Programming",
-    courseName: "Computer Science Fundamentals",
-    intakeName: "January 2024 Intake",
-    dueDate: "2026-06-01",
-    maxMarks: 100,
-    description: "Final project for the first half of the semester.",
-    assignmentSheetName: "midterm-project.pdf",
-    assignmentSheetUrl: "/Afker%20Ahmed%20Qatar%20cv%20copy.pdf",
-    submissions: [
-      {
-        id: "sub-1",
-        studentName: "Alice Johnson",
-        studentId: "S001",
-        status: "submitted",
-        submittedAt: "2026-05-28 14:20",
-        marks: 92,
-        grade: "A-",
-        feedback: "Great job, minor improvements suggested on error handling.",
-        filePlaceholder: "Alice_Midterm.pdf",
-        fileUrl: "/Afker%20Ahmed%20Qatar%20cv%20copy.pdf",
-      },
-      {
-        id: "sub-2",
-        studentName: "Brian Lee",
-        studentId: "S002",
-        status: "submitted",
-        submittedAt: "2026-05-30 09:05",
-        filePlaceholder: "brian-project.zip",
-      },
-      {
-        id: "sub-3",
-        studentName: "Carla Mendes",
-        studentId: "S003",
-        status: "not_submitted",
-      },
-      {
-        id: "sub-4",
-        studentName: "David Kim",
-        studentId: "S004",
-        status: "marked",
-        submittedAt: "2026-05-29 16:45",
-        marks: 85,
-        grade: "B+",
-        feedback: "Good structure, consider improving UI.",
-        filePlaceholder: "david-project.zip",
-      },
-    ],
-  },
-];
-
-function getStatusBadgeClasses(status: Submission["status"]) {
-  switch (status) {
-    case "submitted":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-    case "marked":
-      return "bg-green-50 text-green-700 border-green-200";
-    case "not_submitted":
-    default:
-      return "bg-gray-50 text-gray-600 border-gray-200";
-  }
-}
-
-function getGradeFromMarks(marks: number, maxMarks: number): string {
-  if (!Number.isFinite(marks) || maxMarks <= 0) return "";
-  const percentage = (marks / maxMarks) * 100;
-
-  if (percentage >= 85) return "A";
-  if (percentage >= 75) return "B";
-  if (percentage >= 55) return "C";
-  if (percentage >= 36) return "S";
-  return "F";
-}
-
-function getEffectiveGrade(
-  marks: number,
-  assignment: AssignmentDetails,
-  submission: Submission,
-): string {
-  const base = getGradeFromMarks(marks, assignment.maxMarks);
-
-  const dueDateString = assignment.dueDate;
-  let isLate = false;
-  if (submission.submittedAt) {
-    const submitted = new Date(submission.submittedAt);
-    const due = new Date(dueDateString);
-    if (!Number.isNaN(submitted.getTime()) && !Number.isNaN(due.getTime())) {
-      isLate = submitted.getTime() > due.getTime();
-    }
-  }
-
-  const isResubmission = !!submission.canResubmit && base !== "F";
-
-  if ((isLate || isResubmission) && base !== "F") {
-    return "S";
-  }
-
-  return base;
-}
-
-export default function AdminAssignmentSubmissionsPage() {
-  const params = useParams<{ assignmentId: string }>();
+export default function AssignmentDetails() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const assignmentId = params?.assignmentId;
+  const params = useParams();
+  const assignmentId = params.assignmentId as string;
+  
+  const [loading, setLoading] = useState(true);
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [filter, setFilter] = useState<string>("all");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const initialAssignment = useMemo(
-    () =>
-      mockAssignments.find((a) => a.id === assignmentId) ?? mockAssignments[0],
-    [assignmentId],
-  );
+  // Grading Modal State
+  const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [gradeData, setGradeData] = useState({
+    mark: "",
+    grade: "",
+    feedback: "",
+  });
 
-  const [assignment, setAssignment] = useState<AssignmentDetails | null>(
-    initialAssignment,
-  );
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState<
-    string | null
-  >(searchParams?.get("submissionId") ?? null);
-  const [filter, setFilter] = useState<
-    "submitted" | "not_submitted" | "marked" | "resubmission"
-  >("submitted");
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isMobileMarkingModalOpen, setIsMobileMarkingModalOpen] =
-    useState(false);
+  useEffect(() => {
+    if (!assignmentId) return;
 
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (selectedSubmissionId) {
-      params.set("submissionId", selectedSubmissionId);
-      router.replace(`?${params.toString()}`, { scroll: false });
-    } else {
-      params.delete("submissionId");
-      router.replace(
-        selectedSubmissionId === null
-          ? window.location.pathname
-          : `?${params.toString()}`,
-        { scroll: false },
-      );
+    let isSubscribed = false;
+
+    const setupSubscription = async () => {
+      try {
+        await pb.collection("assignment_submissions").subscribe("*", (e) => {
+          if (e.record.assignment === assignmentId) {
+            fetchData();
+          }
+        });
+        isSubscribed = true;
+      } catch (error) {
+        console.error("Realtime subscription failed:", error);
+      }
+    };
+
+    fetchData();
+    setupSubscription();
+
+    return () => {
+      if (isSubscribed) {
+        pb.collection("assignment_submissions").unsubscribe("*").catch(err => {
+          console.error("Failed to unsubscribe:", err);
+        });
+      }
+    };
+  }, [assignmentId]);
+
+  const fetchData = async () => {
+    try {
+      const assignmentRecord = await pb.collection("assignments").getOne(assignmentId, {
+        expand: "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
+      });
+      console.log("Fetched assignment details with subject:", assignmentRecord.expand?.course_subject?.expand?.subject);
+
+      const submissionsRecords = await pb.collection("assignment_submissions").getFullList({
+        filter: `assignment = "${assignmentId}"`,
+        expand: "student",
+        sort: "-submitted_at",
+      });
+
+      setAssignment(assignmentRecord as any);
+      setSubmissions(submissionsRecords as any);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching assignment details:", error);
+      toast.error("Failed to load assignment data");
+      router.push("/dashboard/admin/assignments");
     }
-  }, [selectedSubmissionId, router]);
-
-  const stats = useMemo(() => {
-    if (!assignment)
-      return { total: 0, submitted: 0, notSubmitted: 0, marked: 0 };
-    const total = assignment.submissions.length;
-    const submitted = assignment.submissions.filter(
-      (s) => s.status === "submitted" || s.status === "marked",
-    ).length;
-    const marked = assignment.submissions.filter(
-      (s) => s.status === "marked",
-    ).length;
-    const notSubmitted = assignment.submissions.filter(
-      (s) => s.status === "not_submitted",
-    ).length;
-
-    return { total, submitted, notSubmitted, marked };
-  }, [assignment]);
-
-  const handleExportMarksheet = () => {
-    if (!assignment) return;
-
-    const headers = [
-      "Student Name",
-      "Student ID",
-      "Status",
-      "Submitted At",
-      "Marks",
-      "Grade",
-      "Can Resubmit",
-    ];
-
-    const rows = assignment.submissions.map((s) => [
-      s.studentName,
-      s.studentId,
-      s.status.replace("_", " "),
-      s.submittedAt ?? "",
-      s.marks != null ? String(s.marks) : "",
-      s.grade ?? "",
-      s.canResubmit ? "Yes" : "No",
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((field) => {
-            const value = field.replace(/"/g, '""');
-            return `"${value}"`;
-          })
-          .join(","),
-      )
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    const safeTitle = assignment.title.replace(/[^a-z0-9]+/gi, "-");
-    link.download = `${safeTitle || "marksheet"}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
-  const filteredSubmissions = useMemo(() => {
-    if (!assignment) return [];
-    if (filter === "resubmission") {
-      return assignment.submissions.filter((s) => s.canResubmit);
-    }
-    return assignment.submissions.filter((s) => s.status === filter);
-  }, [assignment, filter]);
-
-  const selectedSubmission = assignment?.submissions.find(
-    (s) => s.id === selectedSubmissionId,
-  );
-
-  const [marksInput, setMarksInput] = useState<string>(
-    selectedSubmission?.marks != null ? String(selectedSubmission.marks) : "",
-  );
-  const [gradeInput, setGradeInput] = useState<string>(
-    selectedSubmission?.grade ?? "",
-  );
-  const [feedbackInput, setFeedbackInput] = useState<string>(
-    selectedSubmission?.feedback ?? "",
-  );
-
-  React.useEffect(() => {
-    setGradeInput(selectedSubmission?.grade ?? "");
-    setFeedbackInput(selectedSubmission?.feedback ?? "");
-    setMarksInput(
-      selectedSubmission?.marks != null ? String(selectedSubmission.marks) : "",
-    );
-  }, [selectedSubmission?.id]);
-
-  const hasValidMarks = React.useMemo(() => {
-    if (!assignment) return false;
-    const raw = marksInput.trim();
-    if (!raw) return false;
-    const numeric = Number(raw);
-    if (!Number.isFinite(numeric)) return false;
-    if (numeric < 0) return false;
-    if (numeric > assignment.maxMarks) return false;
-    return true;
-  }, [marksInput, assignment]);
-
-  const gradePercentageLabel = React.useMemo(() => {
-    if (!assignment) return "0.0%";
-    const numeric = Number(marksInput);
-    if (!Number.isFinite(numeric) || assignment.maxMarks <= 0) return "0.0%";
-    const pct = (numeric / assignment.maxMarks) * 100;
-    return `${pct.toFixed(1)}%`;
-  }, [marksInput, assignment]);
-
-  const handleSave = (grade: string, feedback: string) => {
+  const handleGradeSubmission = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!selectedSubmission) return;
-    if (!hasValidMarks) return;
 
-    setAssignment((prev) => {
-      if (!prev) return prev;
-      const numericMarks = Number(marksInput);
-      const safeMarks = Number.isFinite(numericMarks)
-        ? numericMarks
-        : undefined;
-      const autoGrade =
-        safeMarks != null
-          ? getEffectiveGrade(safeMarks, prev, selectedSubmission)
-          : grade || undefined;
-      const isFail = autoGrade === "F";
-      const updated = prev.submissions.map((s) =>
-        s.id === selectedSubmission.id
-          ? {
-              ...s,
-              marks: safeMarks,
-              grade: autoGrade || undefined,
-              feedback: feedback || undefined,
-              status: "marked" as const,
-              canResubmit: isFail,
-            }
-          : s,
-      );
-      return { ...prev, submissions: updated };
-    });
+    try {
+      await pb.collection("assignment_submissions").update(selectedSubmission.id, {
+        mark: gradeData.mark,
+        grade: gradeData.grade,
+        feedback: gradeData.feedback,
+        evaluation_status: "marked",
+        marked_at: new Date().toISOString(),
+        marked_by: pb.authStore.model?.id,
+      });
+
+      toast.success("Submission graded successfully!");
+      setIsGradeModalOpen(false);
+      setSelectedSubmission(null);
+      setGradeData({ mark: "", grade: "", feedback: "" });
+      fetchData();
+    } catch (error) {
+      console.error("Error grading submission:", error);
+      toast.error("Failed to submit grade");
+    }
   };
 
-  if (!assignment) {
+  const filteredSubmissions = submissions.filter((submission) => {
+    const studentName = submission.expand?.student?.name || "";
+    const matchesSearch = studentName.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (filter === "pending") return submission.evaluation_status === "pending";
+    if (filter === "marked") return submission.evaluation_status === "marked";
+    if (filter === "late") return submission.submission_status === "due-passed";
+    return true;
+  });
+
+  const stats = {
+    total: submissions.length,
+    pending: submissions.filter(s => s.evaluation_status === "pending").length,
+    marked: submissions.filter(s => s.evaluation_status === "marked").length,
+    late: submissions.filter(s => s.submission_status === "due-passed").length,
+  };
+
+  if (loading || !assignment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-xl shadow-md p-6 max-w-md w-full text-center border border-gray-200">
-          <h1 className="text-lg font-semibold text-gray-900 mb-2">
-            Assignment not found
-          </h1>
-          <Button onClick={() => router.back()}>Back to Dashboard</Button>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 uppercase tracking-widest font-black text-[10px] text-gray-400">
+        <div className="text-center">
+            <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            Synchronizing Records...
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-2 md:px-6 md:py-3 pt-8 relative">
-      <AdminBreadcrumbs
-        items={[
-          { label: "Assignments", href: "/dashboard/admin/assignments" },
-          { label: assignment?.title || "Assignment" },
-        ]}
+    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans text-gray-900">
+      <AdminSidebar 
+        isSidebarOpen={isSidebarOpen} 
+        setIsSidebarOpen={setIsSidebarOpen} 
+        adminName={pb.authStore.model?.name}
+        onLogout={() => {
+          logout();
+          router.push("/");
+        }}
       />
-      <div className="max-w-6xl mx-auto space-y-4">
-        <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-          <DialogContent className="sm:max-w-4xl h-[80vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>{assignment.title}</DialogTitle>
-              <DialogDescription>
-                {assignment.subjectCode} · {assignment.subjectName} · Due:{" "}
-                {assignment.dueDate}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2 border rounded-md overflow-hidden bg-gray-50">
-                {assignment.assignmentSheetUrl ? (
-                  <iframe
-                    src={assignment.assignmentSheetUrl}
-                    className="w-full h-full border-0"
-                    title="Assignment sheet"
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-sm text-gray-500">
-                    Preview not available
+      
+      <main className="p-4 md:p-6 lg:p-8 space-y-8">
+        {/* Navigation & Header */}
+        <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+                <FileText size={40} />
+              </div>
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight uppercase">
+                    {assignment.title}
+                  </h1>
+                  <Badge className="bg-indigo-50 text-indigo-600 border-none px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                    {assignment.expand?.course_subject?.expand?.course_intake?.expand?.intake?.code}
+                  </Badge>
+                </div>
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <BookOpen size={14} className="text-indigo-400" />
+                  {assignment.expand?.course_subject?.expand?.course_intake?.expand?.course?.name} — {assignment.expand?.course_subject?.expand?.subject?.name || assignment.expand?.course_subject?.expand?.subject?.[0]?.name}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-2">
+                 <div className="text-right">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Assigned Marker</p>
+                    <p className="text-sm font-black text-gray-900 uppercase tracking-tight">{assignment.expand?.marker?.name || "Unassigned"}</p>
+                 </div>
+                 <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-black text-xs">
+                    {assignment.expand?.marker?.name?.charAt(0).toUpperCase() || "?"}
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <StatsCarousel
+            stats={[
+              {
+                title: "Total Submissions",
+                value: stats.total,
+                icon: FileText,
+                bgColor: "bg-blue-50",
+                iconColor: "text-blue-600",
+              },
+              {
+                title: "Pending Marking",
+                value: stats.pending,
+                icon: Clock,
+                bgColor: "bg-orange-50",
+                iconColor: "text-orange-600",
+              },
+              {
+                title: "Marked Records",
+                value: stats.marked,
+                icon: CheckCircle,
+                bgColor: "bg-green-50",
+                iconColor: "text-green-600",
+              },
+              {
+                title: "Late Turn-ins",
+                value: stats.late,
+                icon: AlertCircle,
+                bgColor: "bg-red-50",
+                iconColor: "text-red-600",
+              },
+            ]}
+          />
+        </div>
+
+        {/* Filters & Table */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-4">
+            <AdminActionBar
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              searchPlaceholder="Search student name..."
+              action={
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: "all", label: "ALL", color: "indigo" },
+                    { id: "pending", label: "PENDING", color: "orange" },
+                    { id: "marked", label: "MARKED", color: "green" },
+                    { id: "late", label: "LATE", color: "red" },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setFilter(t.id)}
+                      className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap ${
+                        filter === t.id
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                          : "text-gray-400 bg-gray-50 hover:bg-gray-100"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              }
+            />
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-6 duration-1000">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50/50 border-b border-gray-50">
+                    <th className="px-10 py-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Student Identity</th>
+                    <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">Timestamps</th>
+                    <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">Sub. Status</th>
+                    <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">Eval. Status</th>
+                    <th className="px-10 py-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">Grade</th>
+                    <th className="px-10 py-6 text-right text-[10px] font-black uppercase tracking-widest text-gray-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredSubmissions.map((submission) => (
+                    <tr key={submission.id} className="hover:bg-gray-50/30 transition-colors group/row">
+                      <td className="px-10 py-6 text-left">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs shadow-sm">
+                            {submission.expand?.student?.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-gray-900 uppercase tracking-tight line-clamp-1">{submission.expand?.student?.name}</span>
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">ID: {submission.expand?.student?.id?.slice(-6).toUpperCase()}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-10 py-6">
+                        <div className="flex flex-col items-center">
+                          <span className="text-[10px] font-black text-gray-900 uppercase tracking-tight">{new Date(submission.submitted_at).toLocaleDateString("en-GB")}</span>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{new Date(submission.submitted_at).toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </td>
+                      <td className="px-10 py-6 text-center">
+                        <Badge className={cn(
+                          "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border-none pointer-events-none mx-auto",
+                          submission.submission_status === "on-time" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                        )}>
+                          {submission.submission_status}
+                        </Badge>
+                      </td>
+                      <td className="px-10 py-6 text-center">
+                        <Badge className={cn(
+                          "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border-none pointer-events-none mx-auto",
+                          submission.evaluation_status === "marked" ? "bg-blue-50 text-blue-600" : "bg-orange-50 text-orange-600"
+                        )}>
+                          {submission.evaluation_status}
+                        </Badge>
+                      </td>
+                      <td className="px-10 py-6 text-center">
+                        {submission.mark ? (
+                          <div className="flex flex-col items-center leading-tight">
+                            <span className="text-sm font-black text-gray-900">{submission.grade}</span>
+                            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">{submission.mark}/{assignment.total_marks || 100}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest italic mx-auto">Pending</span>
+                        )}
+                      </td>
+                      <td className="px-10 py-6">
+                        <div className="flex items-center justify-end gap-2 pr-2 opacity-40 group-hover/row:opacity-100 transition-opacity">
+                          {submission.file && (
+                            <a
+                              href={pb.files.getURL(submission, submission.file)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2.5 bg-white border border-gray-100 rounded-xl text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                              title="Download Submission"
+                            >
+                              <Download size={14} />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedSubmission(submission);
+                              setGradeData({
+                                mark: submission.mark?.toString() || "",
+                                grade: submission.grade || "",
+                                feedback: submission.feedback || "",
+                              });
+                              setIsGradeModalOpen(true);
+                            }}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                          >
+                            <CheckCircle size={14} />
+                            Grade
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredSubmissions.length === 0 && (
+              <div className="text-center py-24 bg-gray-50/30">
+                <div className="w-20 h-20 bg-gray-100 rounded-[2rem] flex items-center justify-center text-gray-300 mx-auto mb-6">
+                  <Search size={40} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">No submissions found</h3>
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">Try adjusting your filters or search query</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Grading Modal */}
+        <Dialog open={isGradeModalOpen} onOpenChange={setIsGradeModalOpen}>
+          <DialogContent className="sm:max-w-[500px] w-[95vw] bg-white rounded-[2rem] p-0 border-none shadow-2xl">
+            <div className="p-8 space-y-8">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-4 text-left">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black shadow-lg shadow-indigo-100">
+                    <CheckCircle size={20} />
                   </div>
-                )}
-              </div>
-              <div className="border rounded-md bg-white p-4 text-sm text-gray-700 space-y-2">
-                <h3 className="font-semibold text-gray-900 text-base">
-                  Instructions
-                </h3>
-                <p>{assignment.description}</p>
-              </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight leading-none">Grade Submission</h2>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Evaluate student performance and provide feedback</p>
+                  </div>
+                </DialogTitle>
+              </DialogHeader>
+
+              {selectedSubmission && (
+                <div className="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-600 font-black text-xs shadow-sm capitalize">
+                      {selectedSubmission.expand?.student?.name?.charAt(0)}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-gray-900 uppercase tracking-tight">{selectedSubmission.expand?.student?.name}</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Marking Criteria: {assignment.total_marks || 100} Points Max</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleGradeSubmission} className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Awarded Mark</Label>
+                    <div className="relative">
+                      <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                      <Input
+                        type="number"
+                        required
+                        max={assignment.total_marks}
+                        placeholder="0"
+                        value={gradeData.mark}
+                        onChange={(e) => setGradeData({ ...gradeData, mark: e.target.value })}
+                        className="h-14 pl-12 rounded-[1.2rem] border-gray-100 bg-gray-50/50 font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Final Grade</Label>
+                    <Select required value={gradeData.grade} onValueChange={(val) => setGradeData({ ...gradeData, grade: val })}>
+                      <SelectTrigger className="h-14 rounded-[1.2rem] border-gray-100 bg-gray-50/50 font-bold">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-gray-100 shadow-2xl">
+                        {["A", "B", "C", "S", "F"].map((g) => (
+                          <SelectItem key={g} value={g} className="font-bold">Grade {g}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Constructive Feedback</Label>
+                  <Textarea
+                    placeholder="Provide detailed feedback for the student..."
+                    value={gradeData.feedback}
+                    onChange={(e) => setGradeData({ ...gradeData, feedback: e.target.value })}
+                    className="min-h-[120px] rounded-[1.5rem] border-gray-100 bg-gray-50/50 font-bold focus:bg-white resize-none p-6"
+                  />
+                </div>
+
+                <div className="pt-6 border-t border-gray-50 flex gap-3">
+                  <Button type="button" variant="ghost" onClick={() => setIsGradeModalOpen(false)} className="flex-1 py-6 rounded-[1.2rem] font-black text-[10px] uppercase tracking-widest text-gray-400">CANCEL</Button>
+                  <Button type="submit" className="flex-[2] py-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 transition-all active:scale-95">SUBMIT EVALUATION</Button>
+                </div>
+              </form>
             </div>
           </DialogContent>
         </Dialog>
-
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 mt-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full shadow-sm"
-              onClick={() => router.back()}
-            >
-              <ArrowLeft size={18} />
-            </Button>
-            <div>
-              <h1 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight">
-                {assignment.title}
-              </h1>
-              <p className="text-sm font-bold text-indigo-600 uppercase tracking-wider">
-                {assignment.subjectCode} — {assignment.subjectName}
-              </p>
-              <p className="text-xs font-medium text-gray-500 mt-0.5">
-                {assignment.courseName} · Intake: {assignment.intakeName}
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden md:flex border-emerald-600 text-emerald-700 hover:bg-emerald-50"
-            onClick={handleExportMarksheet}
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Export Marks
-          </Button>
-        </div>
-
-        {/* Stats & Filters */}
-        <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
-            <div className="text-center md:text-left">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Total Students
-              </p>
-              <p className="text-lg font-black text-gray-900">{stats.total}</p>
-            </div>
-            <div className="h-8 w-px bg-gray-100 hidden md:block" />
-            <div className="text-center md:text-left">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Submitted
-              </p>
-              <p className="text-lg font-black text-emerald-600">
-                {stats.submitted}
-              </p>
-            </div>
-            <div className="h-8 w-px bg-gray-100 hidden md:block" />
-            <div className="text-center md:text-left">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Marked
-              </p>
-              <p className="text-lg font-black text-indigo-600">
-                {stats.marked}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: "submitted", label: "Submitted", icon: Clock },
-              { id: "not_submitted", label: "Pending", icon: X },
-              { id: "marked", label: "Marked", icon: CheckCircle2 },
-              { id: "resubmission", label: "Resubmits", icon: RotateCcw },
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
-                  filter === f.id
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                    : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                <f.icon size={14} />
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* List */}
-          <div className="md:col-span-1 space-y-4">
-            <div
-              className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl shadow-indigo-100 cursor-pointer hover:scale-[1.02] transition-transform"
-              onClick={() => setIsSheetOpen(true)}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-white/20 rounded-xl">
-                  <FileText size={20} />
-                </div>
-                <p className="font-bold text-sm">Assignment Info</p>
-              </div>
-              <p className="text-[10px] opacity-80 leading-relaxed font-medium">
-                View original assignment sheet and marking instructions.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-50 bg-gray-50/50">
-                <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest">
-                  Submissions
-                </h2>
-              </div>
-              <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y divide-gray-50">
-                {filteredSubmissions.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      setSelectedSubmissionId(s.id);
-                      if (window.innerWidth < 768)
-                        setIsMobileMarkingModalOpen(true);
-                    }}
-                    className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${selectedSubmissionId === s.id ? "bg-indigo-50/50" : ""}`}
-                  >
-                    <p className="text-sm font-bold text-gray-900">
-                      {s.studentName}
-                    </p>
-                    <p className="text-[10px] text-gray-500 font-bold mb-2">
-                      ID: {s.studentId}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border-2 ${getStatusBadgeClasses(s.status)}`}
-                      >
-                        {s.status.replace("_", " ")}
-                      </span>
-                      {s.grade && (
-                        <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
-                          {s.grade}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-                {filteredSubmissions.length === 0 && (
-                  <div className="p-8 text-center text-xs text-gray-400 font-bold italic">
-                    No submissions found
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Marking Area */}
-          <div className="md:col-span-3 hidden md:block">
-            {selectedSubmission ? (
-              <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden h-fit">
-                <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black">
-                      {selectedSubmission.studentName.charAt(0)}
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-black text-gray-900 uppercase tracking-tight">
-                        {selectedSubmission.studentName}
-                      </h2>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        STUDENT ID: {selectedSubmission.studentId}
-                      </p>
-                    </div>
-                  </div>
-                  {selectedSubmission.status === "marked" && (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-2xl border-2 border-emerald-100">
-                      <CheckCircle2 size={16} className="text-emerald-500" />
-                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
-                        Marked
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Preview */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                        Submission Preview
-                      </h3>
-                      {selectedSubmission.fileUrl && (
-                        <a
-                          href={selectedSubmission.fileUrl}
-                          target="_blank"
-                          className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
-                        >
-                          Full Window
-                        </a>
-                      )}
-                    </div>
-                    <div className="bg-gray-100 rounded-3xl overflow-hidden aspect-[4/3] border-4 border-gray-50 shadow-inner flex items-center justify-center relative group">
-                      {selectedSubmission.fileUrl ? (
-                        <iframe
-                          src={selectedSubmission.fileUrl}
-                          className="w-full h-full border-0"
-                        />
-                      ) : (
-                        <div className="text-center p-8">
-                          <FileText
-                            size={48}
-                            className="text-gray-300 mx-auto mb-4"
-                          />
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                            {selectedSubmission.filePlaceholder ||
-                              "No file uploaded"}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Grading */}
-                  <div className="space-y-6">
-                    <div className="p-6 bg-gray-50/50 rounded-3xl border border-gray-100 space-y-4 shadow-sm">
-                      <h4 className="font-black text-indigo-600 uppercase text-xs tracking-widest border-b border-gray-100 pb-3">
-                        Grading System
-                      </h4>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1">
-                            Marks ( / {assignment.maxMarks})
-                          </label>
-                          <input
-                            type="number"
-                            value={marksInput}
-                            onChange={(e) => setMarksInput(e.target.value)}
-                            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
-                          />
-                        </div>
-                        <div className="flex flex-col justify-end">
-                          <div className="flex items-center justify-between px-4 py-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
-                            <p className="text-[10px] font-black uppercase opacity-60">
-                              Result
-                            </p>
-                            <p className="text-lg font-black">
-                              {gradeInput || "—"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1">
-                          Feedback
-                        </label>
-                        <textarea
-                          rows={4}
-                          value={feedbackInput}
-                          onChange={(e) => setFeedbackInput(e.target.value)}
-                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium resize-none"
-                          placeholder="Your private feedback..."
-                        />
-                      </div>
-
-                      <div className="flex gap-3 pt-2">
-                        <button
-                          onClick={() => {
-                            setMarksInput(
-                              selectedSubmission.marks?.toString() || "",
-                            );
-                            setFeedbackInput(selectedSubmission.feedback || "");
-                          }}
-                          className="flex-1 py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest bg-white border-2 border-gray-100 text-gray-400 hover:bg-gray-50 transition-all"
-                        >
-                          Reset
-                        </button>
-                        <button
-                          disabled={!hasValidMarks}
-                          onClick={() => handleSave(gradeInput, feedbackInput)}
-                          className={`flex-[2] py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 ${
-                            hasValidMarks
-                              ? "bg-indigo-600 text-white shadow-indigo-100"
-                              : "bg-gray-100 text-gray-300 pointer-events-none"
-                          }`}
-                        >
-                          Update Grade
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-[40px] border border-gray-100 border-dashed p-20 text-center">
-                <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Clock className="text-gray-300" size={40} />
-                </div>
-                <h3 className="text-lg font-black text-gray-900 mb-2 uppercase tracking-tight">
-                  Select a Submission
-                </h3>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
-                  Choose a student from the left sidebar to start seeing their
-                  work and grading.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Modal */}
-      <ModernModal
-        open={isMobileMarkingModalOpen}
-        onOpenChange={setIsMobileMarkingModalOpen}
-        title={selectedSubmission?.studentName ?? ""}
-        subtitle={
-          selectedSubmission ? `ID: ${selectedSubmission.studentId}` : ""
-        }
-        avatarChar={selectedSubmission?.studentName.charAt(0)}
-      >
-        {selectedSubmission && (
-          <div className="space-y-4">
-            {selectedSubmission.fileUrl && (
-              <div className="bg-gray-100 rounded-3xl overflow-hidden aspect-video border-4 border-gray-50 shadow-inner">
-                <iframe
-                  src={selectedSubmission.fileUrl}
-                  className="w-full h-full border-0"
-                />
-              </div>
-            )}
-
-            <div className="p-6 bg-gray-50/50 rounded-3xl border border-gray-100 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1">
-                  Marks
-                </label>
-                <input
-                  type="number"
-                  value={marksInput}
-                  onChange={(e) => setMarksInput(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1">
-                  Feedback
-                </label>
-                <textarea
-                  rows={3}
-                  value={feedbackInput}
-                  onChange={(e) => setFeedbackInput(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-medium"
-                />
-              </div>
-              <button
-                disabled={!hasValidMarks}
-                onClick={() => {
-                  handleSave(gradeInput, feedbackInput);
-                  setIsMobileMarkingModalOpen(false);
-                }}
-                className="w-full py-4 rounded-2xl font-bold bg-indigo-600 text-white shadow-xl shadow-indigo-100"
-              >
-                SAVE GRADE
-              </button>
-            </div>
-          </div>
-        )}
-      </ModernModal>
+      </main>
     </div>
   );
 }

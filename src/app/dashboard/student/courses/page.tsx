@@ -86,6 +86,7 @@ export default function CoursesPage() {
         const certMap: Record<string, string> = {
           pending: "Pending",
           applied: "Applied",
+          processing: "Processing",
           delivered: "Issued",
         };
         const certificateStatus =

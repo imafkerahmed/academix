@@ -163,6 +163,7 @@ export default function CoursePage() {
       const certMap: Record<string, string> = {
         pending: "Pending",
         applied: "Applied",
+        processing: "Processing",
         delivered: "Issued",
       };
       const certificateStatus =
@@ -342,7 +343,9 @@ export default function CoursePage() {
             className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-none ${
               course.certificateStatus.toLowerCase() === "issued"
                 ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-100"
-                : "bg-gray-100 text-gray-500 hover:bg-gray-100"
+                : course.certificateStatus.toLowerCase() === "processing"
+                  ? "bg-violet-100 text-violet-700 hover:bg-violet-100"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-100"
             }`}
           >
             {course.certificateStatus}

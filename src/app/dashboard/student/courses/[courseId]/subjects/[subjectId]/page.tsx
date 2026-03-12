@@ -13,8 +13,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { RouteLink } from "@/components/ui/route-link";
 import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Download } from "lucide-react";
 import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 export default function SubjectPage() {
   const params = useParams();
@@ -144,12 +145,12 @@ export default function SubjectPage() {
         room: "",
         description: subjectRecord.description || "",
         attendance: { present: 0, total: 0, percentage: 0 },
-        assignments: [],
+        assignments: [], // Will be filled below
         materials: studyMaterials.map((m) => ({
           id: m.id,
           title: m.title,
           type: m.type || "document",
-          url: m.file ? pb.files.getUrl(m, m.file) : m.video_url || "",
+          url: m.file ? pb.files.getURL(m, m.file) : m.video_url || "",
           uploadedAt: m.created,
           description: m.description || "",
         })),
@@ -157,13 +158,87 @@ export default function SubjectPage() {
           id: m.id,
           title: m.title,
           type: m.type,
-          url: m.video_url || (m.file ? pb.files.getUrl(m, m.file) : ""),
+          url: m.video_url || (m.file ? pb.files.getURL(m, m.file) : ""),
           duration: m.duration || "",
           thumbnail: "",
           description: m.description || "",
           uploadedAt: m.created,
         })),
       });
+
+      // Fetch assignments for these course_subjects
+      if (courseSubjectIds.length > 0) {
+        try {
+          const filterParts = courseSubjectIds.map((id) => `course_subject = "${id}"`);
+          const assignmentFilter = `(${filterParts.join(" || ")})`;
+
+          console.log("Fetching assignments for subjects:", courseSubjectIds);
+          const assignments = await pb.collection("assignments").getFullList({
+            filter: assignmentFilter,
+            expand: "marker",
+            sort: "-due_date",
+          });
+          console.log("Assignments found:", assignments.length);
+
+          // Fetch submissions for these assignments for the current student
+          const studentId = pb.authStore.model?.id;
+          let submissions: any[] = [];
+          
+          if (assignments.length > 0 && studentId) {
+            const assignmentIds = assignments.map(a => `assignment = "${a.id}"`);
+            const submissionFilter = `student = "${studentId}" && (${assignmentIds.join(" || ")})`;
+            submissions = await pb.collection("assignment_submissions").getFullList({
+              filter: submissionFilter,
+            });
+          }
+
+          // Map assignments to the format expected by the UI
+          const mappedAssignments = assignments.map((a) => {
+            const submission = submissions.find((s) => s.assignment === a.id);
+            const now = new Date();
+            const dueDate = new Date(a.due_date);
+            const isClosed = !a.open_after_due && now > dueDate;
+
+            return {
+              id: a.id,
+              title: a.title,
+              description: a.description,
+              rules: "Please follow all academic integrity guidelines. Submit your work in PDF or DOCX format. Late submissions may be penalized.",
+              dueDate: a.due_date,
+              unlockDate: a.opens_at || a.issued_at || a.created,
+              totalMarks: a.total_marks,
+              markingLecturer: a.expand?.marker?.name || "TBA",
+              status: submission
+                ? submission.evaluation_status === "marked"
+                  ? "Graded"
+                  : "Submitted"
+                : "Not Started",
+              grade: submission
+                ? submission.evaluation_status === "marked"
+                  ? submission.mark
+                    ? `${submission.mark}/${a.total_marks || 100}`
+                    : submission.grade
+                  : "Pending"
+                : "-",
+              submittedDate: submission?.submitted_at,
+              submittedFile: submission?.file,
+              isLate: submission?.submission_status === "due-passed",
+              assignmentSheet: a.file ? pb.files.getURL(a, a.file) : null,
+              submissionId: submission?.id,
+              submissionRecord: submission,
+              isClosed: isClosed
+            };
+          });
+
+          console.log("Mapped assignments:", mappedAssignments);
+          setSubject((prev: any) => ({
+            ...prev,
+            assignments: mappedAssignments,
+          }));
+        } catch (e) {
+          console.log("Could not fetch assignments:", e);
+        }
+      }
     } catch (error) {
       console.error("Error fetching subject:", error);
       setSubject(null);
@@ -336,62 +411,61 @@ export default function SubjectPage() {
   };
 
   // Handle assignment submission
-  const handleSubmitAssignment = () => {
+  const handleSubmitAssignment = async () => {
     if (!uploadedFile || !selectedAssignment) return;
 
-    // Check if assignment is closed
-    if (selectedAssignment.isClosed) {
-      alert("This assignment is closed and no longer accepts submissions.");
-      return;
-    }
+    try {
+      setLoading(true);
+      const studentId = pb.authStore.model?.id;
+      if (!studentId) {
+        toast.error("User not authenticated");
+        return;
+      }
 
-    // Update the assignment status (in real app, this would be an API call)
-    const today = new Date();
-    const submittedDate = today.toISOString();
+      const data = new FormData();
+      data.append("assignment", selectedAssignment.id);
+      data.append("student", studentId);
+      data.append("file", uploadedFile);
+      data.append("submitted_at", new Date().toISOString());
 
-    // Initialize submission history if it doesn't exist
-    if (!selectedAssignment.submissionHistory) {
-      selectedAssignment.submissionHistory = [];
-    }
-
-    // Check if this is a replacement before grading
-    const isReplacement =
-      selectedAssignment.status === "Submitted" &&
-      (selectedAssignment.grade === "Pending" ||
-        selectedAssignment.grade === "-");
-
-    // Add to submission history
-    const newSubmission = {
-      submittedDate: submittedDate,
-      fileName: uploadedFile.name,
-      version: selectedAssignment.submissionHistory.length + 1,
-      isReplacement: isReplacement,
-    };
-    selectedAssignment.submissionHistory.push(newSubmission);
-
-    // Update assignment details
-    selectedAssignment.status = "Submitted";
-    selectedAssignment.grade = "Pending";
-    selectedAssignment.submittedDate = submittedDate;
-    selectedAssignment.submittedFile = uploadedFile.name;
-    selectedAssignment.isLate = new Date(selectedAssignment.dueDate) < today;
-
-    // Set success message based on action
-    if (isReplacement) {
-      setSuccessMessage(
-        "File replaced successfully! Your new submission will be reviewed by the instructor.",
+      // Determine submission status
+      const dueDate = new Date(selectedAssignment.dueDate);
+      const now = new Date();
+      data.append(
+        "submission_status",
+        now > dueDate ? "due-passed" : "on-time",
       );
-    } else {
-      setSuccessMessage(
-        "Assignment submitted successfully! Your submission will be reviewed by the instructor shortly.",
-      );
-    }
+      data.append("evaluation_status", "pending");
 
-    // Close assignment modal and show success
-    setShowAssignmentModal(false);
-    setSelectedAssignment(null);
-    setUploadedFile(null);
-    setShowSuccessModal(true);
+      if (selectedAssignment.submissionId) {
+        // Update existing submission
+        await pb
+          .collection("assignment_submissions")
+          .update(selectedAssignment.submissionId, data);
+        setSuccessMessage(
+          "File replaced successfully! Your new submission will be reviewed by the instructor.",
+        );
+      } else {
+        // Create new submission
+        await pb.collection("assignment_submissions").create(data);
+        setSuccessMessage(
+          "Assignment submitted successfully! Your submission will be reviewed by the instructor shortly.",
+        );
+      }
+
+      setShowAssignmentModal(false);
+      setSelectedAssignment(null);
+      setUploadedFile(null);
+      setShowSuccessModal(true);
+
+      // Refresh data
+      await fetchSubjectData();
+    } catch (error) {
+      console.error("Error submitting assignment:", error);
+      toast.error("Failed to submit assignment. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle animation mount/unmount
@@ -1054,7 +1128,12 @@ export default function SubjectPage() {
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
                   Assignment File
                 </h3>
-                <button className="flex items-center gap-2 md:gap-3 p-3 md:p-4 border-2 border-gray-200 rounded-lg hover:bg-gray-50 transition-colors w-full">
+                <a 
+                  href={selectedAssignment.assignmentSheet}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 md:gap-3 p-3 md:p-4 border-2 border-gray-200 rounded-lg hover:bg-gray-50 transition-colors w-full"
+                >
                   <div className="w-10 h-10 md:w-12 md:h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <svg
                       className="w-5 h-5 md:w-6 md:h-6 text-red-600"
@@ -1070,27 +1149,14 @@ export default function SubjectPage() {
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <p className="text-sm md:text-base font-semibold text-gray-900 truncate">
-                      {selectedAssignment.assignmentSheet ||
-                        selectedAssignment.assignmentFile}
+                      {selectedAssignment.title} — Assignment Brief
                     </p>
                     <p className="text-xs md:text-sm text-gray-500">
-                      Click to download
+                      Click to download reference material
                     </p>
                   </div>
-                  <svg
-                    className="w-5 h-5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                </button>
+                  <Download className="w-5 h-5 text-gray-400" />
+                </a>
               </div>
 
               {/* Submission Section */}
@@ -1243,7 +1309,12 @@ export default function SubjectPage() {
                           </Badge>
                         )}
                       </div>
-                      <button className="flex items-center gap-2 md:gap-3 p-3 bg-white border border-green-200 rounded-lg hover:bg-green-50 transition-colors w-full">
+                      <a 
+                        href={selectedAssignment.submissionRecord ? pb.files.getURL(selectedAssignment.submissionRecord, selectedAssignment.submittedFile) : "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 md:gap-3 p-3 bg-white border border-green-200 rounded-lg hover:bg-green-50 transition-colors w-full"
+                      >
                         <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
                           <svg
                             className="w-5 h-5 text-green-600"
@@ -1262,23 +1333,11 @@ export default function SubjectPage() {
                             {selectedAssignment.submittedFile}
                           </p>
                           <p className="text-xs md:text-sm text-gray-500">
-                            Click to download
+                            Click to download your submission
                           </p>
                         </div>
-                        <svg
-                          className="w-5 h-5 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                          />
-                        </svg>
-                      </button>
+                        <Download className="w-5 h-5 text-gray-400" />
+                      </a>
                     </div>
 
                     {/* Instructor Feedback */}
