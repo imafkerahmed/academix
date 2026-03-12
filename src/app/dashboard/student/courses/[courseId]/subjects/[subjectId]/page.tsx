@@ -422,6 +422,13 @@ export default function SubjectPage() {
         return;
       }
 
+      console.log("Submitting assignment with data:", {
+        assignmentId: selectedAssignment.id,
+        studentId,
+        fileName: uploadedFile.name,
+        fileSize: uploadedFile.size,
+      });
+
       const data = new FormData();
       data.append("assignment", selectedAssignment.id);
       data.append("student", studentId);
@@ -431,35 +438,42 @@ export default function SubjectPage() {
       // Determine submission status
       const dueDate = new Date(selectedAssignment.dueDate);
       const now = new Date();
-      data.append(
-        "submission_status",
-        now > dueDate ? "due-passed" : "on-time",
-      );
+      const submission_status = now > dueDate ? "due-passed" : "on-time";
+      data.append("submission_status", submission_status);
       data.append("evaluation_status", "pending");
 
+      console.log("Submission status:", submission_status);
+
       if (selectedAssignment.submissionId) {
-        // Update existing submission
-        await pb
+        console.log("Updating existing submission:", selectedAssignment.submissionId);
+        const updated = await pb
           .collection("assignment_submissions")
           .update(selectedAssignment.submissionId, data);
+        console.log("Submission updated successfully:", updated.id);
         setSuccessMessage(
           "File replaced successfully! Your new submission will be reviewed by the instructor.",
         );
       } else {
-        // Create new submission
-        await pb.collection("assignment_submissions").create(data);
+        console.log("Creating new submission");
+        const created = await pb.collection("assignment_submissions").create(data);
+        console.log("Submission created successfully:", created.id);
         setSuccessMessage(
           "Assignment submitted successfully! Your submission will be reviewed by the instructor shortly.",
         );
       }
 
+      // Close assignment modal and set success message before refreshing
       setShowAssignmentModal(false);
-      setSelectedAssignment(null);
       setUploadedFile(null);
       setShowSuccessModal(true);
 
-      // Refresh data
+      // Refresh data immediately
+      console.log("Refreshing subject data after submission...");
       await fetchSubjectData();
+      
+      // Auto-select the same assignment if we want to keep it open (optional)
+      // For now, we close it as per current logic.
+      setSelectedAssignment(null);
     } catch (error) {
       console.error("Error submitting assignment:", error);
       toast.error("Failed to submit assignment. Please try again.");
@@ -1106,9 +1120,10 @@ export default function SubjectPage() {
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">
                   Description
                 </h3>
-                <p className="text-sm md:text-base text-gray-700 whitespace-pre-line">
-                  {selectedAssignment.description}
-                </p>
+                <div 
+                  className="text-sm md:text-base text-gray-700 prose-simple max-w-none"
+                  dangerouslySetInnerHTML={{ __html: selectedAssignment.description }}
+                />
               </div>
 
               {/* Rules */}
@@ -1117,9 +1132,10 @@ export default function SubjectPage() {
                   Rules & Guidelines
                 </h3>
                 <div className="bg-blue-50 p-3 md:p-4 rounded-lg">
-                  <p className="text-sm md:text-base text-gray-700 whitespace-pre-line">
-                    {selectedAssignment.rules}
-                  </p>
+                  <div 
+                    className="text-sm md:text-base text-gray-700 prose-simple max-w-none"
+                    dangerouslySetInnerHTML={{ __html: selectedAssignment.rules }}
+                  />
                 </div>
               </div>
 

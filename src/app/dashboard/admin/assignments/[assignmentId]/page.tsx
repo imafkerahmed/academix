@@ -238,10 +238,17 @@ export default function AssignmentDetails() {
                     {assignment.expand?.course_subject?.expand?.course_intake?.expand?.intake?.code}
                   </Badge>
                 </div>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                  <BookOpen size={14} className="text-indigo-400" />
-                  {assignment.expand?.course_subject?.expand?.course_intake?.expand?.course?.name} — {assignment.expand?.course_subject?.expand?.subject?.name || assignment.expand?.course_subject?.expand?.subject?.[0]?.name}
-                </p>
+                <div className="flex flex-col gap-1 mt-1">
+                  <div className="flex items-center gap-2">
+                    <BookOpen size={14} className="text-indigo-400" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                      {assignment.expand?.course_subject?.expand?.course_intake?.expand?.course?.name}
+                    </span>
+                  </div>
+                  <h2 className="text-indigo-600 font-black text-sm md:text-base uppercase tracking-tight ml-5">
+                    {assignment.expand?.course_subject?.expand?.subject?.name || assignment.expand?.course_subject?.expand?.subject?.[0]?.name}
+                  </h2>
+                </div>
               </div>
             </div>
 

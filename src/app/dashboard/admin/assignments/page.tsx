@@ -851,17 +851,26 @@ export default function AssignmentManagement() {
                   </h3>
 
                   <div className="space-y-4 mb-8">
-                    <div className="flex items-center gap-3 text-gray-400 text-[10px] font-bold uppercase tracking-widest">
+                    <div className="flex items-center gap-3 text-gray-400 text-[10px] font-bold uppercase tracking-widest hover:text-indigo-600 transition-colors">
                       <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-indigo-400">
+                        <BookOpen size={14} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-400 line-clamp-1">
+                          {assignment.expand?.course_subject?.expand?.course_intake?.expand?.course?.name}
+                        </span>
+                        <span className="text-indigo-600 font-black text-xs mt-0.5 line-clamp-1 uppercase tracking-tight">
+                          {assignment.expand?.course_subject?.expand?.subject?.name || assignment.expand?.course_subject?.expand?.subject?.[0]?.name}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-gray-400 text-[10px] font-bold uppercase tracking-widest">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
                         <FileText size={14} />
                       </div>
                       <div className="flex flex-col">
-                        <span>Submissions: {submissionCount} Total</span>
-                        <span className="text-indigo-600 mt-0.5 line-clamp-2 leading-tight">
-                          {assignment.expand?.course_subject?.expand?.course_intake?.expand?.course?.name}
-                          <span className="text-gray-400 mx-1">—</span>
-                          {assignment.expand?.course_subject?.expand?.subject?.name || assignment.expand?.course_subject?.expand?.subject?.[0]?.name}
-                        </span>
+                        <span className="text-gray-900">Submissions: {submissionCount} Total</span>
                       </div>
                     </div>
 
@@ -870,8 +879,8 @@ export default function AssignmentManagement() {
                         <User size={14} />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-gray-900 line-clamp-1">Marker: {assignment.expand?.marker?.name || "Unassigned"}</span>
-                        <span className="mt-0.5">Deadline: {new Date(assignment.due_date).toLocaleDateString("en-GB")}</span>
+                        <span className="text-gray-900 line-clamp-1 tracking-tight">Marker: {assignment.expand?.marker?.name || "Unassigned"}</span>
+                        <span className="mt-0.5 font-medium text-gray-400">Deadline: {new Date(assignment.due_date).toLocaleDateString("en-GB")}</span>
                       </div>
                     </div>
                   </div>
