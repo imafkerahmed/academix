@@ -36,15 +36,18 @@ interface Intake {
   name: string;
 }
 
-interface CourseIntake {
+interface CourseIntakeFee {
   id: string;
-  intake: string;
-  course_fee?: number;
-  registration_fee?: number;
-  duration?: number;
+  course_intake: string;
+  course_fee: number;
+  registration_fee: number;
+  duration: number;
   expand?: {
-    course?: { id: string; name: string; code: string };
-    intake?: { id: string; code: string; name: string };
+    course_intake: {
+      expand?: {
+        course: { id: string; name: string; code: string };
+      };
+    };
   };
 }
 
@@ -59,7 +62,7 @@ export function EnrollCourseModal({
 
   // Data arrays
   const [intakes, setIntakes] = useState<Intake[]>([]);
-  const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);
+  const [courseIntakes, setCourseIntakes] = useState<CourseIntakeFee[]>([]);
 
   // Selected State
   const [selectedIntakeId, setSelectedIntakeId] = useState("");
@@ -108,7 +111,10 @@ export function EnrollCourseModal({
       const selectedCourse = courseIntakes.find(
         (c) => c.id === selectedCourseIntakeId,
       );
-      if (selectedCourse?.course_fee && selectedCourse?.duration) {
+      if (
+        selectedCourse?.course_fee !== undefined &&
+        selectedCourse?.duration !== undefined
+      ) {
         const calc = calculateEnrollmentFees(
           selectedCourse.course_fee,
           selectedCourse.registration_fee || 0,
@@ -117,6 +123,7 @@ export function EnrollCourseModal({
           includeRegistrationFee,
           discountType,
           discountValue,
+          customUpfrontAmount,
         );
         setFeeCalculation(calc);
       }
@@ -129,6 +136,7 @@ export function EnrollCourseModal({
     includeRegistrationFee,
     discountType,
     discountValue,
+    customUpfrontAmount,
     courseIntakes,
   ]);
 
@@ -150,10 +158,10 @@ export function EnrollCourseModal({
     setFetchingData(true);
     try {
       const records = await pb
-        .collection("course_intakes")
-        .getFullList<CourseIntake>({
-          filter: `intake = "${intakeId}"`,
-          expand: "course,intake",
+        .collection("course_intake_fees")
+        .getFullList<CourseIntakeFee>({
+          filter: `course_intake.intake = "${intakeId}"`,
+          expand: "course_intake.course",
         });
       setCourseIntakes(records);
     } catch (error) {
@@ -198,20 +206,18 @@ export function EnrollCourseModal({
       // Generate unique registration number
       registrationNumber = await generateRegistrationNumber(
         selectedIntake.code,
-        selectedCourse.expand?.course?.code || "COURSE",
+        selectedCourse.expand?.course_intake?.expand?.course?.code || "COURSE",
       );
 
-      // Fetch course_intake_fees to link
-      const feeRecords = await pb.collection("course_intake_fees").getFullList({
-        filter: `course_intake="${selectedCourseIntakeId}"`,
-      });
-      const courseIntakeFeeId = feeRecords[0]?.id || null;
+      // Use the already selected fee record
+      const courseIntakeFeeId = selectedCourse.id;
+      const courseIntakeId = selectedCourse.course_intake;
 
       // Create enrollment with all fields
       const enrollmentRecord = await pb.collection("enrollments").create({
         student: studentId,
         registration_number: registrationNumber,
-        course_intake: selectedCourseIntakeId,
+        course_intake: courseIntakeId,
         course_intake_fees: courseIntakeFeeId,
 
         // Payment configuration
@@ -398,7 +404,7 @@ export function EnrollCourseModal({
               </div>
             ) : (
               courseIntakes.map((c) => {
-                const courseInfo = c.expand?.course;
+                const courseInfo = c.expand?.course_intake?.expand?.course;
                 const isSelected = selectedCourseIntakeId === c.id;
 
                 return (
@@ -420,7 +426,7 @@ export function EnrollCourseModal({
                       <p
                         className={`text-[10px] font-bold tracking-widest uppercase mt-1 ${isSelected ? "text-indigo-500" : "text-gray-400"}`}
                       >
-                        {courseInfo?.code || "N/A"} • {c.duration || "—"} Months
+                        {courseInfo?.code || "N/A"} • {c.duration || "0"} Months
                       </p>
                     </div>
                     <div className="text-right">
@@ -432,9 +438,7 @@ export function EnrollCourseModal({
                       <p
                         className={`text-xs font-black ${isSelected ? "text-indigo-600" : "text-gray-900"}`}
                       >
-                        {c.course_fee
-                          ? `LKR ${c.course_fee.toLocaleString()}`
-                          : "See Advisor"}
+                        LKR {c.course_fee.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -581,6 +585,111 @@ export function EnrollCourseModal({
                   </div>
                 );
               })()}
+
+            {/* Step 4: Discount (New) */}
+            <div className="space-y-3 pt-2">
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">
+                <DollarSign size={12} className="text-green-500" />
+                4. Discount Options (Optional)
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                <select
+                  value={discountType || ""}
+                  onChange={(e) => {
+                    setDiscountType((e.target.value as any) || null);
+                    setDiscountValue(0);
+                  }}
+                  className="px-4 py-2.5 bg-white border-2 border-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-900 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100/50 transition-all outline-none"
+                >
+                  <option value="">No Discount</option>
+                  <option value="percentage">Percentage %</option>
+                  <option value="flat">Flat Amount</option>
+                </select>
+                <input
+                  type="number"
+                  min="0"
+                  step={discountType === "percentage" ? "1" : "100"}
+                  value={discountValue || ""}
+                  onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                  disabled={!discountType}
+                  placeholder={discountType === "percentage" ? "e.g. 10%" : "e.g. 5000"}
+                  className="col-span-2 px-4 py-2.5 bg-white border-2 border-gray-100 rounded-xl text-xs font-bold text-gray-900 disabled:bg-gray-50 disabled:text-gray-300 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100/50 transition-all placeholder:text-gray-300"
+                />
+              </div>
+            </div>
+
+            {/* Detailed Fee Breakdown (New) */}
+            {feeCalculation && (
+              <div className="mt-4 p-5 bg-gradient-to-br from-indigo-50/50 to-white rounded-2xl border-2 border-indigo-100 shadow-sm animate-in fade-in zoom-in-95 duration-500">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-5 bg-indigo-600 rounded-full" />
+                  <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">
+                    Fee Calculation Breakdown
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="font-bold text-gray-400 uppercase tracking-widest">
+                      Course Fee
+                    </span>
+                    <span className="font-black text-gray-900">
+                      LKR {feeCalculation.total_course_fee.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {feeCalculation.discount_amount > 0 && (
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="font-bold text-emerald-500 uppercase tracking-widest">
+                        Discount Applied
+                      </span>
+                      <span className="font-black text-emerald-500">
+                        - LKR {feeCalculation.discount_amount.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
+                  {includeRegistrationFee && feeCalculation.registration_fee_amount > 0 && (
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="font-bold text-gray-400 uppercase tracking-widest">
+                        Registration Fee
+                      </span>
+                      <span className="font-black text-gray-900">
+                        LKR {feeCalculation.registration_fee_amount.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="pt-3 mt-1 border-t border-indigo-100/50">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">
+                          {paymentOption === "installments_only"
+                            ? "Initial Payment"
+                            : paymentOption === "full_payment"
+                              ? "Total Combined Fee"
+                              : "Upfront Payment"}
+                        </p>
+                        <p className="text-xl font-black text-indigo-600">
+                          LKR {feeCalculation.upfront_payment.toLocaleString()}
+                        </p>
+                      </div>
+                      {feeCalculation.installment_count > 0 && (
+                        <div className="text-right">
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                            {feeCalculation.installment_count}x Installments
+                          </p>
+                          <p className="text-xs font-black text-gray-900">
+                            LKR {feeCalculation.installment_amount.toLocaleString()}
+                            <span className="text-[9px] text-gray-400 ml-1">/mo</span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -595,15 +704,19 @@ export function EnrollCourseModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={loading || !selectedCourseIntakeId}
+            disabled={loading || !selectedCourseIntakeId || !feeCalculation}
             className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             ) : (
-              <Building2 size={16} />
+              <Check size={16} />
             )}
-            {loading ? "Enrolling..." : "Confirm Enrollment"}
+            {!feeCalculation && selectedCourseIntakeId
+              ? "Calculating Fees..."
+              : loading
+                ? "Enrolling..."
+                : "Complete Enrollment"}
           </button>
         </div>
       </div>
