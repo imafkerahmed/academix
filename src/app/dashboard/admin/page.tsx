@@ -35,7 +35,7 @@ const todaysClasses = [
     id: 21,
     title: "Zoom Math Class",
     topic: "Algebra: Quadratic Equations",
-    type: "Online Zoom Class",
+    type: "Online Class",
     date: "2026-02-07",
     startTime: "10:00",
     endTime: "11:00",
@@ -65,7 +65,7 @@ const todaysClasses = [
     id: 23,
     title: "Zoom English Lecture",
     topic: "Shakespearean Sonnets",
-    type: "Online Zoom Class",
+    type: "Online Class",
     date: "2026-02-07",
     startTime: "15:00",
     endTime: "16:00",
@@ -115,6 +115,8 @@ const statsData = [
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false);
   const [isAllSchedulesOpen, setIsAllSchedulesOpen] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
@@ -129,8 +131,86 @@ export default function AdminDashboard() {
     if (currentUser.accountStatus === "disabled") {
       return;
     }
+
+    fetchCalendarEvents();
   }, [router]);
 
+  const fetchCalendarEvents = async () => {
+    try {
+      setIsCalendarLoading(true);
+
+      // 1. Fetch all Classes
+      const classes = await pb.collection("classes").getFullList({
+        filter: 'status != "cancelled"',
+        expand: "course_subject.subject,course_subject.course_intake.course",
+        sort: "start_time",
+      });
+
+      // 2. Fetch all Assignments
+      const assignments = await pb.collection("assignments").getFullList({
+        expand: "course_subject.subject,course_subject.course_intake.course",
+      });
+
+      // 3. Format Events
+      const classEvents = classes.map((c: any) => {
+        const cs = c.expand?.course_subject;
+        const subject = cs?.expand?.subject;
+        const course = cs?.expand?.course_intake?.expand?.course;
+
+        const subjectName = subject?.name || (Array.isArray(subject) ? subject[0]?.name : subject?.name);
+
+        return {
+          id: c.id,
+          title: subjectName || "Class",
+          topic: c.topic || "",
+          type: (c.type === "Online Class" ? "Online Class" : c.type) || "Online Class",
+          date: new Date(c.start_time).toISOString().slice(0, 10),
+          startTime: new Date(c.start_time).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          endTime: new Date(
+            new Date(c.start_time).getTime() + c.duration * 60000,
+          ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          status: c.status,
+          courseName: course?.name,
+          subjectName: subjectName,
+          link: c.zoom_link || "",
+          rawStartTime: c.start_time,
+          duration: c.duration,
+        };
+      });
+
+      const assignmentEvents = assignments.map((a: any) => {
+        const cs = a.expand?.course_subject;
+        const subject = cs?.expand?.subject;
+        const course = cs?.expand?.course_intake?.expand?.course;
+
+        const dueDate = a.deadline || a.due_date || a.created;
+        return {
+          id: a.id,
+          title: `Assignment: ${a.title}`,
+          topic: "",
+          type: "Assignment",
+          date: new Date(dueDate).toISOString().slice(0, 10),
+          startTime: new Date(dueDate).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          status: "pending",
+          courseName: course?.name,
+          subjectName: subject?.name,
+          link: `/dashboard/admin/assignments/${a.id}`,
+        };
+      });
+
+      setCalendarEvents([...classEvents, ...assignmentEvents]);
+    } catch (error) {
+      console.error("Error fetching calendar events:", error);
+    } finally {
+      setIsCalendarLoading(false);
+    }
+  };
   // Show disabled account message if account is disabled
   if (pb.authStore.model?.accountStatus === "disabled") {
     return (
@@ -216,7 +296,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex items-start justify-center">
                   <div className="w-full">
-                    <Calendar />
+                    <Calendar events={calendarEvents} />
                   </div>
                 </div>
               </div>

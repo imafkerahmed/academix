@@ -109,6 +109,32 @@ export default function CoursePage() {
           semesterGroups["All Subjects"] = [];
         }
 
+        const courseSubjectIds = courseSubjects.map((cs) => cs.id);
+
+        // Fetch ALL assignments for these course_subjects
+        let allAssignments: any[] = [];
+        if (courseSubjectIds.length > 0) {
+          const assignmentFilter = courseSubjectIds
+            .map((id) => `course_subject = "${id}"`)
+            .join(" || ");
+          allAssignments = await pb.collection("assignments").getFullList({
+            filter: `(${assignmentFilter})`,
+          });
+        }
+
+        // Fetch ALL submissions for these assignments for the student
+        const studentId = pb.authStore.model?.id;
+        let allSubmissions: any[] = [];
+        if (allAssignments.length > 0 && studentId) {
+          const assignmentIds = allAssignments.map((a) => a.id);
+          const submissionFilter = `student = "${studentId}" && (${assignmentIds.map((id) => `assignment = "${id}"`).join(" || ")})`;
+          allSubmissions = await pb
+            .collection("assignment_submissions")
+            .getFullList({
+              filter: submissionFilter,
+            });
+        }
+
         courseSubjects.forEach((cs: any) => {
           const subjectData = cs.expand?.subject;
           const lecturerData = cs.expand?.lecturer;
@@ -120,6 +146,17 @@ export default function CoursePage() {
               ? [subjectData]
               : [];
 
+          // Assignments for THIS specific course_subject
+          const csAssignments = allAssignments.filter(
+            (a) => a.course_subject === cs.id,
+          );
+          const totalAs = csAssignments.length;
+          const completedAs = csAssignments.filter((a) =>
+            allSubmissions.some((s) => s.assignment === a.id),
+          ).length;
+          const progressValue =
+            totalAs > 0 ? Math.round((completedAs / totalAs) * 100) : 0;
+
           subjects.forEach((subject: any) => {
             const subjectEntry = {
               id: subject.id,
@@ -127,7 +164,7 @@ export default function CoursePage() {
               code: subject.code,
               instructor:
                 lecturerData?.name || lecturerData?.full_name || "TBA",
-              progress: 0, // Progress tracking not implemented yet
+              progress: progressValue,
             };
 
             const semesterKey = cs.semester || "All Subjects";

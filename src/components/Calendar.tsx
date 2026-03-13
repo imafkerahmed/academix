@@ -31,7 +31,7 @@ const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // Event badge color
 const typeBadge: Record<string, string> = {
-  "Online Zoom Class": "bg-blue-100 text-blue-700 border-blue-200",
+  "Online Class": "bg-blue-100 text-blue-700 border-blue-200",
   "Physical Class": "bg-yellow-100 text-yellow-700 border-yellow-200",
   Holiday: "bg-purple-100 text-purple-700 border-purple-200",
   Assignment: "bg-green-100 text-green-700 border-green-200",
@@ -48,9 +48,9 @@ function EventItem({ event }: { event: (typeof mockEvents)[0] }) {
       >
         {event.type}
       </span>
-      <span className="font-medium truncate">{event.title}</span>
+      <span className="font-medium truncate">{event.subjectName || event.title}</span>
       {/* Show topic for Zoom class */}
-      {event.type === "Online Zoom Class" && event.topic && (
+      {event.type === "Online Class" && event.topic && (
         <span className="ml-2 text-blue-500 font-medium truncate">
           {event.topic}
         </span>
@@ -113,23 +113,40 @@ function DayCell({
 }
 
 // Main Calendar component
-interface CalendarProps {
-  onModalOpenChange?: (open: boolean) => void;
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  topic?: string;
+  type: "Online Class" | "Physical Class" | "Holiday" | "Assignment" | string;
+  date: string; // YYYY-MM-DD
+  startTime?: string;
+  endTime?: string;
+  status?: string;
+  courseName?: string;
+  subjectName?: string;
+  link?: string;
+  rawStartTime?: string;
+  duration?: number;
 }
 
-const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
+interface CalendarProps {
+  onModalOpenChange?: (open: boolean) => void;
+  events?: CalendarEvent[];
+}
+
+const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange, events = [] }) => {
   // Render day view (must be inside Calendar to access state)
   function renderDay() {
     const d = new Date(current.year, current.month, current.day);
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const events = getEventsForDate(dateStr);
+    const dayEvents = getEventsForDate(dateStr);
     return (
       <div className="grid grid-cols-1 gap-2">
         <DayCell
           key={dateStr}
           day={d.getDate()}
           date={dateStr}
-          events={events}
+          events={dayEvents}
           isToday={dateStr === todayStr}
           isSelected={selected === dateStr}
           onClick={() => {
@@ -171,7 +188,7 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
 
   // Get events for a date
   const getEventsForDate = (date: string) =>
-    mockEvents.filter((e) => e.date === date);
+    events.filter((e) => e.date === date);
 
   // Navigation handlers
   function prev() {
@@ -390,12 +407,12 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
         avatarColor="bg-indigo-600"
         className="max-w-2xl"
       >
-        <div className="max-h-[500px] overflow-y-auto no-scrollbar py-2 space-y-4">
+        <div className="overflow-y-auto no-scrollbar py-2 space-y-4">
           {getEventsForDate(modalDate || "").map((event) => (
             <div
               key={event.id}
               className={`bg-white border rounded-[2.5rem] p-8 flex flex-col gap-6 shadow-sm hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-300 w-full group relative overflow-hidden ${
-                event.type === "Online Zoom Class"
+                event.type === "Online Class"
                   ? "border-blue-100"
                   : event.type === "Physical Class"
                     ? "border-yellow-100"
@@ -409,12 +426,12 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 relative z-10">
                 <div className="flex-1">
                   <h4 className="font-black text-gray-900 text-xl tracking-tight group-hover:text-indigo-600 transition-colors uppercase leading-tight">
-                    {event.title}
+                    {event.subjectName || event.title}
                   </h4>
                   <div className="flex items-center gap-3 mt-3">
                     <span
                       className={`text-[10px] px-3 py-1 rounded-xl font-black uppercase tracking-widest ${
-                        event.type === "Online Zoom Class"
+                        event.type === "Online Class"
                           ? "bg-blue-50 text-blue-700"
                           : event.type === "Physical Class"
                             ? "bg-yellow-50 text-yellow-700"
@@ -427,21 +444,63 @@ const Calendar: React.FC<CalendarProps> = ({ onModalOpenChange }) => {
                     >
                       {event.type}
                     </span>
-                    {event.topic && (
+                    {event.topic && event.type !== "Assignment" && (
                       <div className="flex items-center gap-2 text-[10px] font-black text-blue-600 bg-blue-50/50 w-fit px-3 py-1 rounded-xl uppercase tracking-widest">
                         <Info size={12} /> {event.topic}
                       </div>
                     )}
                   </div>
+                  {event.courseName && (
+                    <div className="mt-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                       <span>{event.courseName}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="shrink-0 flex gap-3">
-                  {event.type === "Online Zoom Class" ? (
-                    <button className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-blue-100 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all">
-                      Schedule
-                    </button>
+                  {event.type === "Online Class" ? (
+                    (() => {
+                      const now = Date.now();
+                      const scheduledEnd = event.rawStartTime 
+                        ? new Date(event.rawStartTime).getTime() + (event.duration || 60) * 60000 
+                        : 0;
+                      const hasEnded = event.status === "completed" || (scheduledEnd > 0 && now >= scheduledEnd);
+
+                      if (hasEnded) {
+                        return (
+                          <span className="px-6 py-3 rounded-2xl bg-gray-100 text-gray-400 text-xs font-black uppercase tracking-[0.1em]">
+                            Class Ended
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <button 
+                          onClick={() => {
+                            window.location.href = `/dashboard/classroom/${event.id}?role=attendee`;
+                          }}
+                          className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl transition-all ${
+                            event.status === "ongoing" || event.status === "in_progress"
+                              ? "bg-green-600 shadow-green-100 hover:bg-green-700"
+                              : "bg-blue-600 shadow-blue-100 hover:bg-blue-700"
+                          } hover:scale-105 active:scale-95`}
+                        >
+                          {event.status === "ongoing" || event.status === "in_progress" ? "Join Live" : "Join Session"}
+                        </button>
+                      );
+                    })()
                   ) : event.type === "Assignment" ? (
-                    <button className="px-6 py-3 rounded-2xl bg-green-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-green-100 hover:bg-green-700 hover:scale-105 active:scale-95 transition-all">
+                    <button 
+                      onClick={() => event.link && (window.location.href = event.link)}
+                      className="px-6 py-3 rounded-2xl bg-green-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-green-100 hover:bg-green-700 hover:scale-105 active:scale-95 transition-all"
+                    >
+                      View
+                    </button>
+                  ) : event.link ? (
+                    <button 
+                      onClick={() => window.location.href = event.link!}
+                      className="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all"
+                    >
                       View
                     </button>
                   ) : null}

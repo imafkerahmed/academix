@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Card,
@@ -22,12 +22,16 @@ export default function SubjectPage() {
   const router = useRouter();
   const subjectId = params?.subjectId as string;
   const courseId = params?.courseId as string;
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "materials" ? 1 : 
+                     searchParams.get("tab") === "videos" ? 2 : 0;
+                     
   const [loading, setLoading] = useState(true);
   const [subject, setSubject] = useState<any>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
-  const [activeTab, setActiveTab] = useState(0); // 0: Assignments, 1: Materials, 2: Videos
+  const [activeTab, setActiveTab] = useState(initialTab); // 0: Assignments, 1: Materials, 2: Videos
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -169,7 +173,9 @@ export default function SubjectPage() {
       // Fetch assignments for these course_subjects
       if (courseSubjectIds.length > 0) {
         try {
-          const filterParts = courseSubjectIds.map((id) => `course_subject = "${id}"`);
+          const filterParts = courseSubjectIds.map(
+            (id) => `course_subject = "${id}"`,
+          );
           const assignmentFilter = `(${filterParts.join(" || ")})`;
 
           console.log("Fetching assignments for subjects:", courseSubjectIds);
@@ -183,13 +189,17 @@ export default function SubjectPage() {
           // Fetch submissions for these assignments for the current student
           const studentId = pb.authStore.model?.id;
           let submissions: any[] = [];
-          
+
           if (assignments.length > 0 && studentId) {
-            const assignmentIds = assignments.map(a => `assignment = "${a.id}"`);
+            const assignmentIds = assignments.map(
+              (a) => `assignment = "${a.id}"`,
+            );
             const submissionFilter = `student = "${studentId}" && (${assignmentIds.join(" || ")})`;
-            submissions = await pb.collection("assignment_submissions").getFullList({
-              filter: submissionFilter,
-            });
+            submissions = await pb
+              .collection("assignment_submissions")
+              .getFullList({
+                filter: submissionFilter,
+              });
           }
 
           // Map assignments to the format expected by the UI
@@ -203,7 +213,8 @@ export default function SubjectPage() {
               id: a.id,
               title: a.title,
               description: a.description,
-              rules: "Please follow all academic integrity guidelines. Submit your work in PDF or DOCX format. Late submissions may be penalized.",
+              rules:
+                "Please follow all academic integrity guidelines. Submit your work in PDF or DOCX format. Late submissions may be penalized.",
               dueDate: a.due_date,
               unlockDate: a.opens_at || a.issued_at || a.created,
               totalMarks: a.total_marks,
@@ -226,14 +237,26 @@ export default function SubjectPage() {
               assignmentSheet: a.file ? pb.files.getURL(a, a.file) : null,
               submissionId: submission?.id,
               submissionRecord: submission,
-              isClosed: isClosed
+              isClosed: isClosed,
             };
           });
 
           console.log("Mapped assignments:", mappedAssignments);
+
+          // Calculate progress based on completion
+          const totalAssignments = mappedAssignments.length;
+          const completedAssignments = mappedAssignments.filter(
+            (a) => a.status === "Submitted" || a.status === "Graded",
+          ).length;
+          const progressValue =
+            totalAssignments > 0
+              ? Math.round((completedAssignments / totalAssignments) * 100)
+              : 0;
+
           setSubject((prev: any) => ({
             ...prev,
             assignments: mappedAssignments,
+            progress: progressValue,
           }));
         } catch (e) {
           console.log("Could not fetch assignments:", e);
@@ -445,7 +468,10 @@ export default function SubjectPage() {
       console.log("Submission status:", submission_status);
 
       if (selectedAssignment.submissionId) {
-        console.log("Updating existing submission:", selectedAssignment.submissionId);
+        console.log(
+          "Updating existing submission:",
+          selectedAssignment.submissionId,
+        );
         const updated = await pb
           .collection("assignment_submissions")
           .update(selectedAssignment.submissionId, data);
@@ -455,7 +481,9 @@ export default function SubjectPage() {
         );
       } else {
         console.log("Creating new submission");
-        const created = await pb.collection("assignment_submissions").create(data);
+        const created = await pb
+          .collection("assignment_submissions")
+          .create(data);
         console.log("Submission created successfully:", created.id);
         setSuccessMessage(
           "Assignment submitted successfully! Your submission will be reviewed by the instructor shortly.",
@@ -470,7 +498,7 @@ export default function SubjectPage() {
       // Refresh data immediately
       console.log("Refreshing subject data after submission...");
       await fetchSubjectData();
-      
+
       // Auto-select the same assignment if we want to keep it open (optional)
       // For now, we close it as per current logic.
       setSelectedAssignment(null);
@@ -723,11 +751,6 @@ export default function SubjectPage() {
                             <h3 className="font-black text-gray-900 group-hover:text-indigo-600 transition-colors">
                               {assignment.title}
                             </h3>
-                            {assignment.assignmentSheet && (
-                              <span className="px-2 py-0.5 bg-green-50 text-[8px] font-black text-green-600 rounded-lg border border-green-100">
-                                SHEET
-                              </span>
-                            )}
                           </div>
                           <div className="flex items-center gap-3 mt-3 text-[10px] font-bold text-gray-400 uppercase tracking-wide">
                             <span className="flex items-center gap-1.5">
@@ -747,7 +770,11 @@ export default function SubjectPage() {
                               Due:{" "}
                               {new Date(assignment.dueDate).toLocaleDateString(
                                 "en-US",
-                                { month: "short", day: "numeric" },
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
                               )}
                             </span>
                             <span className="flex items-center gap-1.5">
@@ -1120,9 +1147,11 @@ export default function SubjectPage() {
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">
                   Description
                 </h3>
-                <div 
+                <div
                   className="text-sm md:text-base text-gray-700 prose-simple max-w-none"
-                  dangerouslySetInnerHTML={{ __html: selectedAssignment.description }}
+                  dangerouslySetInnerHTML={{
+                    __html: selectedAssignment.description,
+                  }}
                 />
               </div>
 
@@ -1132,9 +1161,11 @@ export default function SubjectPage() {
                   Rules & Guidelines
                 </h3>
                 <div className="bg-blue-50 p-3 md:p-4 rounded-lg">
-                  <div 
+                  <div
                     className="text-sm md:text-base text-gray-700 prose-simple max-w-none"
-                    dangerouslySetInnerHTML={{ __html: selectedAssignment.rules }}
+                    dangerouslySetInnerHTML={{
+                      __html: selectedAssignment.rules,
+                    }}
                   />
                 </div>
               </div>
@@ -1144,7 +1175,7 @@ export default function SubjectPage() {
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
                   Assignment File
                 </h3>
-                <a 
+                <a
                   href={selectedAssignment.assignmentSheet}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -1325,8 +1356,15 @@ export default function SubjectPage() {
                           </Badge>
                         )}
                       </div>
-                      <a 
-                        href={selectedAssignment.submissionRecord ? pb.files.getURL(selectedAssignment.submissionRecord, selectedAssignment.submittedFile) : "#"}
+                      <a
+                        href={
+                          selectedAssignment.submissionRecord
+                            ? pb.files.getURL(
+                                selectedAssignment.submissionRecord,
+                                selectedAssignment.submittedFile,
+                              )
+                            : "#"
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 md:gap-3 p-3 bg-white border border-green-200 rounded-lg hover:bg-green-50 transition-colors w-full"
