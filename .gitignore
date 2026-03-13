@@ -1,5 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
 /.pnp
@@ -10,45 +8,67 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
 # next.js
 /.next/
 /out/
 
-# production
+# production build
 /build
+dist/
 
-# misc
+# misc / OS junk
 .DS_Store
+.DS_Store?
+._*
+Thumbs.db
 *.pem
+*.key
 
-# debug
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (NEVER commit these)
+.env
+.env.local
+.env.production
+.env.development
+.env*.local
 
-# vercel
+# Keep .env.example if you want to show which variables are needed
+!.env.example
+
+# Vercel / IDEs
 .vercel
+.vscode/
+.idea/
+.aiexclude
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
-# PocketBase
-services/pocketbase/pb_data/*
-!services/pocketbase/pb_data/.gitkeep
-services/pocketbase/pb_migrations/*
-!services/pocketbase/pb_migrations/.gitkeep
-services/pocketbase/pb_hooks/*
-!services/pocketbase/pb_hooks/.gitkeep
+# --- Infrastructure & Services (Keep these on the server only) ---
+services/
+docker-compose.yml
+docker-compose.override.yml
 
-# Galene
-services/galene/data/*
-!services/galene/data/config.json
-services/galene/recordings/*
+# --- PocketBase Specifics ---
+# Ignore all database files and backups
+pocketbase/pb_data/
+*.db
+*.db-shm
+*.db-wal
+
+# Only allow migrations and hooks if you are using them for version control
+# Otherwise, it is safer to ignore these too if you manage them manually on the server
+# !pocketbase/pb_migrations/
+# !pocketbase/pb_hooks/
+
+# --- Galene Specifics ---
+# Already covered by ignoring the /services folder, but adding as a backup:
+galene/data/
+galene/groups/
+galene/recordings/
