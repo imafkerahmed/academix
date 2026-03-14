@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  User,
-  CreditCard,
   DollarSign,
   Check,
   Search,
@@ -43,13 +41,22 @@ interface Student {
   avatar?: string;
 }
 
+interface PBUser {
+  id: string;
+  userId?: string;
+  name?: string;
+  email?: string;
+  mobile?: string;
+  academicStatus?: string;
+  avatar?: string;
+}
+
 export function EnrollExistingStudentModal({
   isOpen,
   onClose,
   onSuccess,
-  intakeId,
   courseIntakeId,
-}: EnrollExistingStudentModalProps) {
+}: Omit<EnrollExistingStudentModalProps, "intakeId">) {
   const [stage, setStage] = useState(1); // 1: Select Student, 2: Payment Options
   const [loading, setLoading] = useState(false);
   const [fetchingStudents, setFetchingStudents] = useState(false);
@@ -80,6 +87,126 @@ export function EnrollExistingStudentModal({
   const [feeCalculation, setFeeCalculation] =
     useState<EnrollmentFeeCalculation | null>(null);
 
+  const resetModal = React.useCallback(() => {
+    setStage(1);
+    setSelectedStudent(null);
+    setSearchQuery("");
+    setPaymentOption("full_payment");
+    setIncludeRegistrationFee(true);
+    setDiscountType(null);
+    setDiscountValue(0);
+    setCustomUpfrontAmount(0);
+    setFeeCalculation(null);
+  }, []);
+
+  const fetchPendingStudents = React.useCallback(async () => {
+    try {
+      setFetchingStudents(true);
+
+      // Get all students with pending academic status who are not already enrolled in this course
+      const allStudents = await pb.collection("users").getFullList({
+        filter: `role = "student" && academicStatus = "pending"`,
+        sort: "name",
+      });
+
+      // Get already enrolled students in this course
+      const enrollments = await pb.collection("enrollments").getFullList({
+        filter: `course_intake = "${courseIntakeId}"`,
+        fields: "student",
+      });
+
+      const enrolledStudentIds = (enrollments as unknown as { student: string }[]).map((e) => e.student);
+
+      // Filter out already enrolled students and map to Student interface
+      const availableStudents: Student[] = (allStudents as unknown as PBUser[])
+        .filter((s) => !enrolledStudentIds.includes(s.id))
+        .map((s) => ({
+          id: s.id,
+          userId: s.userId || "",
+          name: s.name || "",
+          email: s.email || "",
+          mobile: s.mobile || "",
+          academicStatus: s.academicStatus || "pending",
+          avatar: s.avatar || "",
+        }));
+
+      setStudents(availableStudents);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      toast.error("Failed to load students");
+    } finally {
+      setFetchingStudents(false);
+    }
+  }, [courseIntakeId]);
+
+  const fetchCourseDetails = React.useCallback(async () => {
+    try {
+      // Fetch course_intake_fees
+      const fees = await pb.collection("course_intake_fees").getFullList({
+        filter: `course_intake = "${courseIntakeId}"`,
+        expand: "course_intake.course,course_intake.intake",
+      });
+
+      if (fees.length > 0) {
+        const fee = fees[0] as unknown as {
+          id: string;
+          course_fee: number;
+          registration_fee: number;
+          duration: number;
+          expand?: {
+            course_intake?: {
+              intake?: string;
+              course?: string;
+              expand?: {
+                intake?: { code?: string };
+                course?: { code?: string };
+              };
+            };
+          };
+        };
+        setCourseFee(fee.course_fee);
+        setRegistrationFee(fee.registration_fee);
+        setDuration(fee.duration);
+        setCourseIntakeFeeId(fee.id);
+
+        // Get intake and course codes (with direct-fetch fallback)
+        const expandedIntakeCode =
+          fee.expand?.course_intake?.expand?.intake?.code || "";
+        const expandedCourseCode =
+          fee.expand?.course_intake?.expand?.course?.code || "";
+
+        if (!expandedIntakeCode && fee.expand?.course_intake?.intake) {
+          try {
+            const intakeRec = await pb
+              .collection("intakes")
+              .getOne(fee.expand.course_intake.intake);
+            setIntakeCode((intakeRec.code as string) || "");
+          } catch {
+            setIntakeCode("");
+          }
+        } else {
+          setIntakeCode(expandedIntakeCode);
+        }
+
+        if (!expandedCourseCode && fee.expand?.course_intake?.course) {
+          try {
+            const courseRec = await pb
+              .collection("courses")
+              .getOne(fee.expand.course_intake.course);
+            setCourseCode((courseRec.code as string) || "");
+          } catch {
+            setCourseCode("");
+          }
+        } else {
+          setCourseCode(expandedCourseCode);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching course details:", error);
+      toast.error("Failed to load course details");
+    }
+  }, [courseIntakeId]);
+
   // Fetch students and course details when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -87,7 +214,7 @@ export function EnrollExistingStudentModal({
       fetchCourseDetails();
       resetModal();
     }
-  }, [isOpen, courseIntakeId]);
+  }, [isOpen, fetchPendingStudents, fetchCourseDetails, resetModal]);
 
   // Recalculate fees when payment options change
   useEffect(() => {
@@ -117,111 +244,6 @@ export function EnrollExistingStudentModal({
     discountValue,
     customUpfrontAmount,
   ]);
-
-  function resetModal() {
-    setStage(1);
-    setSelectedStudent(null);
-    setSearchQuery("");
-    setPaymentOption("full_payment");
-    setIncludeRegistrationFee(true);
-    setDiscountType(null);
-    setDiscountValue(0);
-    setCustomUpfrontAmount(0);
-    setFeeCalculation(null);
-  }
-
-  async function fetchPendingStudents() {
-    try {
-      setFetchingStudents(true);
-
-      // Get all students with pending academic status who are not already enrolled in this course
-      const allStudents = await pb.collection("users").getFullList({
-        filter: `role = "student" && academicStatus = "pending"`,
-        sort: "name",
-      });
-
-      // Get already enrolled students in this course
-      const enrollments = await pb.collection("enrollments").getFullList({
-        filter: `course_intake = "${courseIntakeId}"`,
-        fields: "student",
-      });
-
-      const enrolledStudentIds = enrollments.map((e: any) => e.student);
-
-      // Filter out already enrolled students and map to Student interface
-      const availableStudents: Student[] = allStudents
-        .filter((s: any) => !enrolledStudentIds.includes(s.id))
-        .map((s: any) => ({
-          id: s.id,
-          userId: s.userId || "",
-          name: s.name || "",
-          email: s.email || "",
-          mobile: s.mobile || "",
-          academicStatus: s.academicStatus || "pending",
-          avatar: s.avatar || "",
-        }));
-
-      setStudents(availableStudents);
-    } catch (error) {
-      console.error("Error fetching students:", error);
-      toast.error("Failed to load students");
-    } finally {
-      setFetchingStudents(false);
-    }
-  }
-
-  async function fetchCourseDetails() {
-    try {
-      // Fetch course_intake_fees
-      const fees = await pb.collection("course_intake_fees").getFullList({
-        filter: `course_intake = "${courseIntakeId}"`,
-        expand: "course_intake.course,course_intake.intake",
-      });
-
-      if (fees.length > 0) {
-        const fee = fees[0];
-        setCourseFee(fee.course_fee);
-        setRegistrationFee(fee.registration_fee);
-        setDuration(fee.duration);
-        setCourseIntakeFeeId(fee.id);
-
-        // Get intake and course codes (with direct-fetch fallback)
-        const expandedIntakeCode =
-          fee.expand?.course_intake?.expand?.intake?.code || "";
-        const expandedCourseCode =
-          fee.expand?.course_intake?.expand?.course?.code || "";
-
-        if (!expandedIntakeCode && fee.expand?.course_intake?.intake) {
-          try {
-            const intakeRec = await pb
-              .collection("intakes")
-              .getOne(fee.expand.course_intake.intake);
-            setIntakeCode(intakeRec.code || "");
-          } catch {
-            setIntakeCode("");
-          }
-        } else {
-          setIntakeCode(expandedIntakeCode);
-        }
-
-        if (!expandedCourseCode && fee.expand?.course_intake?.course) {
-          try {
-            const courseRec = await pb
-              .collection("courses")
-              .getOne(fee.expand.course_intake.course);
-            setCourseCode(courseRec.code || "");
-          } catch {
-            setCourseCode("");
-          }
-        } else {
-          setCourseCode(expandedCourseCode);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching course details:", error);
-      toast.error("Failed to load course details");
-    }
-  }
 
   async function handleEnroll() {
     if (!selectedStudent || !feeCalculation || !courseIntakeFeeId) return;
@@ -332,12 +354,9 @@ export function EnrollExistingStudentModal({
             });
           }
         }
-      } catch (paymentError: any) {
-        console.error(
-          "Payment/installment creation error:",
-          paymentError?.message,
-          paymentError?.data,
-        );
+      } catch (paymentError: unknown) {
+        const err = paymentError as { message?: string; data?: unknown };
+        console.error("Payment/installment creation error:", err?.message, err?.data);
       }
 
       // Update student's academic status
@@ -348,17 +367,18 @@ export function EnrollExistingStudentModal({
       toast.success(`${selectedStudent.name} enrolled successfully!`);
       onSuccess();
       onClose();
-    } catch (error: any) {
-      console.error("Error enrolling student:", error?.message, error?.data);
-      const fieldErrors = error?.data?.data
-        ? Object.entries(error.data.data)
-            .map(([field, err]: any) => `${field}: ${err?.message || err}`)
+    } catch (error: unknown) {
+      const err = error as { message?: string; data?: { data?: Record<string, { message?: string } | string> } };
+      console.error("Error enrolling student:", err?.message, err?.data);
+      const fieldErrors = err?.data?.data
+        ? Object.entries(err.data.data)
+            .map(([field, fieldErr]: [string, unknown]) => `${field}: ${(fieldErr as { message?: string })?.message || fieldErr}`)
             .join(", ")
         : null;
       if (registrationNumber) {
         await rollbackRegistrationNumber(registrationNumber);
       }
-      toast.error(fieldErrors || error?.message || "Failed to enroll student");
+      toast.error(fieldErrors || err?.message || "Failed to enroll student");
     } finally {
       setLoading(false);
     }
@@ -515,7 +535,12 @@ export function EnrollExistingStudentModal({
                     key={option.value}
                     type="button"
                     onClick={() => {
-                      setPaymentOption(option.value as any);
+                      setPaymentOption(
+                        option.value as
+                          | "full_payment"
+                          | "upfront_installments"
+                          | "installments_only",
+                      );
                       if (option.value !== "upfront_installments")
                         setCustomUpfrontAmount(0);
                     }}

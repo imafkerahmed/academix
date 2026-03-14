@@ -1,5 +1,13 @@
 import pb from "./pocketbase";
 
+interface UsedRegistrationCode {
+  id: string;
+  registration_number: string;
+  intake_code: string;
+  course_code: string;
+  sequence_number: number;
+}
+
 /**
  * Generates unique registration number in format: ACD-INTMAR2026-BBM-001
  * @param intakeCode - Full intake code (e.g., "INT/MAR/2026" or "INT/2026/MAR")
@@ -20,7 +28,7 @@ export async function generateRegistrationNumber(
   // Find all records matching this exact prefix pattern
   const existingCodes = await pb
     .collection("used_registration_codes")
-    .getFullList({
+    .getFullList<UsedRegistrationCode>({
       filter: `intake_code = "${intakeCode}" && course_code = "${courseCode}" && registration_number ~ "${basePattern}-"`,
     })
     .catch(() => []);
@@ -28,7 +36,7 @@ export async function generateRegistrationNumber(
   // Extract sequence numbers from registration_number strings and find the max
   let maxSequence = 0;
   for (const record of existingCodes) {
-    const regNum = record.registration_number as string;
+    const regNum = record.registration_number;
     // Extract the last segment (e.g., "001" from "ACD-INTMAR2026-BBM-001")
     const match = regNum.match(/-(\d+)$/);
     if (match) {
@@ -88,9 +96,11 @@ export async function rollbackRegistrationNumber(
   registrationNumber: string,
 ): Promise<void> {
   try {
-    const records = await pb.collection("used_registration_codes").getFullList({
-      filter: `registration_number = "${registrationNumber}"`,
-    });
+    const records = await pb
+      .collection("used_registration_codes")
+      .getFullList<UsedRegistrationCode>({
+        filter: `registration_number = "${registrationNumber}"`,
+      });
     await Promise.all(
       records.map((r) => pb.collection("used_registration_codes").delete(r.id)),
     );

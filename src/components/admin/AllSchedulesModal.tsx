@@ -48,15 +48,21 @@ export default function AllSchedulesModal({
     });
   }, [classes, selectedDay]);
 
+  const wasOpen = React.useRef(isOpen);
+
   // When the modal opens, default to today if available, otherwise first available day
   useEffect(() => {
-    if (!isOpen || classes.length === 0) return;
-    const todayKey = new Date().toISOString().slice(0, 10);
-    if (dayOptions.find((d) => d.value === todayKey)) {
-      setSelectedDay(todayKey);
-      return;
+    if (isOpen && !wasOpen.current && classes.length > 0 && dayOptions.length > 0) {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const hasToday = dayOptions.find((d) => d.value === todayKey);
+      const targetDay = hasToday ? todayKey : dayOptions[0].value;
+      
+      // Defer state update to avoid cascading render warning
+      setTimeout(() => {
+        setSelectedDay(targetDay);
+      }, 0);
     }
-    if (dayOptions.length > 0) setSelectedDay(dayOptions[0].value);
+    wasOpen.current = isOpen;
   }, [isOpen, classes, dayOptions]);
 
   const getStatusColor = (status: string) => {

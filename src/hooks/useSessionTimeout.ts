@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { logout } from "@/lib/pocketbase";
 
@@ -19,7 +19,7 @@ export function useSessionTimeout({
   const [showWarning, setShowWarning] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
 
-  const resetTimeout = () => {
+  const resetTimeout = useCallback(() => {
     // Clear existing timeouts
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
@@ -55,12 +55,12 @@ export function useSessionTimeout({
       logout();
       router.push("/login");
     }, timeoutMs);
-  };
+  }, [enabled, timeoutMinutes, warningMinutes, router]);
 
-  const handleUserActivity = () => {
+  const handleUserActivity = useCallback(() => {
     if (showWarning) return; // Don't reset if warning is showing
     resetTimeout();
-  };
+  }, [showWarning, resetTimeout]);
 
   const extendSession = () => {
     setShowWarning(false);
@@ -70,8 +70,10 @@ export function useSessionTimeout({
   useEffect(() => {
     if (!enabled) return;
 
-    // Initialize timeout on mount without triggering cascading render if already set
-    resetTimeout();
+    // Use a microtask to avoid cascading render on mount
+    Promise.resolve().then(() => {
+      resetTimeout();
+    });
 
     // Track user activity
     const events = [
@@ -98,7 +100,7 @@ export function useSessionTimeout({
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     };
-  }, [enabled, handleUserActivity]); // Removed showWarning as it resets on every warning pop
+  }, [enabled, handleUserActivity, resetTimeout]); // Removed showWarning as it resets on every warning pop
 
   return {
     showWarning,

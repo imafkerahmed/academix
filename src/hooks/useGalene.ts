@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { GaleneClient, createGaleneClient } from "@/lib/galene";
-import { toast } from "sonner";
 
 export interface RemoteStream {
   id: string;
@@ -61,7 +60,7 @@ export interface UseGaleneReturn {
   raiseHand: () => void;
   lowerHand: () => void;
   raisedHands: Set<string>;
-  whiteboardEvents: any[];
+  whiteboardEvents: unknown[];
   whiteboardActive: boolean;
   sendUserMessage: (kind: string, dest?: string, value?: string) => void;
   ownId: string;
@@ -117,13 +116,15 @@ export function useGalene(): UseGaleneReturn {
   // New state for hand raise and whiteboard events
   const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set());
   // Initialize whiteboard state from sessionStorage if it exists
-  const [whiteboardEvents, setWhiteboardEvents] = useState<any[]>(() => {
+  const [whiteboardEvents, setWhiteboardEvents] = useState<unknown[]>(() => {
     if (typeof window !== "undefined") {
       const saved = sessionStorage.getItem("galene-wb-events");
       if (saved) {
         try {
           return JSON.parse(saved);
-        } catch (e) {}
+        } catch {
+          // Ignore parse errors
+        }
       }
     }
     return [];
@@ -230,7 +231,6 @@ export function useGalene(): UseGaleneReturn {
           setConnecting(false);
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         client.on("error", (err: Error & { message?: string }) => {
           console.error("[useGalene] Error:", err);
           setError(err?.message || "Connection error");
@@ -472,7 +472,6 @@ export function useGalene(): UseGaleneReturn {
           setScreenShareStream(null);
         });
 
-        // Connect and publish
         await client.connect(group, username, password);
         await client.publishStream(stream, "camera");
       } catch (err: unknown) {
@@ -485,7 +484,7 @@ export function useGalene(): UseGaleneReturn {
         console.error("[useGalene] Connection error:", err);
       }
     },
-    [],
+    [triggerNotification, sendUserMessage],
   );
 
   const disconnect = useCallback(() => {

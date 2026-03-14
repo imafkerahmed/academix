@@ -24,8 +24,10 @@ export function RouteLoaderProvider({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    setIsLoading(false);
-  }, [pathname, searchParams]);
+    if (isLoading) {
+      Promise.resolve().then(() => setIsLoading(false));
+    }
+  }, [pathname, searchParams, isLoading]);
 
   return (
     <RouteLoaderContext.Provider value={{ isLoading, setIsLoading }}>

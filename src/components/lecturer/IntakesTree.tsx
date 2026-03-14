@@ -19,13 +19,7 @@ import {
   Layout,
 } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Button } from "@/components/ui/button";
@@ -197,8 +191,8 @@ function SubjectDetailsView({
   onBack,
 }: SubjectDetailsViewProps) {
   const router = useRouter();
-  const allMaterials = mockMaterialsPerSubject[subject.id] || [];
-  const assignments = mockAssignmentsPerSubject[subject.id] || [];
+  const allMaterials = React.useMemo(() => mockMaterialsPerSubject[subject.id] || [], [subject.id]);
+  const assignments = React.useMemo(() => mockAssignmentsPerSubject[subject.id] || [], [subject.id]);
   const [activeTab, setActiveTab] = useState("assignments");
 
   const [materials, setMaterials] = useState<SubjectMaterial[]>(allMaterials);
@@ -226,7 +220,7 @@ function SubjectDetailsView({
     setNewMaterialFileName("");
     setPreviewMaterial(null);
     setIsPreviewOpen(false);
-  }, [subject.id]);
+  }, [subject.id, allMaterials]);
 
   const handleAddMaterial = (event: React.FormEvent) => {
     event.preventDefault();
@@ -978,13 +972,12 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
   const [selectedCourseCode, setSelectedCourseCode] = useState("");
   const [selectedIntakeCode, setSelectedIntakeCode] = useState("");
 
-  const selectionRestoredRef = React.useRef(false);
 
   const persistSelection = (
     intakeId: string | null,
-    subjectId: string | null = null,
   ) => {
     // Persistence disabled as per user request
+    console.log("Persistence disabled for intake:", intakeId);
   };
 
   const toggleCourse = (courseId: string) => {
@@ -1001,7 +994,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     setSelectedSubject(subject);
     setSelectedCourseCode(courseCode);
     setSelectedIntakeCode(intakeCode);
-    persistSelection(intakeId, subject.id);
+    persistSelection(intakeId);
   };
 
   const handleBackToIntake = () => {
@@ -1009,7 +1002,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     setSelectedCourseCode("");
     setSelectedIntakeCode("");
     if (selectedIntake) {
-      persistSelection(selectedIntake, null);
+      persistSelection(selectedIntake);
     }
   };
 
@@ -1068,7 +1061,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
                   setSelectedSubject(null);
                   setSelectedCourseCode("");
                   setSelectedIntakeCode("");
-                  persistSelection(intake.id, null);
+                  persistSelection(intake.id);
                 }}
                 className={`group relative w-full text-left p-5 rounded-[1.8rem] transition-all duration-500 border ${
                   selectedIntake === intake.id

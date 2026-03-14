@@ -2,26 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  User,
-  Mail,
-  Phone,
-  MapPin,
   BookOpen,
-  CreditCard,
   ChevronRight,
-  ChevronLeft,
   Check,
-  Key,
   Layers,
-  Calendar,
   DollarSign,
-  Type,
-  IdCard,
-  Users,
-  Building2,
-  Globe,
-  MessageSquare,
-  Hash,
   Camera,
   Upload,
   X,
@@ -491,7 +476,7 @@ export function RegisterStudentModal({
 
             if (feeCalc.installment_count > 0) {
               const enrollmentDate = new Date();
-              let firstDueDate = new Date(enrollmentDate);
+              const firstDueDate = new Date(enrollmentDate);
               if (formData.paymentOption === "upfront_installments") {
                 // First installment starts the month after the upfront payment
                 firstDueDate.setMonth(firstDueDate.getMonth() + 1);
@@ -514,11 +499,12 @@ export function RegisterStudentModal({
                 });
               }
             }
-          } catch (paymentError: any) {
+          } catch (paymentError: unknown) {
+            const err = paymentError as { message?: string; data?: unknown };
             console.error(
               "Payment/installment creation error:",
-              paymentError?.message,
-              paymentError?.data,
+              err?.message,
+              err?.data,
             );
           }
 
@@ -531,14 +517,15 @@ export function RegisterStudentModal({
       }
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       if (registrationNumber) {
         await rollbackRegistrationNumber(registrationNumber);
       }
-      if (isSuperuserOnlyError(error)) {
+      if (isSuperuserOnlyError(err)) {
         toast.error("You don't have permission to perform this action.");
       } else {
-        toast.error(error.message || "Something went wrong");
+        toast.error(err.message || "Something went wrong");
       }
     } finally {
       setLoading(false);
@@ -1146,7 +1133,10 @@ export function RegisterStudentModal({
                             onClick={() =>
                               setFormData((prev) => ({
                                 ...prev,
-                                paymentOption: option.value as any,
+                                paymentOption: option.value as
+                                  | "full_payment"
+                                  | "upfront_installments"
+                                  | "installments_only",
                                 customUpfrontAmount:
                                   option.value !== "upfront_installments"
                                     ? 0
@@ -1293,7 +1283,7 @@ export function RegisterStudentModal({
                           onChange={(e) =>
                             setFormData((prev) => ({
                               ...prev,
-                              discountType: (e.target.value as any) || null,
+                              discountType: (e.target.value as "percentage" | "flat") || null,
                               discountValue: 0,
                             }))
                           }

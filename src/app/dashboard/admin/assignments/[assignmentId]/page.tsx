@@ -100,6 +100,29 @@ export default function AssignmentDetails() {
     feedback: "",
   });
 
+  const fetchData = async () => {
+    try {
+      const assignmentRecord = await pb.collection("assignments").getOne(assignmentId, {
+        expand: "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
+      });
+      console.log("Fetched assignment details with subject:", assignmentRecord.expand?.course_subject?.expand?.subject);
+
+      const submissionsRecords = await pb.collection("assignment_submissions").getFullList({
+        filter: `assignment = "${assignmentId}"`,
+        expand: "student",
+        sort: "-submitted_at",
+      });
+
+      setAssignment(assignmentRecord as unknown as Assignment);
+      setSubmissions(submissionsRecords as unknown as Submission[]);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching assignment details:", error);
+      toast.error("Failed to load assignment data");
+      router.push("/dashboard/admin/assignments");
+    }
+  };
+
   useEffect(() => {
     if (!assignmentId) return;
 
@@ -129,29 +152,6 @@ export default function AssignmentDetails() {
       }
     };
   }, [assignmentId]);
-
-  const fetchData = async () => {
-    try {
-      const assignmentRecord = await pb.collection("assignments").getOne(assignmentId, {
-        expand: "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
-      });
-      console.log("Fetched assignment details with subject:", assignmentRecord.expand?.course_subject?.expand?.subject);
-
-      const submissionsRecords = await pb.collection("assignment_submissions").getFullList({
-        filter: `assignment = "${assignmentId}"`,
-        expand: "student",
-        sort: "-submitted_at",
-      });
-
-      setAssignment(assignmentRecord as any);
-      setSubmissions(submissionsRecords as any);
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching assignment details:", error);
-      toast.error("Failed to load assignment data");
-      router.push("/dashboard/admin/assignments");
-    }
-  };
 
   const handleGradeSubmission = async (e: React.FormEvent) => {
     e.preventDefault();

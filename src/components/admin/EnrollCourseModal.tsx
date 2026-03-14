@@ -5,7 +5,6 @@ import {
   Calendar,
   BookOpen,
   CreditCard,
-  Building2,
   DollarSign,
   Check,
 } from "lucide-react";
@@ -292,7 +291,7 @@ export function EnrollCourseModal({
         // Create installment schedule if payment plan has installments
         if (feeCalculation.installment_count > 0) {
           const enrollmentDate = new Date();
-          let firstDueDate = new Date(enrollmentDate);
+          const firstDueDate = new Date(enrollmentDate);
 
           if (paymentOption === "upfront_installments") {
             // First installment starts the month after the upfront payment
@@ -316,12 +315,9 @@ export function EnrollCourseModal({
             });
           }
         }
-      } catch (paymentError: any) {
-        console.error(
-          "Payment/installment creation error:",
-          paymentError?.message,
-          paymentError?.data,
-        );
+      } catch (paymentError: unknown) {
+        const err = paymentError as { message?: string; data?: unknown };
+        console.error("Payment/installment creation error:", err?.message, err?.data);
       }
 
       toast.success(
@@ -329,17 +325,18 @@ export function EnrollCourseModal({
       );
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       if (registrationNumber) {
         await rollbackRegistrationNumber(registrationNumber);
       }
-      if (!isSuperuserOnlyError(error)) {
-        console.error("Error creating enrollment:", error);
+      if (!isSuperuserOnlyError(err)) {
+        console.error("Error creating enrollment:", err);
       }
       toast.error(
-        isSuperuserOnlyError(error)
+        isSuperuserOnlyError(err)
           ? "You don't have permission to perform this action."
-          : error?.message || "Failed to create enrollment.",
+          : err?.message || "Failed to create enrollment.",
       );
     } finally {
       setLoading(false);
@@ -476,7 +473,12 @@ export function EnrollCourseModal({
                 <button
                   key={type.id}
                   onClick={() => {
-                    setPaymentOption(type.id as any);
+                    setPaymentOption(
+                      type.id as
+                        | "full_payment"
+                        | "installments_only"
+                        | "upfront_installments",
+                    );
                     if (type.id !== "upfront_installments")
                       setCustomUpfrontAmount(0);
                   }}
@@ -596,7 +598,9 @@ export function EnrollCourseModal({
                 <select
                   value={discountType || ""}
                   onChange={(e) => {
-                    setDiscountType((e.target.value as any) || null);
+                    setDiscountType(
+                      (e.target.value as "percentage" | "flat") || null,
+                    );
                     setDiscountValue(0);
                   }}
                   className="px-4 py-2.5 bg-white border-2 border-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-900 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100/50 transition-all outline-none"

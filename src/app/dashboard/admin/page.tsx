@@ -3,23 +3,14 @@ import React from "react";
 import { useRouter } from "next/navigation";
 
 import AllSchedulesModal from "@/components/admin/AllSchedulesModal";
-import AdminSidebar from "@/components/admin/AdminSidebar";
 import Calendar from "@/components/Calendar";
-import AnimatedList from "@/components/ui/AnimatedList";
-import AdminStatsCard from "@/components/admin/AdminStatsCard";
 import {
   Users,
   GraduationCap,
   BookOpen,
   DollarSign,
-  FileText,
-  Bell,
   TrendingUp,
-  Menu,
-  Clock,
   Layout,
-  Zap,
-  Activity,
   Video,
   Calendar as CalendarIcon,
   Lock,
@@ -113,12 +104,26 @@ const statsData = [
   },
 ];
 
+interface CalendarEvent {
+  id: string;
+  title: string;
+  topic: string;
+  type: string;
+  date: string;
+  startTime: string;
+  endTime?: string;
+  status: string;
+  courseName?: string;
+  subjectName?: string;
+  link: string;
+  rawStartTime?: string;
+  duration?: number;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
-  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
-  const [isCalendarLoading, setIsCalendarLoading] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isAllSchedulesOpen, setIsAllSchedulesOpen] = React.useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   useEffect(() => {
     const currentUser = pb.authStore.model;
@@ -137,8 +142,6 @@ export default function AdminDashboard() {
 
   const fetchCalendarEvents = async () => {
     try {
-      setIsCalendarLoading(true);
-
       // 1. Fetch all Classes
       const classes = await pb.collection("classes").getFullList({
         filter: 'status != "cancelled"',
@@ -152,7 +155,7 @@ export default function AdminDashboard() {
       });
 
       // 3. Format Events
-      const classEvents = classes.map((c: any) => {
+      const classEvents = classes.map((c) => {
         const cs = c.expand?.course_subject;
         const subject = cs?.expand?.subject;
         const course = cs?.expand?.course_intake?.expand?.course;
@@ -181,7 +184,7 @@ export default function AdminDashboard() {
         };
       });
 
-      const assignmentEvents = assignments.map((a: any) => {
+      const assignmentEvents = assignments.map((a) => {
         const cs = a.expand?.course_subject;
         const subject = cs?.expand?.subject;
         const course = cs?.expand?.course_intake?.expand?.course;
@@ -205,10 +208,7 @@ export default function AdminDashboard() {
       });
 
       setCalendarEvents([...classEvents, ...assignmentEvents]);
-    } catch (error) {
-      console.error("Error fetching calendar events:", error);
     } finally {
-      setIsCalendarLoading(false);
     }
   };
   // Show disabled account message if account is disabled
@@ -252,7 +252,7 @@ export default function AdminDashboard() {
     classTitle: c.title,
     startTime: c.date + "T" + (c.startTime || "00:00") + ":00Z",
     duration: c.duration ?? 60,
-    status: (c.status as any) ?? "scheduled",
+    status: (c.status as "scheduled" | "ongoing" | "completed") ?? "scheduled",
     zoomJoinUrl: c.joinUrl ?? "",
   }));
 
@@ -391,43 +391,3 @@ export default function AdminDashboard() {
   );
 }
 
-function DateTimeStatCard() {
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const timer = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  if (!now) return null;
-
-  const time = now.toLocaleTimeString("en-US", {
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const date = now.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-
-  return (
-    <div className="bg-white rounded-[1.8rem] shadow-sm border border-gray-100 px-6 py-3 flex items-center gap-4 hover:shadow-md transition-all group">
-      <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-        <Clock size={18} />
-      </div>
-      <div className="flex flex-col">
-        <span className="text-xl font-black text-gray-900 tracking-tight leading-none group-hover:text-indigo-600 transition-colors">
-          {time}
-        </span>
-        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">
-          {date.toUpperCase()}
-        </span>
-      </div>
-    </div>
-  );
-}

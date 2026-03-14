@@ -90,10 +90,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Error promoting user:", error);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Error promoting user:", err);
     return NextResponse.json(
-      { error: error?.message || "Failed to promote user" },
+      { error: err?.message || "Failed to promote user" },
       { status: 500 },
     );
   }

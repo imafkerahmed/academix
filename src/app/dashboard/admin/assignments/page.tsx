@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -94,6 +94,8 @@ export default function AssignmentManagement() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const nowTimestamp = useMemo(() => Date.now(), []);
+
   // Create Assignment Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -110,7 +112,7 @@ export default function AssignmentManagement() {
     marker: "",
     open_after_due: false,
     issued_at: new Date().toISOString().split("T")[0],
-    due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    due_date: new Date(nowTimestamp + 7 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
     opens_at: new Date().toISOString().split("T")[0],
@@ -126,6 +128,62 @@ export default function AssignmentManagement() {
     grade: "",
     feedback: "",
   });
+
+  const fetchMarkers = useCallback(async () => {
+    try {
+      const records = await pb.collection("users").getFullList({
+        filter: 'role = "lecturer"',
+      });
+      setMarkers(records);
+    } catch (error) {
+      console.error("Error fetching markers:", error);
+    }
+  }, []);
+
+  const fetchOngoingSubjects = useCallback(async () => {
+    try {
+      const records = await pb.collection("course_subjects").getFullList({
+        filter: 'course_intake.course_status = "ongoing"',
+        expand: "subject,course_intake.course,course_intake.intake",
+      });
+      setOngoingSubjects(records);
+    } catch (error) {
+      console.error("Error fetching ongoing subjects:", error);
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const assignmentsPromise = pb
+        .collection("assignments")
+        .getFullList({
+          expand: "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
+          sort: "-created",
+        })
+        .catch(() => []);
+
+      const submissionsPromise = pb
+        .collection("assignment_submissions")
+        .getFullList({
+          expand: "student,assignment",
+          sort: "-created",
+        })
+        .catch(() => []);
+
+      const [assignmentsData, submissionsData] = await Promise.all([
+        assignmentsPromise,
+        submissionsPromise,
+      ]);
+
+      setAssignments((assignmentsData as any) || []);
+      setSubmissions((submissionsData as any) || []);
+      setLoading(false);
+    } catch (error) {
+      setAssignments([]);
+      setSubmissions([]);
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let isSubscribed = false;
@@ -151,30 +209,7 @@ export default function AssignmentManagement() {
         pb.collection("assignment_submissions").unsubscribe("*").catch(() => {});
       }
     };
-  }, []);
-
-  const fetchMarkers = async () => {
-    try {
-      const records = await pb.collection("users").getFullList({
-        filter: 'role = "lecturer"',
-      });
-      setMarkers(records);
-    } catch (error) {
-      console.error("Error fetching markers:", error);
-    }
-  };
-
-  const fetchOngoingSubjects = async () => {
-    try {
-      const records = await pb.collection("course_subjects").getFullList({
-        filter: 'course_intake.course_status = "ongoing"',
-        expand: "subject,course_intake.course,course_intake.intake",
-      });
-      setOngoingSubjects(records);
-    } catch (error) {
-      console.error("Error fetching ongoing subjects:", error);
-    }
-  };
+  }, [fetchData, fetchMarkers, fetchOngoingSubjects]);
 
   const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,7 +254,7 @@ export default function AssignmentManagement() {
       marker: "",
       open_after_due: false,
       issued_at: new Date().toISOString().split("T")[0],
-      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      due_date: new Date(nowTimestamp + 7 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0],
       opens_at: new Date().toISOString().split("T")[0],
@@ -249,39 +284,6 @@ export default function AssignmentManagement() {
     } catch (error) {
       console.error("Error grading submission:", error);
       toast.error("Failed to submit grade");
-    }
-  };
-
-  const fetchData = async () => {
-    try {
-      const assignmentsPromise = pb
-        .collection("assignments")
-        .getFullList({
-          expand: "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
-          sort: "-created",
-        })
-        .catch(() => []);
-
-      const submissionsPromise = pb
-        .collection("assignment_submissions")
-        .getFullList({
-          expand: "student,assignment",
-          sort: "-created",
-        })
-        .catch(() => []);
-
-      const [assignmentsData, submissionsData] = await Promise.all([
-        assignmentsPromise,
-        submissionsPromise,
-      ]);
-
-      setAssignments((assignmentsData as any) || []);
-      setSubmissions((submissionsData as any) || []);
-      setLoading(false);
-    } catch (error) {
-      setAssignments([]);
-      setSubmissions([]);
-      setLoading(false);
     }
   };
 

@@ -18,7 +18,7 @@ export async function POST(
     // Fetch the user record first so we can default the password to userId
     const user = await pb.collection("users").getOne(id);
 
-    const userIdField = (user as any).userId as string | undefined;
+    const userIdField = (user as unknown as { userId?: string }).userId;
 
     const finalPassword = newPasswordFromBody || userIdField;
 
@@ -37,16 +37,17 @@ export async function POST(
     });
 
     return NextResponse.json({ record: updated });
-  } catch (err: any) {
-    console.error("Admin reset password error:", err);
+  } catch (err: unknown) {
+    const error = err as { status?: number; message?: string; data?: unknown };
+    console.error("Admin reset password error:", error);
 
-    const status = err?.status || 500;
-    const errorPayload: any = {
-      error: err?.message || "Failed to reset password",
+    const status = error?.status || 500;
+    const errorPayload: Record<string, unknown> = {
+      error: error?.message || "Failed to reset password",
     };
 
-    if (err?.data) {
-      errorPayload.data = err.data;
+    if (error?.data) {
+      errorPayload.data = error.data;
     }
 
     return NextResponse.json(errorPayload, { status });

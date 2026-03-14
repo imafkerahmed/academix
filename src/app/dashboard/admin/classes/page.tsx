@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -118,6 +118,50 @@ export default function ClassManagement() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const nowTimestamp = useMemo(() => Date.now(), []);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const records = await pb
+        .collection("classes")
+        .getFullList({
+          sort: "-start_time",
+          expand:
+            "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,lecturer",
+        })
+        .catch(() => []);
+
+      setClasses((records as any) || []);
+      setLoading(false);
+    } catch (error) {
+      setClasses([]);
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchLecturers = useCallback(async () => {
+    try {
+      const records = await pb.collection("users").getFullList({
+        filter: 'role = "lecturer"',
+      });
+      setLecturers(records);
+    } catch (error) {
+      console.error("Error fetching lecturers:", error);
+    }
+  }, []);
+
+  const fetchOngoingSubjects = useCallback(async () => {
+    try {
+      const records = await pb.collection("course_subjects").getFullList({
+        filter: 'course_intake.course_status = "ongoing"',
+        expand: "subject,course_intake.course,course_intake.intake",
+      });
+      setOngoingSubjects(records);
+    } catch (error) {
+      console.error("Error fetching ongoing subjects:", error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchData();
     fetchLecturers();
@@ -131,7 +175,7 @@ export default function ClassManagement() {
     return () => {
       pb.collection("classes").unsubscribe("*");
     };
-  }, [router]);
+  }, [fetchData, fetchLecturers, fetchOngoingSubjects]);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);
@@ -176,28 +220,7 @@ export default function ClassManagement() {
     nearestDefaults.amPm,
   );
 
-  const fetchLecturers = async () => {
-    try {
-      const records = await pb.collection("users").getFullList({
-        filter: 'role = "lecturer"',
-      });
-      setLecturers(records);
-    } catch (error) {
-      console.error("Error fetching lecturers:", error);
-    }
-  };
 
-  const fetchOngoingSubjects = async () => {
-    try {
-      const records = await pb.collection("course_subjects").getFullList({
-        filter: 'course_intake.course_status = "ongoing"',
-        expand: "subject,course_intake.course,course_intake.intake",
-      });
-      setOngoingSubjects(records);
-    } catch (error) {
-      console.error("Error fetching ongoing subjects:", error);
-    }
-  };
 
   const handleCreateClass = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -228,7 +251,7 @@ export default function ClassManagement() {
       }
 
       // Generate unique galene_group for each class
-      const galeneGroup = `class-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const galeneGroup = `class-${nowTimestamp}-${Math.floor(Math.random() * 10000)}`;
 
       // Resolve subject names for the title
       const selectedSubjectsData = ongoingSubjects.filter((s) =>
@@ -330,24 +353,6 @@ export default function ClassManagement() {
     }
   };
 
-  const fetchData = async () => {
-    try {
-      const records = await pb
-        .collection("classes")
-        .getFullList({
-          sort: "-start_time",
-          expand:
-            "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,lecturer",
-        })
-        .catch(() => []);
-
-      setClasses((records as any) || []);
-      setLoading(false);
-    } catch (error) {
-      setClasses([]);
-      setLoading(false);
-    }
-  };
 
   const handleLogout = () => {
     logout();
@@ -368,7 +373,7 @@ export default function ClassManagement() {
 
     const scheduledEnd =
       new Date(classItem.start_time).getTime() + classItem.duration * 60000;
-    const isWithinTimeWindow = Date.now() < scheduledEnd;
+    const isWithinTimeWindow = nowTimestamp < scheduledEnd;
     const isEndedEarly = classItem.status === "completed" && isWithinTimeWindow;
 
     // Treat 'ended early' classes as 'scheduled' for tab filtering

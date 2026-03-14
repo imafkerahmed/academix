@@ -1,10 +1,9 @@
 "use client";
 
-import * as React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
 import {
   Edit,
   BookOpen,
@@ -92,11 +91,7 @@ export default function CourseDetailsPage() {
     duration: "",
   });
 
-  useEffect(() => {
-    if (intakeId && courseId) fetchData();
-  }, [intakeId, courseId]);
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [intakeRecord, courseRecord, courseIntakesData] = await Promise.all(
@@ -212,7 +207,11 @@ export default function CourseDetailsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [intakeId, courseId, router]);
+
+  useEffect(() => {
+    if (intakeId && courseId) fetchData();
+  }, [intakeId, courseId, fetchData]);
 
   async function handleSaveEditCourse(e: React.FormEvent) {
     e.preventDefault();
@@ -1323,7 +1322,6 @@ export default function CourseDetailsPage() {
           setShowAddStudentModal(false);
           setStudentsRefreshKey((prev) => prev + 1); // Trigger refresh
         }}
-        intakeId={intakeId}
         courseIntakeId={courseIntake?.id || ""}
       />
     </div>

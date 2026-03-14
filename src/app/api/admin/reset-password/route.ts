@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import PocketBase from "pocketbase";
+import { User } from "@/lib/pocketbase";
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const userRole = (pb.authStore.model as any)?.role;
+    const userRole = (pb.authStore.model as unknown as User)?.role;
     if (userRole !== "admin" && userRole !== "superuser") {
       console.error("User role is not admin or superuser:", userRole);
       return NextResponse.json(
@@ -83,11 +84,12 @@ export async function POST(req: NextRequest) {
 
     try {
       await adminPb.admins.authWithPassword(adminEmail, adminPassword);
-    } catch (adminAuthError: any) {
+    } catch (adminAuthError: unknown) {
+      const err = adminAuthError as { message?: string; response?: unknown };
       console.error(
         "Admin auth failed:",
-        adminAuthError?.message,
-        adminAuthError?.response,
+        err?.message,
+        err?.response,
       );
       return NextResponse.json(
         {
@@ -105,25 +107,33 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, record });
-  } catch (error: any) {
-    console.error("Password reset error:", error);
+  } catch (error: unknown) {
+    const err = error as {
+      data?: { data?: Record<string, string | { message?: string }> };
+      message?: string;
+      status?: number;
+    };
+    console.error("Password reset error:", err);
     let errorMessage = "Failed to reset password.";
 
-    if (error?.data?.data) {
+    if (err?.data?.data) {
       // Extract validation error details from PocketBase
-      const validationErrors = error.data.data;
+      const validationErrors = err.data.data;
       errorMessage =
         Object.entries(validationErrors)
-          .map(([key, err]: [string, any]) => `${key}: ${err.message || err}`)
+          .map(([key, val]) => {
+            const detail = typeof val === "string" ? val : val.message || JSON.stringify(val);
+            return `${key}: ${detail}`;
+          })
           .join("; ") || errorMessage;
-    } else if (error?.message) {
-      errorMessage = error.message;
+    } else if (err?.message) {
+      errorMessage = err.message;
     }
 
     console.error("Returning error to client:", errorMessage);
     return NextResponse.json(
       { error: errorMessage },
-      { status: error?.status || 400 },
+      { status: err?.status || 400 },
     );
   }
 }

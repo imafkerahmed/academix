@@ -3,24 +3,15 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LayoutDashboard,
-  TrendingUp,
   Calendar as CalendarIcon,
-  BookOpen,
-  CheckCircle2,
-  Clock,
-  GraduationCap,
   Megaphone,
   Bell,
-  Info,
   X as CloseIcon,
   Loader2,
   Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import StatsCarousel from "@/components/admin/StatsCarousel";
-import AdminStatsCard from "@/components/admin/AdminStatsCard";
 import StudentProfile from "@/components/student-profile";
 import Section5Schedules from "@/components/Schedules";
 import Calendar from "@/components/Calendar";
@@ -41,15 +32,260 @@ interface Announcement {
   };
 }
 
+interface EnrollmentRecord {
+  id: string;
+  course_intake: string;
+  status: string;
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  topic?: string;
+  type: string;
+  date: string;
+  startTime: string;
+  endTime?: string;
+  status: string;
+  courseName?: string;
+  subjectName?: string;
+  link: string;
+  rawStartTime?: string;
+  duration?: number;
+}
+
+interface StudentUser {
+  id: string;
+  name?: string;
+  userId?: string;
+  avatar?: string;
+  accountStatus?: string;
+  academicAdvisor?: string;
+}
+
+interface PBClass {
+  id: string;
+  topic?: string;
+  type?: string;
+  start_time: string;
+  duration: number;
+  zoom_link?: string;
+  status: string;
+  expand?: {
+    course_subject?: {
+      id: string;
+      course_intake?: string;
+      expand?: {
+        subject?: { name: string; id: string };
+        course_intake?: {
+          expand?: {
+            course?: { name: string };
+          };
+        };
+      };
+    };
+  };
+}
+
+interface PBAssignment {
+  id: string;
+  title: string;
+  deadline?: string;
+  due_date?: string;
+  created: string;
+  expand?: {
+    course_subject?: {
+      id: string;
+      course_intake?: string;
+      expand?: {
+        subject?: { name: string; id: string };
+        course_intake?: {
+          expand?: {
+            course?: { name: string };
+          };
+        };
+      };
+    };
+  };
+}
+
 export default function StudentDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const [courses, setCourses] = useState<any[]>([]);
-  const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [user, setUser] = useState<StudentUser | null>(null);
+  const [enrollments, setEnrollments] = useState<EnrollmentRecord[]>([]);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
-  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
+
+
+  const fetchCalendarEvents = React.useCallback(async () => {
+    try {
+      setIsCalendarLoading(true);
+      const currentUser = pb.authStore.model;
+      if (!currentUser) return;
+
+      // 1. Fetch enrollments
+      const token = pb.authStore.token;
+      const resp = await fetch("/api/student/enrollments", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) throw new Error("Failed to fetch enrollments");
+      const { enrollments: enrollmentRecords } = await resp.json();
+
+      const intakeIds = enrollmentRecords.map((e: { course_intake: string }) => e.course_intake);
+      if (intakeIds.length === 0) {
+        setCalendarEvents([]);
+        return;
+      }
+
+      // 2. Fetch course subject IDs
+      const csFilter = intakeIds
+        .map((id: string) => `course_intake = "${id}"`)
+        .join(" || ");
+
+      const matchingCourseSubjects = await pb
+        .collection("course_subjects")
+        .getFullList({
+          filter: csFilter,
+          fields: "id",
+        });
+
+      const csIds = matchingCourseSubjects.map((cs) => cs.id);
+      if (csIds.length === 0) {
+        setCalendarEvents([]);
+        return;
+      }
+
+      // 3. Fetch Classes
+      const classFilter = csIds
+        .map((id: string) => `course_subject ~ "${id}"`)
+        .join(" || ");
+
+      const classes = (await pb.collection("classes").getFullList({
+        filter: `(${classFilter}) && status != "cancelled"`,
+        expand: "course_subject.subject,course_intake.course",
+        sort: "start_time",
+      })) as unknown as PBClass[];
+
+      // 4. Fetch Assignments
+      const assignmentFilter = csIds
+        .map((id: string) => `course_subject = "${id}"`)
+        .join(" || ");
+
+      const assignments = (await pb.collection("assignments").getFullList({
+        filter: assignmentFilter,
+        expand: "course_subject.subject,course_subject.course_intake.course",
+      })) as unknown as PBAssignment[];
+
+      // 5. Format Events
+      const classEvents = classes.map((c: PBClass) => {
+        const cs = Array.isArray(c.expand?.course_subject) ? c.expand.course_subject[0] : c.expand?.course_subject;
+        const subject = cs?.expand?.subject;
+        const course = cs?.expand?.course_intake?.expand?.course;
+        
+        // Find enrollment for this course_intake to build the link
+        const enrollment = enrollments.find((e: EnrollmentRecord) => e.course_intake === cs?.course_intake);
+        const link = enrollment ? `/dashboard/student/courses/${enrollment.id}/subjects/${subject?.id}` : "";
+
+        const subjectName = subject?.name || (Array.isArray(subject) ? subject[0]?.name : subject?.name);
+        
+        return {
+          id: c.id,
+          title: subjectName || "Class",
+          topic: c.topic || "",
+          type: (c.type === "Online Class" ? "Online Class" : c.type) || "Online Class",
+          date: new Date(c.start_time).toISOString().slice(0, 10),
+          startTime: new Date(c.start_time).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          endTime: new Date(
+            new Date(c.start_time).getTime() + c.duration * 60000,
+          ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          status: c.status,
+          courseName: course?.name,
+          subjectName: subjectName,
+          link: c.zoom_link || link,
+          rawStartTime: c.start_time,
+          duration: c.duration,
+        };
+      });
+
+      const assignmentEvents = assignments.map((a: PBAssignment) => {
+        const cs = a.expand?.course_subject;
+        const subject = cs?.expand?.subject;
+        const course = cs?.expand?.course_intake?.expand?.course;
+        
+        // Find enrollment for this course_intake to build the link
+        const enrollment = enrollments.find((e: EnrollmentRecord) => e.course_intake === cs?.course_intake);
+        const link = enrollment ? `/dashboard/student/courses/${enrollment.id}/subjects/${subject?.id}?tab=assignments` : "";
+
+        const dueDate = a.deadline || a.due_date || a.created;
+        return {
+          id: a.id,
+          title: `Assignment: ${a.title}`,
+          topic: "",
+          type: "Assignment",
+          date: new Date(dueDate).toISOString().slice(0, 10),
+          startTime: new Date(dueDate).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          status: "pending",
+          courseName: course?.name,
+          subjectName: subject?.name,
+          link: link,
+        };
+      });
+
+      setCalendarEvents([...classEvents, ...assignmentEvents]);
+    } catch (error) {
+      console.error("Error fetching calendar events:", error);
+    } finally {
+      setIsCalendarLoading(false);
+    }
+  }, [enrollments]);
+
+  const fetchStudentData = React.useCallback(async (studentId: string) => {
+    try {
+      // Fetch enrollments via API endpoint
+      const token = pb.authStore.token;
+      const response = await fetch("/api/student/enrollments", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw { status: response.status, message: response.statusText };
+      }
+
+      const data = await response.json();
+      const enrollmentRecords = data.enrollments;
+
+      setEnrollments(enrollmentRecords);
+
+      // courseList removal since it was unused
+      console.log("Fetching data for student:", studentId);
+    } catch (error: unknown) {
+      console.error("Error fetching student data:", error);
+      // Handle permission errors by redirecting to login
+      const err = error as { status?: number; message?: string };
+      if (err?.status === 403 || err?.status === 404) {
+        toast.error("Permission denied. Please log in again.");
+        setLoading(false);
+        await pb.authStore.clear();
+        router.push("/login");
+        return;
+      }
+      // For other errors, use empty data
+      setEnrollments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
   // Check account status on initial load
   useEffect(() => {
@@ -80,227 +316,15 @@ export default function StudentDashboard() {
         return;
       }
 
-      setUser(latestUser);
+      setUser(latestUser as unknown as StudentUser);
       fetchStudentData(latestUser.id);
       fetchCalendarEvents();
     };
 
     checkAccountStatus();
-  }, [router]);
+  }, [router, fetchStudentData, fetchCalendarEvents]);
 
-  const fetchCalendarEvents = async () => {
-    try {
-      setIsCalendarLoading(true);
-      const currentUser = pb.authStore.model;
-      if (!currentUser) return;
-
-      // 1. Fetch enrollments
-      const token = pb.authStore.token;
-      const resp = await fetch("/api/student/enrollments", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok) throw new Error("Failed to fetch enrollments");
-      const { enrollments: enrollmentRecords } = await resp.json();
-
-      const intakeIds = enrollmentRecords.map((e: any) => e.course_intake);
-      if (intakeIds.length === 0) {
-        setCalendarEvents([]);
-        return;
-      }
-
-      // 2. Fetch course subject IDs
-      const csFilter = intakeIds
-        .map((id: string) => `course_intake = "${id}"`)
-        .join(" || ");
-
-      const matchingCourseSubjects = await pb
-        .collection("course_subjects")
-        .getFullList({
-          filter: csFilter,
-          fields: "id",
-        });
-
-      const csIds = matchingCourseSubjects.map((cs) => cs.id);
-      if (csIds.length === 0) {
-        setCalendarEvents([]);
-        return;
-      }
-
-      // 3. Fetch Classes
-      const classFilter = csIds
-        .map((id: string) => `course_subject ~ "${id}"`)
-        .join(" || ");
-
-      const classes = await pb.collection("classes").getFullList({
-        filter: `(${classFilter}) && status != "cancelled"`,
-        expand: "course_subject.subject,course_subject.course_intake.course",
-        sort: "start_time",
-      });
-
-      // 4. Fetch Assignments
-      const assignmentFilter = csIds
-        .map((id: string) => `course_subject = "${id}"`)
-        .join(" || ");
-
-      const assignments = await pb.collection("assignments").getFullList({
-        filter: assignmentFilter,
-        expand: "course_subject.subject,course_subject.course_intake.course",
-      });
-
-      // 5. Format Events
-      const classEvents = classes.map((c: any) => {
-        const cs = Array.isArray(c.expand?.course_subject) ? c.expand.course_subject[0] : c.expand?.course_subject;
-        const subject = cs?.expand?.subject;
-        const course = cs?.expand?.course_intake?.expand?.course;
-        
-        // Find enrollment for this course_intake to build the link
-        const enrollment = enrollments.find(e => e.course_intake === cs?.course_intake);
-        const link = enrollment ? `/dashboard/student/courses/${enrollment.id}/subjects/${subject?.id}` : "";
-
-        const subjectName = subject?.name || (Array.isArray(subject) ? subject[0]?.name : subject?.name);
-        
-        return {
-          id: c.id,
-          title: subjectName || "Class",
-          topic: c.topic || "",
-          type: (c.type === "Online Class" ? "Online Class" : c.type) || "Online Class",
-          date: new Date(c.start_time).toISOString().slice(0, 10),
-          startTime: new Date(c.start_time).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          endTime: new Date(
-            new Date(c.start_time).getTime() + c.duration * 60000,
-          ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          status: c.status,
-          courseName: course?.name,
-          subjectName: subjectName,
-          link: c.zoom_link || link,
-          rawStartTime: c.start_time,
-          duration: c.duration,
-        };
-      });
-
-      const assignmentEvents = assignments.map((a: any) => {
-        const cs = a.expand?.course_subject;
-        const subject = cs?.expand?.subject;
-        const course = cs?.expand?.course_intake?.expand?.course;
-        
-        // Find enrollment for this course_intake to build the link
-        const enrollment = enrollments.find(e => e.course_intake === cs?.course_intake);
-        const link = enrollment ? `/dashboard/student/courses/${enrollment.id}/subjects/${subject?.id}?tab=assignments` : "";
-
-        const dueDate = a.deadline || a.due_date || a.created;
-        return {
-          id: a.id,
-          title: `Assignment: ${a.title}`,
-          topic: "",
-          type: "Assignment",
-          date: new Date(dueDate).toISOString().slice(0, 10),
-          startTime: new Date(dueDate).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          status: "pending",
-          courseName: course?.name,
-          subjectName: subject?.name,
-          link: link,
-        };
-      });
-
-      setCalendarEvents([...classEvents, ...assignmentEvents]);
-    } catch (error) {
-      console.error("Error fetching calendar events:", error);
-    } finally {
-      setIsCalendarLoading(false);
-    }
-  };
-
-  const fetchStudentData = async (studentId: string) => {
-    try {
-      // Fetch enrollments via API endpoint
-      const token = pb.authStore.token;
-      const response = await fetch("/api/student/enrollments", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw { status: response.status, message: response.statusText };
-      }
-
-      const data = await response.json();
-      const enrollmentRecords = data.enrollments;
-
-      setEnrollments(enrollmentRecords);
-
-      // Transform enrollments into basic format
-      const courseList = enrollmentRecords.map(
-        (enrollment: any, index: number) => ({
-          id: enrollment.id,
-          name: `Course ${index + 1}`,
-          registrationNumber: enrollment.id.substring(0, 15).toUpperCase(),
-          description: "",
-          courseStatus:
-            enrollment.status === "completed" ? "Completed" : "Ongoing",
-          certificateStatus: "Not Issued",
-        }),
-      );
-
-      setCourses(courseList);
-    } catch (error: any) {
-      console.error("Error fetching student data:", error);
-      // Handle permission errors by redirecting to login
-      if (error?.status === 403 || error?.status === 404) {
-        toast.error("Permission denied. Please log in again.");
-        setLoading(false);
-        await pb.authStore.clear();
-        router.push("/login");
-        return;
-      }
-      // For other errors, use empty data
-      setCourses([]);
-      setEnrollments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const statsData = [
-    {
-      title: "Enrolled Courses",
-      value: courses.length,
-      icon: BookOpen,
-      bgColor: "bg-blue-50",
-      iconColor: "text-blue-600",
-      trend: { value: "Active", isPositive: true },
-    },
-    {
-      title: "Completed",
-      value: courses.filter((c) => c.courseStatus === "Completed").length,
-      icon: CheckCircle2,
-      bgColor: "bg-green-50",
-      iconColor: "text-green-600",
-      trend: { value: "Finished", isPositive: true },
-    },
-    {
-      title: "In Progress",
-      value: courses.filter((c) => c.courseStatus === "Ongoing").length,
-      icon: Clock,
-      bgColor: "bg-amber-50",
-      iconColor: "text-amber-600",
-      trend: { value: "Ongoing", isPositive: true },
-    },
-    {
-      title: "Certificates",
-      value: courses.filter((c) => c.certificateStatus === "Issued").length,
-      icon: GraduationCap,
-      bgColor: "bg-indigo-50",
-      iconColor: "text-indigo-600",
-      trend: { value: "Issued", isPositive: true },
-    },
-  ];
+  // statsData was unused, removed.
 
   const [isPortalOpen, setIsPortalOpen] = React.useState(false);
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
@@ -308,11 +332,11 @@ export default function StudentDashboard() {
     (a: Announcement) => !a.isRead,
   ).length;
 
-  const markAllAsRead = () => {
+  const markAllAsRead = React.useCallback(() => {
     setAnnouncements(
       announcements.map((a: Announcement) => ({ ...a, isRead: true })),
     );
-  };
+  }, [announcements]);
 
   // Background Scroll Lock
   React.useEffect(() => {
@@ -483,7 +507,7 @@ export default function StudentDashboard() {
                   </div>
                   <div>
                     <h2 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
-                      What's <span className="text-indigo-600">New</span>
+                      What&apos;s <span className="text-indigo-600">New</span>
                     </h2>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
                       {unreadCount} UNREAD UPDATES

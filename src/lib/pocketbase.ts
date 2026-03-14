@@ -23,7 +23,7 @@ export interface User {
   username: string;
   name: string;
   full_name?: string;
-  role: "host" | "attendee" | "admin" | "student" | "lecturer";
+  role: "host" | "attendee" | "admin" | "student" | "lecturer" | "superuser";
   avatar?: string;
   verified: boolean;
   accountStatus?: "active" | "disabled";
@@ -71,46 +71,7 @@ export interface ClassAttendee {
 
 // Helper functions
 // Removed duplicate isAuthenticated and getCurrentUser
-
 // Removed duplicate logout
-
-export interface ZoomToken {
-  id: string;
-  user: string;
-  access_token: string;
-  refresh_token: string;
-  expires_at: string;
-  zoom_user_id?: string;
-  created: string;
-  updated: string;
-}
-
-export interface Class {
-  id: string;
-  host: string;
-  title: string;
-  description?: string;
-  zoom_meeting_id?: string;
-  zoom_join_url?: string;
-  zoom_start_url?: string;
-  recurrence_rule?: Record<string, unknown>;
-  start_time: string;
-  duration?: number;
-  is_recurring: boolean;
-  status: "scheduled" | "in_progress" | "completed" | "cancelled";
-  created: string;
-  updated: string;
-}
-
-export interface ClassAttendee {
-  id: string;
-  class: string;
-  attendee: string;
-  joined_at?: string;
-  status: "registered" | "attended" | "absent";
-  created: string;
-  updated: string;
-}
 
 export interface Intake {
   id: string;

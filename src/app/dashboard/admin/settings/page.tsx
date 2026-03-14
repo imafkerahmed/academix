@@ -27,8 +27,9 @@ export default function SettingsPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    setLoading(false);
-  }, [router]);
+    // Prevent cascading render by only setting loading if it's currently true
+    setLoading(prev => prev ? false : prev);
+  }, []);
 
   const handleLogout = () => {
     logout();

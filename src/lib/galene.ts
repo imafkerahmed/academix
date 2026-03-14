@@ -471,7 +471,7 @@ export class GaleneClient {
       if (event.streams.length > 0) {
         downEntry.stream = event.streams[0];
       } else {
-        event.track && downEntry.stream.addTrack(event.track);
+        if (event.track) downEntry.stream.addTrack(event.track);
       }
       this.emit("remoteStream", {
         id,

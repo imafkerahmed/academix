@@ -1,127 +1,158 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ShieldX,
-  Menu,
   Layout,
   TrendingUp,
   Clock,
   GraduationCap,
   BookOpen,
-  FileEdit,
   Video,
-  CalendarIcon,
   Lock,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import pb from "@/lib/pocketbase";
-import Sidebar from "@/components/lecturer/Sidebar";
 import UpcomingClasses, {
   type UpcomingClass,
 } from "@/components/lecturer/UpcomingClasses";
 import AllSchedulesModal from "@/components/lecturer/AllSchedulesModal";
-import IntakesTree, {
+import {
   type Intake,
   type Course,
   type Subject,
-} from "@/components/lecturer/IntakesTree";
+  type User,
+} from "@/lib/pocketbase";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 
 // Mock user type
-interface MockUser {
-  id: string;
+// Mock user type deleted - unused
+
+// UI specific types extending PB types
+interface UIIntake extends Intake {
   name: string;
-  role: "lecturer" | "student" | "admin";
-  accountStatus: "active" | "disabled";
+  courses: UICourse[];
 }
 
-// Mock data
-const mockUser: MockUser = {
-  id: "lect-001",
-  name: "Dr. Sarah Johnson",
-  role: "lecturer",
-  accountStatus: "active",
-};
+interface UICourse extends Course {
+  subjects: UISubject[];
+}
 
-const mockIntakes: Intake[] = [
+interface UISubject extends Subject {
+  assigned: boolean;
+}
+
+// Mock data deleted - using PB data directly or refined types
+
+const mockIntakes: UIIntake[] = [
   {
     id: "intake-1",
     code: "INT-2024-01",
     name: "January 2024 Intake",
-    startDate: "2024-01-15",
-    endDate: "2024-06-30",
+    start_date: "2024-01-15",
+    end_date: "2024-06-30",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    intakeStatus: "ongoing",
     courses: [
       {
         id: "course-1",
         name: "Computer Science Fundamentals",
         code: "CS101",
-        subjects: [
-          {
-            id: "subject-1",
-            name: "Programming Basics",
-            code: "CS101-A",
-            assigned: true,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString(),
+            subjects: [
+              {
+                id: "subject-1",
+                name: "Programming Basics",
+                code: "CS101-A",
+                assigned: true,
+                description: "Basic programming",
+                created: new Date().toISOString(),
+                updated: new Date().toISOString(),
+              },
+              {
+                id: "subject-2",
+                name: "Data Structures",
+                code: "CS101-B",
+                assigned: true,
+                description: "Data structs",
+                created: new Date().toISOString(),
+                updated: new Date().toISOString(),
+              },
+              {
+                id: "subject-3",
+                name: "Algorithms",
+                code: "CS101-C",
+                assigned: false,
+                description: "Algorithms",
+                created: new Date().toISOString(),
+                updated: new Date().toISOString(),
+              },
+            ],
           },
           {
-            id: "subject-2",
-            name: "Data Structures",
-            code: "CS101-B",
-            assigned: true,
-          },
-          {
-            id: "subject-3",
-            name: "Algorithms",
-            code: "CS101-C",
-            assigned: false,
+            id: "course-2",
+            name: "Web Development",
+            code: "WEB201",
+            created: new Date().toISOString(),
+            updated: new Date().toISOString(),
+            subjects: [
+              {
+                id: "subject-4",
+                name: "Frontend Development",
+                code: "WEB201-A",
+                assigned: true,
+                description: "Frontend",
+                created: new Date().toISOString(),
+                updated: new Date().toISOString(),
+              },
+              {
+                id: "subject-5",
+                name: "Backend Development",
+                code: "WEB201-B",
+                assigned: false,
+                description: "Backend",
+                created: new Date().toISOString(),
+                updated: new Date().toISOString(),
+              },
+            ],
           },
         ],
       },
       {
-        id: "course-2",
-        name: "Web Development",
-        code: "WEB201",
-        subjects: [
+        id: "intake-2",
+        code: "INT-2024-02",
+        name: "March 2024 Intake",
+        start_date: "2024-03-01",
+        end_date: "2024-08-31",
+        created: new Date().toISOString(),
+        updated: new Date().toISOString(),
+        intakeStatus: "ongoing",
+        courses: [
           {
-            id: "subject-4",
-            name: "Frontend Development",
-            code: "WEB201-A",
-            assigned: true,
-          },
-          {
-            id: "subject-5",
-            name: "Backend Development",
-            code: "WEB201-B",
-            assigned: false,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "intake-2",
-    code: "INT-2024-02",
-    name: "March 2024 Intake",
-    startDate: "2024-03-01",
-    endDate: "2024-08-31",
-    courses: [
-      {
-        id: "course-3",
-        name: "Mathematics",
-        code: "MATH101",
-        subjects: [
-          {
-            id: "subject-6",
-            name: "Calculus I",
-            code: "MATH101-A",
-            assigned: true,
+            id: "course-3",
+            name: "Mathematics",
+            code: "MATH101",
+            created: new Date().toISOString(),
+            updated: new Date().toISOString(),
+            subjects: [
+              {
+                id: "subject-6",
+                name: "Calculus I",
+                code: "MATH101-A",
+                assigned: true,
+                description: "Calculus",
+                created: new Date().toISOString(),
+                updated: new Date().toISOString(),
+              },
+            ],
           },
         ],
       },
-    ],
-  },
-];
+    ];
 
 // Data fetching for real classes
 const fetchUpcomingClasses = async (
@@ -138,7 +169,7 @@ const fetchUpcomingClasses = async (
     const today = new Date().toISOString().slice(0, 10);
 
     const mappedRecords = records
-      .filter((record: any) => {
+      .filter((record: { status: string; start_time: string }) => {
         if (record.status === "completed") {
           const recordDate = new Date(record.start_time)
             .toISOString()
@@ -147,7 +178,17 @@ const fetchUpcomingClasses = async (
         }
         return true;
       })
-      .map((record: any) => {
+      .map((record: { 
+        id: string; 
+        title: string; 
+        start_time: string; 
+        duration: number; 
+        status: string;
+        expand?: {
+          lecturer?: { name: string };
+          course_subject?: unknown;
+        }
+      }) => {
         const csExpand = record.expand?.course_subject;
         const subjectsArr = Array.isArray(csExpand)
           ? csExpand
@@ -161,8 +202,13 @@ const fetchUpcomingClasses = async (
               ? Array.from(
                   new Set(
                     subjectsArr.map(
-                      (cs: any) =>
-                        cs.expand?.course_intake?.expand?.intake?.code,
+                      (cs: {
+                        expand?: {
+                          course_intake?: {
+                            expand?: { intake?: { code: string } };
+                          };
+                        };
+                      }) => cs.expand?.course_intake?.expand?.intake?.code,
                     ),
                   ),
                 )
@@ -174,8 +220,13 @@ const fetchUpcomingClasses = async (
               ? Array.from(
                   new Set(
                     subjectsArr.map(
-                      (cs: any) =>
-                        cs.expand?.course_intake?.expand?.course?.name,
+                      (cs: {
+                        expand?: {
+                          course_intake?: {
+                            expand?: { course?: { name: string } };
+                          };
+                        };
+                      }) => cs.expand?.course_intake?.expand?.course?.name,
                     ),
                   ),
                 )
@@ -187,9 +238,14 @@ const fetchUpcomingClasses = async (
               ? Array.from(
                   new Set(
                     subjectsArr.map(
-                      (cs: any) =>
-                        cs.expand?.subject?.[0]?.name ||
-                        cs.expand?.subject?.name,
+                      (cs: {
+                        expand?: {
+                          subject?: { name: string } | { name: string }[];
+                        }
+                      }) => {
+                        const s = cs.expand?.subject;
+                        return Array.isArray(s) ? s[0]?.name : s?.name;
+                      }
                     ),
                   ),
                 )
@@ -205,7 +261,7 @@ const fetchUpcomingClasses = async (
           }),
           rawStartTime: record.start_time,
           duration: record.duration,
-          status: record.status as any,
+          status: record.status as "scheduled" | "in_progress" | "completed" | "cancelled",
           lecturerName: record.expand?.lecturer?.name || "Lecturer",
           isMerged,
         };
@@ -215,7 +271,7 @@ const fetchUpcomingClasses = async (
     const activeUpcoming: UpcomingClass[] = [];
     const ended: UpcomingClass[] = [];
 
-    mappedRecords.forEach((item: any) => {
+    mappedRecords.forEach((item: UpcomingClass & { rawStartTime: string }) => {
       const scheduledEnd =
         new Date(item.rawStartTime).getTime() + item.duration * 60000;
       if (now >= scheduledEnd) {
@@ -233,10 +289,9 @@ const fetchUpcomingClasses = async (
 };
 
 function DateTimeStatCard() {
-  const [now, setNow] = useState<Date | null>(null);
+  const [now, setNow] = useState<Date | null>(() => (typeof window !== "undefined" ? new Date() : null));
 
   useEffect(() => {
-    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -273,16 +328,16 @@ function DateTimeStatCard() {
 
 export default function LecturerDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    const currentUser = pb.authStore.model;
-    if (!pb.authStore.isValid || (currentUser as any)?.role !== "lecturer") {
+    const currentUser = pb.authStore.model as User | null;
+    if (!pb.authStore.isValid || currentUser?.role !== "lecturer") {
       router.replace("/login");
       return;
     }
-    setUser(currentUser);
+    Promise.resolve().then(() => setUser(currentUser));
   }, [router]);
 
   const [upcomingClasses, setUpcomingClasses] = useState<UpcomingClass[]>([]);
@@ -294,7 +349,7 @@ export default function LecturerDashboard() {
 
   useEffect(() => {
     if (user?.id) {
-      loadClasses(user.id);
+      Promise.resolve().then(() => loadClasses(user.id));
 
       // Listen for real-time updates
       const subscribeToClasses = async () => {
@@ -315,6 +370,12 @@ export default function LecturerDashboard() {
       };
     }
   }, [user]);
+
+  const [isSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    // Sidebar effect logic
+  }, [isSidebarOpen]);
 
   // Show disabled account message if account is disabled
   if (user?.accountStatus === "disabled") {
@@ -350,8 +411,6 @@ export default function LecturerDashboard() {
     );
   }
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -370,9 +429,10 @@ export default function LecturerDashboard() {
       (sum, intake) =>
         sum +
         intake.courses.reduce(
-          (courseSum: number, course: Course) =>
+          (courseSum: number, course: UICourse) =>
             courseSum +
-            course.subjects.filter((s: Subject) => s.assigned).length,
+            (course.subjects || []).filter((s: UISubject) => s.assigned)
+              .length,
           0,
         ),
       0,
@@ -416,7 +476,7 @@ export default function LecturerDashboard() {
     },
   ];
 
-  if (!user || user.role !== "lecturer" || user.accountStatus === "disabled") {
+  if (!user || user.role !== "lecturer" || (user.accountStatus as string) === "disabled") {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
@@ -429,12 +489,12 @@ export default function LecturerDashboard() {
           <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-6">
             Insufficient permissions
           </p>
-          <a
+          <Link
             href="/"
             className="inline-block px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
           >
             Back to Home
-          </a>
+          </Link>
         </div>
       </div>
     );

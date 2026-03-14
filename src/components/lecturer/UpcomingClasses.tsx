@@ -3,6 +3,7 @@
 import React from "react";
 import { Clock, Timer } from "lucide-react";
 import pb from "@/lib/pocketbase";
+import { useRouter } from "next/navigation";
 
 export interface UpcomingClass {
   id: string;
@@ -22,6 +23,7 @@ interface UpcomingClassesProps {
 }
 
 export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
+  const router = useRouter();
   const getWeekdayLabel = (dateString: string) => {
     const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) return "";
@@ -52,7 +54,7 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
         /* silent */
       }
     }
-    window.location.href = `/dashboard/classroom/${id}?role=host`;
+    router.push(`/dashboard/classroom/${id}?role=host`);
   };
 
   if (classes.length === 0) {

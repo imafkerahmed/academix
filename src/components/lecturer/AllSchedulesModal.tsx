@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Clock, Timer } from "lucide-react";
+import { X, Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { UpcomingClass } from "./UpcomingClasses";
 import pb from "@/lib/pocketbase";
 
@@ -16,8 +17,19 @@ export default function AllSchedulesModal({
   onClose,
   classes,
 }: AllSchedulesModalProps) {
+  const router = useRouter();
   const [isAnimating, setIsAnimating] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+
+  const [nowTimestamp, setNowTimestamp] = useState<number>(0);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        setNowTimestamp(Date.now());
+      }, 0);
+    }
+  }, [isOpen]);
 
   const monthOptions = React.useMemo(() => {
     const monthMap = new Map<string, string>();
@@ -77,7 +89,11 @@ export default function AllSchedulesModal({
       return itemKey === currentMonthKey;
     });
 
-    setSelectedMonth(hasCurrentMonthClasses ? currentMonthKey : "");
+    const targetMonth = hasCurrentMonthClasses ? currentMonthKey : "";
+    
+    setTimeout(() => {
+      setSelectedMonth(targetMonth);
+    }, 0);
   }, [isOpen, classes]);
 
   // Body scroll lock
@@ -95,9 +111,11 @@ export default function AllSchedulesModal({
   useEffect(() => {
     if (isOpen) {
       // Trigger animation after mount
-      setTimeout(() => setIsAnimating(true), 10);
+      const timer = setTimeout(() => setIsAnimating(true), 10);
+      return () => clearTimeout(timer);
     } else {
-      setIsAnimating(false);
+      const timer = setTimeout(() => setIsAnimating(false), 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
@@ -136,7 +154,7 @@ export default function AllSchedulesModal({
         /* silent */
       }
     }
-    window.location.href = `/dashboard/classroom/${id}?role=host`;
+    router.push(`/dashboard/classroom/${id}?role=host`);
   };
 
   if (!isOpen) return null;
@@ -211,7 +229,7 @@ export default function AllSchedulesModal({
                   classItem.rawStartTime || classItem.startTime;
                 const scheduledEnd =
                   new Date(startTimeStr).getTime() + classItem.duration * 60000;
-                const isWithinTimeWindow = Date.now() < scheduledEnd;
+                const isWithinTimeWindow = nowTimestamp < scheduledEnd;
                 const isReallyEnded = isCompleted && !isWithinTimeWindow;
 
                 return (

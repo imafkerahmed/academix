@@ -16,8 +16,7 @@ interface DrawEvent {
 
 interface WhiteboardProps {
   isHost: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  incomingDrawEvents: any[];
+  incomingDrawEvents: DrawEvent[];
   onDraw: (event: DrawEvent) => void;
   onClose: () => void;
 }
@@ -53,10 +52,16 @@ export default function Whiteboard({
     (
       ctx: CanvasRenderingContext2D,
       canvas: HTMLCanvasElement,
-      events: any[],
+      events: DrawEvent[],
     ) => {
       for (const evt of events) {
-        if (evt.type === "draw" && evt.prevX != null && evt.x != null) {
+        if (
+          evt.type === "draw" &&
+          evt.prevX != null &&
+          evt.prevY != null &&
+          evt.x != null &&
+          evt.y != null
+        ) {
           ctx.beginPath();
           ctx.strokeStyle =
             evt.tool === "eraser" ? "#1a1a2e" : evt.color || "#ffffff";

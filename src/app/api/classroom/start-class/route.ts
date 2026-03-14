@@ -66,17 +66,18 @@ export async function POST(request: Request) {
               `[Classroom] Patched admin user into ${classRecord.galene_group}`,
             );
           }
-        } catch (e) {
-          console.error("Failed to patch galene group config:", e);
+        } catch (err) {
+          console.error("Failed to patch galene group config:", err);
         }
       }
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Error starting class:", error);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Error starting class:", err);
     return NextResponse.json(
-      { error: error?.message || "Failed to start class" },
+      { error: err?.message || "Failed to start class" },
       { status: 500 },
     );
   }

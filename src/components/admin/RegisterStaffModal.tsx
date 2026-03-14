@@ -186,7 +186,7 @@ export function RegisterStaffModal({
     if (isOpen && !isEditMode) {
       generateNextUserId(formData.role);
     }
-  }, [formData.role]);
+  }, [formData.role, isOpen, isEditMode]);
 
   const generateNextUserId = async (role: "admin" | "lecturer") => {
     try {
@@ -363,14 +363,15 @@ export function RegisterStaffModal({
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: Record<string, { message?: string }> } };
       console.error(
         `Error ${isEditMode ? "updating" : "creating"} staff account:`,
         error,
       );
 
       // Extract field-specific error messages
-      const fieldErrors = error?.response?.data || {};
+      const fieldErrors = err?.response?.data || {};
       let firstErrorMessage = "";
 
       for (const field in fieldErrors) {

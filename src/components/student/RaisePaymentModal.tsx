@@ -18,7 +18,7 @@ interface PaymentOption {
   currency: string;
   status: string;
   payment_type?: string;
-  [key: string]: any;
+  date?: string;
 }
 
 interface RaisePaymentModalProps {
@@ -188,7 +188,7 @@ export function RaisePaymentModal({
                     <CheckCircle className="text-green-500" size={48} />
                   </div>
                   <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-2">
-                    You're All Caught Up!
+                    You&apos;re All Caught Up!
                   </h3>
                   <p className="text-sm font-bold text-gray-400 max-w-sm mx-auto leading-relaxed">
                     There are no pending invoices or outstanding payments required for this course at the moment.

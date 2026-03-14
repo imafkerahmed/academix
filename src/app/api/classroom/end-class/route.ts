@@ -28,10 +28,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Error ending class:", error);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Error ending class:", err);
     return NextResponse.json(
-      { error: error?.message || "Failed to end class" },
+      { error: err?.message || "Failed to end class" },
       { status: 500 },
     );
   }

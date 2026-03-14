@@ -13,39 +13,35 @@ import {
 import { RaisePaymentModal } from "@/components/student/RaisePaymentModal";
 
 // Types
-type PaymentStatus = "Paid" | "Pending" | "Failed";
-
-type PaymentDue = {
-  amount: number;
-  currency: string;
-  dueDate: string;
-  description?: string;
-  course?: string;
-};
-
-type CourseInfo = {
-  courseName: string;
-  totalFee: number;
-  currency: string;
-};
-
-type PaymentHistoryItem = {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  currency: string;
-  status: PaymentStatus;
-  receiptUrl?: string;
-  course?: string;
-  reference_Id?: string;
-};
+// Types used in sub-components deleted if unused here
 
 interface StudentPaymentProps {
   selectedCourse?: string;
-  installments?: any[];
-  payments?: any[];
-  enrolledCourses?: any[];
+  installments?: {
+    id: string;
+    due_date: string;
+    remarks?: string;
+    amount: number;
+    status: string;
+    enrollment: string;
+    payment_type?: string;
+  }[];
+  payments?: {
+    id: string;
+    date_paid?: string;
+    created?: string;
+    remarks?: string;
+    amount: number;
+    verified: boolean;
+    enrollment: string;
+    payment_type: string;
+    reference_Id?: string;
+  }[];
+  enrolledCourses?: {
+    id: string;
+    name: string;
+    registration_number?: string;
+  }[];
 }
 
 export default function StudentPayment({
@@ -103,27 +99,27 @@ export default function StudentPayment({
   };
 
   useEffect(() => {
-    if (selectedCourse) {
-      setActiveCourse(selectedCourse);
+    if (selectedCourse && selectedCourse !== activeCourse) {
+      Promise.resolve().then(() => setActiveCourse(selectedCourse));
     } else if (courseOptions.length === 1 && !activeCourse) {
-      setActiveCourse(courseOptions[0]);
+      Promise.resolve().then(() => setActiveCourse(courseOptions[0]));
     }
   }, [selectedCourse, courseOptions, activeCourse]);
 
   useEffect(() => {
-    const handleOpenPay = (e: any) => {
+    const handleOpenPay = (e: CustomEvent<{ course?: string }>) => {
       if (e.detail?.course) setActiveCourse(e.detail.course);
       setShowPayModal(true);
     };
     const handleOpenHistory = () => setShowHistoryModal(true);
 
-    window.addEventListener("open-pay-modal", handleOpenPay as any);
-    window.addEventListener("open-history-modal", handleOpenHistory as any);
+    window.addEventListener("open-pay-modal", handleOpenPay as EventListener);
+    window.addEventListener("open-history-modal", handleOpenHistory as EventListener);
     return () => {
-      window.removeEventListener("open-pay-modal", handleOpenPay as any);
+      window.removeEventListener("open-pay-modal", handleOpenPay as EventListener);
       window.removeEventListener(
         "open-history-modal",
-        handleOpenHistory as any,
+        handleOpenHistory as EventListener,
       );
     };
   }, []);
@@ -146,7 +142,7 @@ export default function StudentPayment({
     status: i.status === "paid" ? "Paid" : "Pending",
     course,
     payment_type: i.payment_type || "installment", // Ensure payment_type exists
-    reference_Id: undefined,
+    reference_Id: undefined as string | undefined,
   }));
   // Map payments to feed items
   const paymentFeed = coursePayments.map((p) => ({
@@ -230,7 +226,7 @@ export default function StudentPayment({
         amount: totalBalance,
         currency: "USD",
         status: "Pending",
-        reference_Id: undefined,
+        reference_Id: undefined as string | undefined,
       },
     ];
   }, [pendingThisMonth, totalBalance, paymentFeed]);
@@ -268,10 +264,11 @@ export default function StudentPayment({
   }
 
   const handleSubmitReceipt = async (data: {
-    selectedInvoice: any;
+    selectedInvoice: unknown;
     files: File[];
     remarks: string;
   }) => {
+    console.log("Submitting receipt for:", data.selectedInvoice);
     await new Promise((r) => setTimeout(r, 1500));
     // TODO: Integrate with PocketBase payments API
     setShowPayModal(false);
@@ -463,13 +460,29 @@ function PaymentHistoryModal({
   history,
   courseOptions,
   selectedCourse,
-}: any) {
+}: {
+  onClose: () => void;
+  history: {
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+    currency: string;
+    status: string;
+    course?: string;
+    payment_type?: string;
+    reference_Id?: string;
+  }[];
+  courseOptions: string[];
+  selectedCourse?: string;
+}) {
   const [filterCourse, setFilterCourse] = useState(selectedCourse || "");
 
   useEffect(() => {
-    // Sync with selectedCourse if it changes externally
-    if (selectedCourse) setFilterCourse(selectedCourse);
-  }, [selectedCourse]);
+    if (selectedCourse && selectedCourse !== filterCourse) {
+      Promise.resolve().then(() => setFilterCourse(selectedCourse));
+    }
+  }, [selectedCourse, filterCourse]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -486,22 +499,23 @@ function PaymentHistoryModal({
   const mergedRows = useMemo(() => {
     // Show all verified payments (including registration/upfront) and pending
     // payments only if they fall in the current month/year
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    const allPayments = history.map((h: any) => ({ ...h, type: "Payment" }));
+    
+    const allPayments = history.map((h) => ({ ...h, type: "Payment" }));
     return allPayments
-      .filter((r: any) => {
+      .filter((r: {
+        id: string;
+        date: string;
+        description: string;
+        amount: number;
+        currency: string;
+        status: string;
+        course?: string;
+        payment_type?: string;
+        reference_Id?: string;
+        type: string;
+      }) => {
         if (filterCourse && r.course !== filterCourse) return false;
-        if (r.status === "Paid") return true;
-        if (r.status === "Pending") {
-          const d = new Date(r.date);
-          return (
-            d.getMonth() === currentMonth && d.getFullYear() === currentYear
-          );
-        }
-        return false;
+        return true;
       })
       .sort(
         (a: { date: string }, b: { date: string }) =>
@@ -559,7 +573,7 @@ function PaymentHistoryModal({
 
         <div className="flex-1 overflow-y-auto p-10 space-y-4 bg-gray-50/30">
           {mergedRows.length > 0 ? (
-            mergedRows.map((row: any) => (
+            mergedRows.map((row) => (
               <div
                 key={row.id}
                 className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex items-center justify-between transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100 hover:-translate-y-1 group"

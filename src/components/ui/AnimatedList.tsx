@@ -156,7 +156,8 @@ const AnimatedList: React.FC<AnimatedListProps> = ({
         });
       }
     }
-    setKeyboardNav(false);
+    // Defer resetting to prevent cascading render
+    Promise.resolve().then(() => setKeyboardNav(false));
   }, [selectedIndex, keyboardNav]);
 
   return (

@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import AdminStatsCard from "./AdminStatsCard";
-import * as LucideIcons from "lucide-react";
+import { LucideProps } from "lucide-react";
 
 interface StatItem {
   title: string;
   value: string | number;
-  icon: React.ComponentType<any>; // icon component
+  icon: React.ComponentType<LucideProps>; // icon component
   bgColor: string;
   iconColor: string;
   trend?: {

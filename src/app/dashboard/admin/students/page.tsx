@@ -78,12 +78,6 @@ export default function StudentManagement() {
     { id: string; name: string; email: string } | undefined
   >(undefined);
 
-  useEffect(() => {
-    const silent = !isInitialMount.current;
-    isInitialMount.current = false;
-    fetchStudents(currentPage, silent);
-  }, [router, currentPage, statusFilter, academicFilter, searchQuery]);
-
   const fetchStudents = async (page = 1, silent = false) => {
     try {
       if (silent) {
@@ -107,7 +101,7 @@ export default function StudentManagement() {
         expand: "enrollments_via_student.course_intake.course",
       });
 
-      setStudents(result.items as any);
+      setStudents(result.items as unknown as Student[]);
       setTotalPages(result.totalPages);
       setTotalItems(result.totalItems);
       setLoading(false);
@@ -123,6 +117,12 @@ export default function StudentManagement() {
       setIsFetching(false);
     }
   };
+
+  useEffect(() => {
+    const silent = !isInitialMount.current;
+    isInitialMount.current = false;
+    fetchStudents(currentPage, silent);
+  }, [router, currentPage, statusFilter, academicFilter, searchQuery]);
 
   const handleLogout = () => {
     logout();
