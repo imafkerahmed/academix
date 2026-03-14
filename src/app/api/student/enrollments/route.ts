@@ -50,8 +50,6 @@ export async function GET(request: NextRequest) {
 
     pb.authStore.save(token, userModel as any);
 
-    console.log(`[API] Fetching enrollments for user ${userId}`);
-
     // Try to fetch enrollments - first without filter, fall back to with filter
     let enrollmentRecords: any[] = [];
     try {
@@ -60,9 +58,6 @@ export async function GET(request: NextRequest) {
         expand: "course_intake.course",
       });
     } catch (filterError: any) {
-      console.log(
-        `[API] getFullList failed, trying with database backup approach`,
-      );
       // If that fails due to rules, try with filter
       try {
         enrollmentRecords = await pb.collection("enrollments").getFullList({
@@ -79,10 +74,6 @@ export async function GET(request: NextRequest) {
     // Filter client-side to respect permission boundaries
     const studentEnrollments = enrollmentRecords.filter(
       (e: any) => e.student === userId,
-    );
-
-    console.log(
-      `[API] Found ${studentEnrollments.length} enrollments for user ${userId}`,
     );
 
     return NextResponse.json({ enrollments: studentEnrollments });

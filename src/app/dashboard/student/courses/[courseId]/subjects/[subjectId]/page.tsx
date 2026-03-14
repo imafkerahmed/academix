@@ -97,7 +97,7 @@ export default function SubjectPage() {
           credits = cs.credits || 0;
         }
       } catch (e) {
-        console.log("Could not fetch course_subjects details");
+        // silent
       }
 
       // Fetch all study materials for this course_subject (only visible ones)
@@ -115,7 +115,7 @@ export default function SubjectPage() {
             sort: "-created",
           });
         } catch (e) {
-          console.log("Could not fetch materials:", e);
+          // silent
         }
       }
 
@@ -178,13 +178,11 @@ export default function SubjectPage() {
           );
           const assignmentFilter = `(${filterParts.join(" || ")})`;
 
-          console.log("Fetching assignments for subjects:", courseSubjectIds);
           const assignments = await pb.collection("assignments").getFullList({
             filter: assignmentFilter,
             expand: "marker",
             sort: "-due_date",
           });
-          console.log("Assignments found:", assignments.length);
 
           // Fetch submissions for these assignments for the current student
           const studentId = pb.authStore.model?.id;
@@ -241,8 +239,6 @@ export default function SubjectPage() {
             };
           });
 
-          console.log("Mapped assignments:", mappedAssignments);
-
           // Calculate progress based on completion
           const totalAssignments = mappedAssignments.length;
           const completedAssignments = mappedAssignments.filter(
@@ -259,7 +255,7 @@ export default function SubjectPage() {
             progress: progressValue,
           }));
         } catch (e) {
-          console.log("Could not fetch assignments:", e);
+          // silent
         }
       }
     } catch (error) {
@@ -445,13 +441,6 @@ export default function SubjectPage() {
         return;
       }
 
-      console.log("Submitting assignment with data:", {
-        assignmentId: selectedAssignment.id,
-        studentId,
-        fileName: uploadedFile.name,
-        fileSize: uploadedFile.size,
-      });
-
       const data = new FormData();
       data.append("assignment", selectedAssignment.id);
       data.append("student", studentId);
@@ -465,26 +454,17 @@ export default function SubjectPage() {
       data.append("submission_status", submission_status);
       data.append("evaluation_status", "pending");
 
-      console.log("Submission status:", submission_status);
-
       if (selectedAssignment.submissionId) {
-        console.log(
-          "Updating existing submission:",
-          selectedAssignment.submissionId,
-        );
         const updated = await pb
           .collection("assignment_submissions")
           .update(selectedAssignment.submissionId, data);
-        console.log("Submission updated successfully:", updated.id);
         setSuccessMessage(
           "File replaced successfully! Your new submission will be reviewed by the instructor.",
         );
       } else {
-        console.log("Creating new submission");
         const created = await pb
           .collection("assignment_submissions")
           .create(data);
-        console.log("Submission created successfully:", created.id);
         setSuccessMessage(
           "Assignment submitted successfully! Your submission will be reviewed by the instructor shortly.",
         );
@@ -496,7 +476,6 @@ export default function SubjectPage() {
       setShowSuccessModal(true);
 
       // Refresh data immediately
-      console.log("Refreshing subject data after submission...");
       await fetchSubjectData();
 
       // Auto-select the same assignment if we want to keep it open (optional)

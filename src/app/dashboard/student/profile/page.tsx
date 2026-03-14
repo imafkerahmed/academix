@@ -59,7 +59,7 @@ export default function StudentProfilePage() {
       try {
         await pb.collection("users").authRefresh();
       } catch (error) {
-        console.log("Auth refresh failed:", error);
+        console.error("Auth refresh failed:", error);
       }
 
       // Check account status from refreshed auth store
@@ -290,7 +290,7 @@ export default function StudentProfilePage() {
         className="hidden"
         accept="image/*"
         onChange={(e) => {
-          console.log("File selected:", e.target.files?.[0]);
+          // File selected
         }}
       />
 

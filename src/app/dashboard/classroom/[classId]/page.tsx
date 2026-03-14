@@ -288,17 +288,11 @@ export default function VirtualClassroom() {
   }, [localStream]);
 
   useEffect(() => {
-    console.log(
-      "[VirtualClassroom] Mounted or state changed. Connected:",
-      connected,
-    );
     if (connected && !isHost) {
       setTimeout(() => {
         sendUserMessage("REQUEST_WHITEBOARD_SYNC");
       }, 1500);
     }
-    return () =>
-      console.log("[VirtualClassroom] Unmounted. Connected:", connected);
   }, [connected, isHost, sendUserMessage]);
 
   // Auto-scroll chat

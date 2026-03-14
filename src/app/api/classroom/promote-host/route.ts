@@ -62,9 +62,6 @@ export async function POST(request: Request) {
       if (config.users[username]) {
         delete config.users[username];
         fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
-        console.log(
-          `[Classroom] Permanently demoted ${username} from host in group ${classRecord.galene_group}`,
-        );
       }
     } else {
       config.users[username] = {
@@ -72,9 +69,6 @@ export async function POST(request: Request) {
         permissions: ["op", "present", "message", "record"],
       };
       fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
-      console.log(
-        `[Classroom] Permanently promoted ${username} to host in group ${classRecord.galene_group}`,
-      );
     }
 
     return NextResponse.json({ success: true });

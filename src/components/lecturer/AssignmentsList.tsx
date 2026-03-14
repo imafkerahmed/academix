@@ -19,7 +19,6 @@ interface AssignmentsListProps {
 
 export default function AssignmentsList({ assignments }: AssignmentsListProps) {
   const handleMarkSubmissions = (assignmentId: string) => {
-    console.log("Mark submissions for:", assignmentId);
     // Placeholder for marking functionality
   };
 

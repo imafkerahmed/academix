@@ -30,7 +30,6 @@ export default function DashboardHeader({
 
   const handleLogout = () => {
     // Placeholder for logout functionality
-    console.log("Logout clicked");
   };
 
   return (
@@ -46,7 +45,7 @@ export default function DashboardHeader({
         {/* Right: Notification and Profile */}
         <div className="flex items-center gap-2 md:gap-4 mr-0 md:mr-8 relative">
           <NotificationButton
-            onClick={() => console.log("Show notifications")}
+            onClick={() => {}}
             aria-label="Show notifications"
           />
           <button

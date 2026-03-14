@@ -829,7 +829,7 @@ function SubjectDetailsView({
                               className="p-2 bg-yellow-50 text-yellow-600 rounded-xl hover:bg-yellow-500 hover:text-white transition-all shadow-sm"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                console.log("Edit material:", material.id);
+                                // edit logic here
                               }}
                             >
                               <FileEdit size={14} />
@@ -838,7 +838,7 @@ function SubjectDetailsView({
                               className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                console.log("Delete material:", material.id);
+                                // delete logic here
                               }}
                             >
                               <Ban size={14} />
@@ -912,7 +912,7 @@ function SubjectDetailsView({
                               className="p-2 bg-yellow-50 text-yellow-600 rounded-xl hover:bg-yellow-500 hover:text-white transition-all shadow-sm"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                console.log("Edit material:", material.id);
+                                // edit logic here
                               }}
                             >
                               <FileEdit size={14} />
@@ -921,7 +921,7 @@ function SubjectDetailsView({
                               className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                console.log("Delete material:", material.id);
+                                // delete logic here
                               }}
                             >
                               <Ban size={14} />

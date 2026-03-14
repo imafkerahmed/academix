@@ -31,7 +31,6 @@ export async function GET(request: Request) {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
           deletedCount++;
-          console.log(`[Cron] Cleaned up Galene group: ${record.galene_group}`);
         }
       }
     }
@@ -52,7 +51,6 @@ export async function GET(request: Request) {
         if (fs.statSync(filePath).isFile()) {
           fs.unlinkSync(filePath);
           chatFilesDeleted++;
-          console.log(`[Cron] Cleaned up chat upload: ${file}`);
         }
       }
     }

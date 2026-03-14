@@ -63,7 +63,7 @@ export default function StudentDashboard() {
       try {
         await pb.collection("users").authRefresh();
       } catch (error) {
-        console.log("Auth refresh failed:", error);
+        console.error("Auth refresh failed:", error);
       }
 
       // Check account status from refreshed auth store

@@ -82,9 +82,7 @@ export async function POST(req: NextRequest) {
     );
 
     try {
-      console.log("Authenticating as PocketBase admin:", adminEmail);
       await adminPb.admins.authWithPassword(adminEmail, adminPassword);
-      console.log("Admin auth successful");
     } catch (adminAuthError: any) {
       console.error(
         "Admin auth failed:",
@@ -101,12 +99,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Update the password using super admin privileges
-    console.log("Updating password for user:", studentId);
     const record = await adminPb.collection("users").update(studentId, {
       password,
       passwordConfirm,
     });
-    console.log("Password updated successfully");
 
     return NextResponse.json({ success: true, record });
   } catch (error: any) {

@@ -367,13 +367,6 @@ export function RegisterStaffModal({
         `Error ${isEditMode ? "updating" : "creating"} staff account:`,
         error,
       );
-      // Log the full response data for debugging
-      if (error?.response?.data) {
-        console.log(
-          "PocketBase Error Details:",
-          JSON.stringify(error.response.data, null, 2),
-        );
-      }
 
       // Extract field-specific error messages
       const fieldErrors = error?.response?.data || {};

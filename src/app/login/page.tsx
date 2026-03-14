@@ -40,14 +40,10 @@ export default function LoginPage() {
 
     try {
       // Authenticate with PocketBase using userId
-      console.log("Attempting login with userId:", userId);
-      console.log("Password length:", password.length);
 
       const authData = await pb
         .collection("users")
         .authWithPassword(userId, password);
-
-      console.log("Login successful, user data:", authData.record);
 
       // Check if account is disabled
       if (authData.record.accountStatus === "disabled") {
@@ -79,13 +75,12 @@ export default function LoginPage() {
           router.push("/dashboard");
       }
     } catch (error: any) {
-      console.error("Login error:", error);
-      console.error("Error data:", error?.data);
-      console.error("Error response:", error?.response);
-      const errorMsg =
-        error?.data?.message ||
-        error?.message ||
-        "Invalid user ID or password. Please try again.";
+      // Generic but clear error for authentication failures
+      const isAuthError = error?.status === 400 || error?.status === 404;
+      const errorMsg = isAuthError 
+        ? "Invalid User ID or password. Please check your credentials."
+        : (error?.data?.message || error?.message || "An unexpected error occurred. Please try again.");
+      
       setLoginError(errorMsg);
       toast.error(errorMsg);
     } finally {

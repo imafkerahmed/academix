@@ -50,17 +50,12 @@ export async function GET(request: NextRequest) {
 
     pb.authStore.save(token, userModel as any);
 
-    console.log(`[API] Fetching documents for user ${userId}`);
-
     // Try to fetch documents - first without filter, fall back to with filter
     let docs: any[] = [];
     try {
       // Try fetching without filter first
       docs = await pb.collection("documents").getFullList();
     } catch (filterError: any) {
-      console.log(
-        `[API] getFullList failed, trying with database backup approach`,
-      );
       // If that fails due to rules, try with filter
       try {
         docs = await pb.collection("documents").getFullList({
@@ -76,10 +71,6 @@ export async function GET(request: NextRequest) {
 
     // Filter client-side to respect permission boundaries
     const studentDocs = docs.filter((d: any) => d.field === userId);
-
-    console.log(
-      `[API] Found ${studentDocs.length} documents for user ${userId}`,
-    );
 
     return NextResponse.json({ documents: studentDocs });
   } catch (error: any) {
