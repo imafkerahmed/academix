@@ -27,6 +27,7 @@ import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
 import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface EditUser {
   id: string;
@@ -495,11 +496,14 @@ export function RegisterStaffModal({
                   className={`w-20 h-20 rounded-2xl ${rc.lightBg} flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-200 group-hover:border-current transition-colors`}
                 >
                   {avatarPreview ? (
-                    <img
-                      src={avatarPreview}
-                      alt="Avatar"
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={avatarPreview}
+                        alt="Avatar"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
                   ) : (
                     <Camera size={24} className="text-gray-300" />
                   )}

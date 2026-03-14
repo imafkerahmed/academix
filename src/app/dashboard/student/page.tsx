@@ -18,6 +18,7 @@ import {
   Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminStatsCard from "@/components/admin/AdminStatsCard";
 import StudentProfile from "@/components/student-profile";
@@ -535,10 +536,11 @@ export default function StudentDashboard() {
                     >
                       {ann.imageUrl && (
                         <div className="w-full h-40 overflow-hidden relative">
-                          <img
+                          <Image
                             src={ann.imageUrl}
                             alt={ann.title}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            fill
+                            className="object-cover transition-transform duration-700 group-hover:scale-110"
                           />
                           {!ann.isRead && (
                             <div className="absolute top-4 right-4 w-3 h-3 bg-indigo-600 rounded-full border-2 border-white shadow-lg z-10" />

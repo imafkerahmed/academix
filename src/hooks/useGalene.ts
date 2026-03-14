@@ -163,6 +163,16 @@ export function useGalene(): UseGaleneReturn {
     };
   }, []);
 
+  // Generic wrapper to send user messages
+  const sendUserMessage = useCallback(
+    (kind: string, dest: string = "", value: string = "") => {
+      if (clientRef.current) {
+        clientRef.current.sendUserMessage(kind, dest, value);
+      }
+    },
+    [],
+  );
+
   const connect = useCallback(
     async (group: string, username: string, password: string) => {
       setConnecting(true);
@@ -221,7 +231,7 @@ export function useGalene(): UseGaleneReturn {
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        client.on("error", (err: any) => {
+        client.on("error", (err: Error & { message?: string }) => {
           console.error("[useGalene] Error:", err);
           setError(err?.message || "Connection error");
           setConnecting(false);
@@ -328,7 +338,7 @@ export function useGalene(): UseGaleneReturn {
         });
 
         // Listen for generic user messages (whiteboard, mute, hand raise)
-        client.on("usermessage", (msg: any) => {
+        client.on("usermessage", (msg: { kind: string; dest: string; value: string; source: string }) => {
           const { kind, dest, value } = msg;
           // Remote mute
           if (kind === "remote-mute" && dest === client.id) {
@@ -501,7 +511,7 @@ export function useGalene(): UseGaleneReturn {
     setVideoMuted(false);
     setIsScreenSharing(false);
     setScreenShareStream(null);
-  }, [localStream]);
+  }, []);
 
   const sendChat = useCallback((message: string) => {
     if (clientRef.current) {
@@ -509,15 +519,6 @@ export function useGalene(): UseGaleneReturn {
     }
   }, []);
 
-  // Generic wrapper to send user messages
-  const sendUserMessage = useCallback(
-    (kind: string, dest: string = "", value: string = "") => {
-      if (clientRef.current) {
-        clientRef.current.sendUserMessage(kind, dest, value);
-      }
-    },
-    [],
-  );
 
   // Host-only mute user (remote mute)
   const muteUser = useCallback(

@@ -30,6 +30,7 @@ import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
 import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import { toast } from "sonner";
+import Image from "next/image";
 import {
   calculateEnrollmentFees,
   EnrollmentFeeCalculation,
@@ -744,11 +745,14 @@ export function RegisterStudentModal({
                 <div className="relative">
                   <div className="w-20 h-20 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden">
                     {avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt="Avatar Preview"
-                        className="w-full h-full object-cover"
-                      />
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={avatarPreview}
+                          alt="Avatar Preview"
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
                     ) : (
                       <Camera className="text-gray-300" size={28} />
                     )}

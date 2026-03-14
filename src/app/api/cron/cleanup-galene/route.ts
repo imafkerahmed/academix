@@ -5,9 +5,15 @@ import path from "path";
 
 export async function GET(request: Request) {
   try {
-    // Basic security: optional Cron secret check
-    // e.g. /api/cron/cleanup-galene?secret=YOUR_CRON_SECRET
-    // You can enforce this by comparing against process.env.CRON_SECRET if desired
+    const { searchParams } = new URL(request.url);
+    const secret = searchParams.get("secret");
+
+    if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+      return NextResponse.json(
+        { error: "Unauthorized: Invalid secret" },
+        { status: 401 },
+      );
+    }
 
     const pb = new PocketBase(process.env.NEXT_PUBLIC_POCKETBASE_URL);
 

@@ -70,6 +70,7 @@ export function useSessionTimeout({
   useEffect(() => {
     if (!enabled) return;
 
+    // Initialize timeout on mount without triggering cascading render if already set
     resetTimeout();
 
     // Track user activity
@@ -82,18 +83,22 @@ export function useSessionTimeout({
       "click",
     ];
 
+    const throttledActivity = () => {
+      handleUserActivity();
+    };
+
     events.forEach((event) => {
-      document.addEventListener(event, handleUserActivity, true);
+      document.addEventListener(event, throttledActivity, true);
     });
 
     return () => {
       events.forEach((event) => {
-        document.removeEventListener(event, handleUserActivity, true);
+        document.removeEventListener(event, throttledActivity, true);
       });
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     };
-  }, [enabled, showWarning]);
+  }, [enabled, handleUserActivity]); // Removed showWarning as it resets on every warning pop
 
   return {
     showWarning,

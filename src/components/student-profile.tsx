@@ -3,6 +3,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
+import Image from "next/image";
 
 interface StudentProfileProps {
   fullName: string;
@@ -33,19 +34,21 @@ export default function StudentProfile({
     >
       {/* Header Row: Avatar and Name */}
       <div className="flex items-center gap-5">
-        {/* Avatar */}
-        <div className="shrink-0">
-          <img
-            src={avatarUrl}
-            alt={fullName}
-            className={`object-cover ring-8 ring-indigo-50 border-4 border-indigo-100 shadow-xl ${
-              avatarSize === "large"
-                ? "w-32 h-32 md:w-48 md:h-48"
-                : compact
-                  ? "w-28 h-28"
-                  : "w-28 h-28 md:w-40 md:h-40"
-            } rounded-[2rem]`}
-          />
+        <div className="shrink-0 relative">
+          <div className={`relative ring-8 ring-indigo-50 border-4 border-indigo-100 shadow-xl overflow-hidden ${
+            avatarSize === "large"
+              ? "w-32 h-32 md:w-48 md:h-48"
+              : compact
+                ? "w-28 h-28"
+                : "w-28 h-28 md:w-40 md:h-40"
+          } rounded-[2rem]`}>
+            <Image
+              src={avatarUrl}
+              alt={fullName}
+              fill
+              className="object-cover"
+            />
+          </div>
         </div>
 
         {/* Name and ID */}

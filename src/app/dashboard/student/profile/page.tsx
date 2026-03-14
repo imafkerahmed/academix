@@ -21,6 +21,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
@@ -330,11 +331,14 @@ export default function StudentProfilePage() {
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full -mr-16 -mt-16 transition-transform duration-700 group-hover:scale-110" />
             <div className="relative z-10">
               <div className="relative inline-block mb-4">
-                <img
-                  src={studentData.avatarUrl}
-                  alt={studentData.fullName}
-                  className="w-36 h-36 rounded-[2.5rem] object-cover border-4 border-white shadow-2xl mx-auto"
-                />
+                <div className="relative w-36 h-36 border-4 border-white shadow-2xl mx-auto rounded-[2.5rem] overflow-hidden">
+                  <Image
+                    src={studentData.avatarUrl}
+                    alt={studentData.fullName}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
                 <button
                   onClick={handleAvatarClick}
                   className="absolute -bottom-2 -right-2 p-3 bg-indigo-600 rounded-2xl text-white shadow-xl hover:bg-indigo-700 transition-all active:scale-95 group/btn"

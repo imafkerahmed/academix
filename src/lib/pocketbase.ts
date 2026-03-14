@@ -50,7 +50,7 @@ export interface Class {
   zoom_meeting_id?: string;
   zoom_join_url?: string;
   zoom_start_url?: string;
-  recurrence_rule?: Record<string, any>;
+  recurrence_rule?: Record<string, unknown>;
   start_time: string;
   duration?: number;
   is_recurring: boolean;
@@ -93,7 +93,7 @@ export interface Class {
   zoom_meeting_id?: string;
   zoom_join_url?: string;
   zoom_start_url?: string;
-  recurrence_rule?: Record<string, any>;
+  recurrence_rule?: Record<string, unknown>;
   start_time: string;
   duration?: number;
   is_recurring: boolean;
