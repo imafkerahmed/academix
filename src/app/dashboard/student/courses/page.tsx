@@ -7,12 +7,104 @@ import { BookOpen, TrendingUp, Loader2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
+import { useCallback } from "react";
+
+interface Course {
+  id: string;
+  name: string;
+  registrationNumber: string;
+  description: string;
+  courseStatus: string;
+  certificateStatus: string;
+}
+
+interface Enrollment {
+  id: string;
+  registration_number?: string;
+  enrollement_status?: string;
+  certificate_status?: string;
+  expand?: {
+    course_intake?: {
+      expand?: {
+        course?: {
+          name: string;
+        };
+      };
+    };
+  };
+}
 
 export default function CoursesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [courses, setCourses] = useState<any[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
+
+  const fetchCourses = useCallback(async () => {
+    try {
+      const token = pb.authStore.token;
+      const response = await fetch("/api/student/enrollments", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw { status: response.status, message: response.statusText };
+      }
+
+      const data = await response.json();
+      const enrollmentRecords = data.enrollments as Enrollment[];
+
+      const courseList = enrollmentRecords.map((enrollment: Enrollment) => {
+        const courseName =
+          enrollment.expand?.course_intake?.expand?.course?.name ||
+          "Unknown Course";
+
+        const statusMap: Record<string, string> = {
+          enrolled: "Ongoing",
+          "dropped-out": "Dropped Out",
+          expelled: "Expelled",
+          completed: "Completed",
+        };
+        const courseStatus =
+          statusMap[enrollment.enrollement_status || "enrolled"] || "Ongoing";
+
+        const certMap: Record<string, string> = {
+          pending: "Pending",
+          applied: "Applied",
+          processing: "Processing",
+          delivered: "Issued",
+        };
+        const certificateStatus =
+          certMap[enrollment.certificate_status || "pending"] || "Not Issued";
+
+        return {
+          id: enrollment.id,
+          name: courseName,
+          registrationNumber: enrollment.registration_number || "",
+          description: "",
+          courseStatus,
+          certificateStatus,
+        };
+      });
+
+      setCourses(courseList);
+    } catch (error: unknown) {
+      console.error("Error fetching courses:", error);
+      const err = error as { status?: number };
+      if (err?.status === 403 || err?.status === 404) {
+        toast.error("Permission denied. Please log in again.");
+        setLoading(false);
+        await pb.authStore.clear();
+        router.push("/login");
+        return;
+      }
+      setCourses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
   useEffect(() => {
     const checkAccountStatus = async () => {
@@ -42,82 +134,11 @@ export default function CoursesPage() {
         return;
       }
 
-      fetchCourses(latestUser.id);
+      fetchCourses();
     };
 
     checkAccountStatus();
-  }, [router]);
-
-  const fetchCourses = async (studentId: string) => {
-    try {
-      // Fetch enrollments via API endpoint
-      const token = pb.authStore.token;
-      const response = await fetch("/api/student/enrollments", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw { status: response.status, message: response.statusText };
-      }
-
-      const data = await response.json();
-      const enrollmentRecords = data.enrollments;
-
-      // Transform enrollments into course format
-      const courseList = enrollmentRecords.map((enrollment: any) => {
-        // Get course name from expanded relation
-        const courseName =
-          enrollment.expand?.course_intake?.expand?.course?.name ||
-          "Unknown Course";
-
-        // Map enrollement_status to courseStatus
-        const statusMap: Record<string, string> = {
-          enrolled: "Ongoing",
-          "dropped-out": "Dropped Out",
-          expelled: "Expelled",
-          completed: "Completed",
-        };
-        const courseStatus =
-          statusMap[enrollment.enrollement_status || "enrolled"] || "Ongoing";
-
-        // Map certificate_status to certificateStatus
-        const certMap: Record<string, string> = {
-          pending: "Pending",
-          applied: "Applied",
-          processing: "Processing",
-          delivered: "Issued",
-        };
-        const certificateStatus =
-          certMap[enrollment.certificate_status || "pending"] || "Not Issued";
-
-        return {
-          id: enrollment.id,
-          name: courseName,
-          registrationNumber: enrollment.registration_number || "",
-          description: "",
-          courseStatus,
-          certificateStatus,
-        };
-      });
-
-      setCourses(courseList);
-    } catch (error: any) {
-      console.error("Error fetching courses:", error);
-      // Handle permission errors by redirecting to login
-      if (error?.status === 403 || error?.status === 404) {
-        toast.error("Permission denied. Please log in again.");
-        setLoading(false);
-        await pb.authStore.clear();
-        router.push("/login");
-        return;
-      }
-      setCourses([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [router, fetchCourses]);
 
   if (loading) {
     return (

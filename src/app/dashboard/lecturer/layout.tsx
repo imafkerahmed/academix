@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Sidebar from "@/components/lecturer/Sidebar";
 import { SessionWarningModal } from "@/components/SessionWarningModal";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
@@ -13,14 +13,10 @@ export default function LecturerLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [userName, setUserName] = useState("Lecturer");
-
-  useEffect(() => {
+  const [userName] = useState<string>(() => {
     const user = pb.authStore.model;
-    if (user) {
-      setUserName(user.name || user.username || "Lecturer");
-    }
-  }, []);
+    return user?.name || user?.username || "Lecturer";
+  });
 
   const { showWarning, timeRemaining, extendSession, forceLogout } =
     useSessionTimeout({

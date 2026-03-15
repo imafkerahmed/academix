@@ -1,52 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import { useState, useEffect, useCallback } from "react";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
 import {
   Plus,
   Calendar,
   BookOpen,
-  Eye,
-  Edit,
-  Trash2,
   Layers,
-  Menu,
-  ChevronRight,
   Search,
   ArrowRight,
-  MoreHorizontal,
 } from "lucide-react";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
-import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 import { useRouter } from "next/navigation";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
 
-// Stat type is only used for type checking in this file; the actual icon prop in stats array is a string for dynamic rendering in StatsCarousel.
-type Stat = {
-  title: string;
-  value: number | string;
-  icon: React.ComponentType<any>;
-  bgColor: string;
-  iconColor: string;
-};
-
-interface StatsCarouselProps {
-  stats: Stat[];
-  // ...other props
+interface Intake {
+  id: string;
+  code: string;
+  start_date: string;
+  end_date: string;
+  intakeStatus: string;
+  created: string;
 }
+
+// Stat type is only used for type checking in this file; the actual icon prop in stats array is a string for dynamic rendering in StatsCarousel.
+
 
 export default function IntakeCourseManagement() {
   const [tab, setTab] = useState<"active" | "completed" | "disabled">("active");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [intakes, setIntakes] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
-  const [courseIntakes, setCourseIntakes] = useState<any[]>([]);
+  const [intakes, setIntakes] = useState<Intake[]>([]);
+  const courses: unknown[] = [];
+  const courseIntakes: unknown[] = [];
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -56,15 +45,10 @@ export default function IntakeCourseManagement() {
     end_date: "",
   });
 
-  // Fetch intakes from PocketBase
-  useEffect(() => {
-    fetchIntakes();
-  }, []);
-
-  async function fetchIntakes() {
+  const fetchIntakes = useCallback(async () => {
     try {
       setLoading(true);
-      const records = await pb.collection("intakes").getFullList({
+      const records = await pb.collection("intakes").getFullList<Intake>({
         sort: "-created",
       });
       setIntakes(records);
@@ -74,7 +58,11 @@ export default function IntakeCourseManagement() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void fetchIntakes();
+  }, [fetchIntakes]);
 
   // Filter intakes by tab and search
   const filteredIntakes = intakes
@@ -85,7 +73,7 @@ export default function IntakeCourseManagement() {
       const status = intake.intakeStatus;
       if (tab === "active") {
         // Show ongoing and pending intakes in active tab
-        return status === "ongoing" || status === "peding" || !status;
+        return status === "ongoing" || status === "pending" || !status;
       }
       if (tab === "completed") {
         // Show only completed intakes
@@ -108,7 +96,7 @@ export default function IntakeCourseManagement() {
       const endDate = new Date(newIntake.end_date);
 
       let calculatedStatus = "ongoing";
-      if (today < startDate) calculatedStatus = "peding";
+      if (today < startDate) calculatedStatus = "pending";
       else if (today > endDate) calculatedStatus = "completed";
 
       const data = {
@@ -128,10 +116,11 @@ export default function IntakeCourseManagement() {
       });
 
       // Refresh the list
-      fetchIntakes();
-    } catch (error: any) {
+      void fetchIntakes();
+    } catch (error: unknown) {
       console.error("Error creating intake:", error);
-      toast.error(error?.message || "Failed to create intake");
+      const err = error as { message?: string };
+      toast.error(err?.message || "Failed to create intake");
     }
   }
   const router = useRouter();
@@ -215,7 +204,7 @@ export default function IntakeCourseManagement() {
                 ].map((t) => (
                   <button
                     key={t.id}
-                    onClick={() => setTab(t.id as any)}
+                    onClick={() => setTab(t.id as "active" | "completed" | "disabled")}
                     className={`px-8 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap ${
                       tab === t.id
                         ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"

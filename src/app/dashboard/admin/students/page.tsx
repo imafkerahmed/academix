@@ -1,26 +1,19 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import pb, { isSuperuserOnlyError, logout } from "@/lib/pocketbase";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import Image from "next/image";
+import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import {
   Search,
   Filter,
   UserPlus,
   Edit,
-  Mail,
-  Phone,
-  MapPin,
-  Menu,
   Users,
   CheckCircle,
   XCircle,
   Calendar,
   Layers,
-  ChevronRight,
-  MoreHorizontal,
-  PlusCircle,
   BookOpen,
 } from "lucide-react";
 import StatsCarousel from "@/components/admin/StatsCarousel";
@@ -59,13 +52,11 @@ interface Student {
 export default function StudentManagement() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
   const isInitialMount = useRef(true);
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [academicFilter, setAcademicFilter] = useState<string>("all");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -78,11 +69,9 @@ export default function StudentManagement() {
     { id: string; name: string; email: string } | undefined
   >(undefined);
 
-  const fetchStudents = async (page = 1, silent = false) => {
+  const fetchStudents = useCallback(async (page = 1, silent = false) => {
     try {
-      if (silent) {
-        setIsFetching(true);
-      } else {
+      if (!silent) {
         setLoading(true);
       }
       const result = await pb.collection("users").getList(page, perPage, {
@@ -105,7 +94,6 @@ export default function StudentManagement() {
       setTotalPages(result.totalPages);
       setTotalItems(result.totalItems);
       setLoading(false);
-      setIsFetching(false);
     } catch (error) {
       if (!isSuperuserOnlyError(error)) {
         console.error("Failed to fetch students:", error);
@@ -114,20 +102,18 @@ export default function StudentManagement() {
       setTotalPages(1);
       setTotalItems(0);
       setLoading(false);
-      setIsFetching(false);
     }
-  };
+  }, [statusFilter, academicFilter, searchQuery]);
 
   useEffect(() => {
     const silent = !isInitialMount.current;
     isInitialMount.current = false;
-    fetchStudents(currentPage, silent);
-  }, [router, currentPage, statusFilter, academicFilter, searchQuery]);
+    const init = async () => {
+      await fetchStudents(currentPage, silent);
+    };
+    init();
+  }, [fetchStudents, currentPage]);
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
@@ -160,7 +146,7 @@ export default function StudentManagement() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
+    <div className="bg-gray-50 min-h-screen font-sans">
       <main className="p-4 md:p-6 lg:p-8 space-y-8">
         {/* Page Header Card */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -309,13 +295,16 @@ export default function StudentManagement() {
                       <div className="flex items-center gap-4">
                         {student.avatar ? (
                           <div className="h-12 w-12 rounded-2xl overflow-hidden shadow-sm border-2 border-white ring-4 ring-indigo-50/50 grayscale group-hover/row:grayscale-0 transition-all duration-300">
-                            <img
+                            <Image
                               src={pb.files.getUrl(
-                                student as any,
+                                student,
                                 student.avatar,
                               )}
                               alt={student.name}
+                              width={48}
+                              height={48}
                               className="w-full h-full object-cover"
+                              unoptimized
                             />
                           </div>
                         ) : (
@@ -457,7 +446,7 @@ export default function StudentManagement() {
       <RegisterStudentModal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
-        onSuccess={() => fetchStudents(currentPage, true)}
+        onSuccess={() => { void fetchStudents(currentPage, true); }}
         enrollOnly={enrollTarget}
       />
     </div>

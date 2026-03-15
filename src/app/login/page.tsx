@@ -15,9 +15,10 @@ export default function LoginPage() {
   const [loginError, setLoginError] = useState("");
 
   useEffect(() => {
-    if (!pb.authStore.isValid) return;
-
-    const role = (pb.authStore.model as any)?.role;
+    interface AuthModel {
+      role?: string;
+    }
+    const role = (pb.authStore.model as unknown as AuthModel)?.role;
     switch (role) {
       case "admin":
         router.replace("/dashboard/admin");
@@ -74,12 +75,13 @@ export default function LoginPage() {
         default:
           router.push("/dashboard");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Generic but clear error for authentication failures
-      const isAuthError = error?.status === 400 || error?.status === 404;
+      const err = error as { status?: number; data?: { message?: string }; message?: string };
+      const isAuthError = err?.status === 400 || err?.status === 404;
       const errorMsg = isAuthError 
         ? "Invalid User ID or password. Please check your credentials."
-        : (error?.data?.message || error?.message || "An unexpected error occurred. Please try again.");
+        : (err?.data?.message || err?.message || "An unexpected error occurred. Please try again.");
       
       setLoginError(errorMsg);
       toast.error(errorMsg);

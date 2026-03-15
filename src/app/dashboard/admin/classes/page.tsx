@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -15,7 +15,6 @@ import {
   XCircle,
   Play,
   Eye,
-  Menu,
   Plus,
   ArrowRight,
   Monitor,
@@ -23,7 +22,6 @@ import {
   User,
   Hash,
   Trash2 as LucideTrash2,
-  ExternalLink,
   Archive,
   RotateCcw,
   Search,
@@ -39,8 +37,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -48,16 +44,62 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui";
-import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+
+interface Intake {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface Course {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface Subject {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface CourseIntake {
+  id: string;
+  course: string;
+  intake: string;
+  course_status: string;
+  expand?: {
+    course?: Course;
+    intake?: Intake;
+  };
+}
+
+interface CourseSubject {
+  id: string;
+  course_intake: string;
+  subject: string;
+  lecturer: string;
+  expand?: {
+    subject?: Subject | Subject[];
+    course_intake?: CourseIntake;
+    lecturer?: Lecturer;
+  };
+}
+
+interface Lecturer {
+  id: string;
+  name: string;
+  username: string;
+  avatar?: string;
+}
 
 interface ZoomClass {
   id: string;
@@ -71,42 +113,8 @@ interface ZoomClass {
   is_recurring: boolean;
   recurrence_day?: string;
   expand?: {
-    lecturer?: {
-      id: string;
-      name: string;
-      username: string;
-      avatar?: string;
-    };
-    course_subject?: Array<{
-      expand?: {
-        subject?: any;
-        course_intake?: {
-          expand?: {
-            course?: any;
-            intake?: any;
-          };
-        };
-        lecturer?: any;
-      };
-    }>;
-  };
-}
-
-interface CourseIntake {
-  id: string;
-  expand?: {
-    course?: any;
-    intake?: any;
-  };
-}
-
-interface CourseSubject {
-  id: string;
-  course_intake?: string;
-  lecturer?: string;
-  expand?: {
-    subject?: any;
-    lecturer?: any;
+    lecturer?: Lecturer;
+    course_subject?: CourseSubject | CourseSubject[];
   };
 }
 
@@ -117,8 +125,36 @@ export default function ClassManagement() {
   const [filter, setFilter] = useState<string>("scheduled");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
+  const [ongoingSubjects, setOngoingSubjects] = useState<CourseSubject[]>([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [subjectSearchTerm, setSubjectSearchTerm] = useState("");
+  const [durationHour, setDurationHour] = useState<string>("1");
+  const [durationMinute, setDurationMinute] = useState<string>("0");
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
+  const [now] = useState(() => Date.now());
+  
+  const [formData, setFormData] = useState({
+    description: "",
+    lecturer: "",
+  });
 
-  const nowTimestamp = useMemo(() => Date.now(), []);
+  const getNearestHourDefaults = useCallback(() => {
+    const now = new Date();
+    let h = now.getHours();
+    if (now.getMinutes() > 0) h += 1;
+    if (h >= 24) h = 0;
+    const amPm = h >= 12 ? "PM" : "AM";
+    let h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return { hour: String(h12).padStart(2, "0"), amPm };
+  }, []);
+
+  const [scheduleHour, setScheduleHour] = useState<string>(() => getNearestHourDefaults().hour);
+  const [scheduleMinute, setScheduleMinute] = useState<string>("00");
+  const [scheduleAmPm, setScheduleAmPm] = useState<string>(() => getNearestHourDefaults().amPm);
 
   const fetchData = useCallback(async () => {
     try {
@@ -126,14 +162,13 @@ export default function ClassManagement() {
         .collection("classes")
         .getFullList({
           sort: "-start_time",
-          expand:
-            "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,lecturer",
+          expand: "course_subject.subject,course_subject.course_intake.course,course_subject.course_intake.intake,lecturer",
         })
         .catch(() => []);
 
-      setClasses((records as any) || []);
+      setClasses((records as unknown as ZoomClass[]) || []);
       setLoading(false);
-    } catch (error) {
+    } catch {
       setClasses([]);
       setLoading(false);
     }
@@ -144,9 +179,9 @@ export default function ClassManagement() {
       const records = await pb.collection("users").getFullList({
         filter: 'role = "lecturer"',
       });
-      setLecturers(records);
-    } catch (error) {
-      console.error("Error fetching lecturers:", error);
+      setLecturers(records as unknown as Lecturer[]);
+    } catch (err: unknown) {
+      console.error("Error fetching lecturers:", err);
     }
   }, []);
 
@@ -156,71 +191,36 @@ export default function ClassManagement() {
         filter: 'course_intake.course_status = "ongoing"',
         expand: "subject,course_intake.course,course_intake.intake",
       });
-      setOngoingSubjects(records);
-    } catch (error) {
-      console.error("Error fetching ongoing subjects:", error);
+      setOngoingSubjects(records as unknown as CourseSubject[]);
+    } catch (err: unknown) {
+      console.error("Error fetching ongoing subjects:", err);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
-    fetchLecturers();
-    fetchOngoingSubjects();
+    let isSubscribed = false;
 
-    // Real-time subscription: auto-refresh when any class changes
-    pb.collection("classes").subscribe("*", () => {
-      fetchData();
-    });
+    const start = async () => {
+      await fetchData();
+      await fetchLecturers();
+      await fetchOngoingSubjects();
+
+      try {
+        await pb.collection("classes").subscribe("*", () => fetchData());
+        isSubscribed = true;
+      } catch (error) {
+        console.error("Real-time subscription failed:", error);
+      }
+    };
+
+    start();
 
     return () => {
-      pb.collection("classes").unsubscribe("*");
+      if (isSubscribed) {
+        pb.collection("classes").unsubscribe("*").catch(() => {});
+      }
     };
   }, [fetchData, fetchLecturers, fetchOngoingSubjects]);
-
-  const [currentStep, setCurrentStep] = useState(1);
-  const [courseIntakes, setCourseIntakes] = useState<CourseIntake[]>([]);
-  const [availableSubjects, setAvailableSubjects] = useState<CourseSubject[]>(
-    [],
-  );
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    description: "",
-    lecturer: "",
-  });
-
-  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
-  const [subjectSearchTerm, setSubjectSearchTerm] = useState("");
-  const [lecturers, setLecturers] = useState<any[]>([]);
-  const [ongoingSubjects, setOngoingSubjects] = useState<any[]>([]);
-
-  const [durationHour, setDurationHour] = useState<string>("1");
-  const [durationMinute, setDurationMinute] = useState<string>("0");
-  // Compute nearest hour for default time
-  const getNearestHourDefaults = () => {
-    const now = new Date();
-    let h = now.getHours();
-    if (now.getMinutes() > 0) h += 1; // round up
-    if (h >= 24) h = 0;
-    const amPm = h >= 12 ? "PM" : "AM";
-    let h12 = h % 12;
-    if (h12 === 0) h12 = 12;
-    return { hour: String(h12).padStart(2, "0"), amPm };
-  };
-
-  const nearestDefaults = getNearestHourDefaults();
-
-  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(
-    new Date(),
-  );
-  const [scheduleHour, setScheduleHour] = useState<string>(
-    nearestDefaults.hour,
-  );
-  const [scheduleMinute, setScheduleMinute] = useState<string>("00");
-  const [scheduleAmPm, setScheduleAmPm] = useState<string>(
-    nearestDefaults.amPm,
-  );
-
-
 
   const handleCreateClass = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -251,7 +251,7 @@ export default function ClassManagement() {
       }
 
       // Generate unique galene_group for each class
-      const galeneGroup = `class-${nowTimestamp}-${Math.floor(Math.random() * 10000)}`;
+      const galeneGroup = `class-${new Date().getTime()}-${Math.floor(Math.random() * 10000)}`;
 
       // Resolve subject names for the title
       const selectedSubjectsData = ongoingSubjects.filter((s) =>
@@ -260,7 +260,10 @@ export default function ClassManagement() {
       const generatedTitle = Array.from(
         new Set(
           selectedSubjectsData
-            .map((s) => s.expand?.subject?.[0]?.name || s.expand?.subject?.name)
+            .map((s) => {
+              const subjectData = s.expand?.subject;
+              return Array.isArray(subjectData) ? subjectData[0]?.name : subjectData?.name;
+            })
             .filter(Boolean),
         ),
       ).join(" & ");
@@ -307,17 +310,11 @@ export default function ClassManagement() {
       fetchData();
     } catch (error) {
       console.error("Error creating class:", error);
-      if (error && typeof error === "object" && "response" in error) {
-        console.error(
-          "PB Validation Error Details:",
-          (error as any).response?.data,
-        );
-      }
       toast.error("Failed to schedule class");
     }
   };
 
-  const handleDeleteClass = async (classId: string, galeneGroup?: string) => {
+  const handleDeleteClass = async (classId: string) => {
     if (
       !window.confirm(
         "Are you sure you want to end and archive this session? This will preserve attendance but close the live room.",
@@ -325,9 +322,6 @@ export default function ClassManagement() {
     )
       return;
     try {
-      // Mark the class as completed in PocketBase
-      // We no longer instantly delete the Galene group. It will be cleaned up nightly via a cron job
-      // to allow smooth "Reopen" functionality during the day without "group does not exist" errors.
       await pb.collection("classes").update(classId, {
         status: "completed",
       });
@@ -353,7 +347,6 @@ export default function ClassManagement() {
     }
   };
 
-
   const handleLogout = () => {
     logout();
     router.push("/");
@@ -371,9 +364,10 @@ export default function ClassManagement() {
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
 
+    // const now = Date.now(); // Impure
     const scheduledEnd =
       new Date(classItem.start_time).getTime() + classItem.duration * 60000;
-    const isWithinTimeWindow = nowTimestamp < scheduledEnd;
+    const isWithinTimeWindow = now < scheduledEnd;
     const isEndedEarly = classItem.status === "completed" && isWithinTimeWindow;
 
     // Treat 'ended early' classes as 'scheduled' for tab filtering
@@ -402,6 +396,12 @@ export default function ClassManagement() {
 
   return (
     <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
+      <AdminSidebar
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+        adminName={pb.authStore.model?.name}
+        onLogout={handleLogout}
+      />
       <main className="p-4 md:p-6 lg:p-8 space-y-8">
         {/* Page Header Card */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -428,29 +428,20 @@ export default function ClassManagement() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-fit w-[95vw] max-h-[90vh] overflow-y-auto bg-white rounded-t-[32px] sm:rounded-3xl p-0 border-none">
               <div className="p-8 space-y-6">
-                {/* Accessibility-only labels */}
                 <DialogHeader className="sr-only">
                   <DialogTitle>Schedule New Class</DialogTitle>
                 </DialogHeader>
 
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black">
-                    {currentStep === 1 ? (
-                      <Search size={20} />
-                    ) : (
-                      <Plus size={20} />
-                    )}
+                    {currentStep === 1 ? <Search size={20} /> : <Plus size={20} />}
                   </div>
                   <div>
                     <h2 className="font-black text-gray-900 uppercase tracking-tight">
-                      {currentStep === 1
-                        ? "Step 1: Select Subjects"
-                        : "Step 2: Session Details"}
+                      {currentStep === 1 ? "Step 1: Select Subjects" : "Step 2: Session Details"}
                     </h2>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      {currentStep === 1
-                        ? "Search and pick subjects for this session"
-                        : "Setup timing and assign host"}
+                      {currentStep === 1 ? "Search and pick subjects for this session" : "Setup timing and assign host"}
                     </p>
                   </div>
                 </div>
@@ -459,37 +450,26 @@ export default function ClassManagement() {
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (currentStep === 1) {
-                      if (selectedSubjectIds.length > 0) {
-                        setCurrentStep(2);
-                      } else {
-                        toast.error("Please select at least one subject");
-                      }
-                    } else {
-                      handleCreateClass(e);
-                    }
+                      if (selectedSubjectIds.length > 0) setCurrentStep(2);
+                      else toast.error("Please select at least one subject");
+                    } else handleCreateClass(e);
                   }}
                   className="space-y-4"
                 >
                   {currentStep === 1 ? (
                     <div className="min-w-[400px] space-y-4">
-                      {/* Search and Select Subjects */}
                       <div className="space-y-4">
                         <div>
                           <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
                             Search Ongoing Subjects
                           </label>
                           <div className="relative">
-                            <Search
-                              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                              size={16}
-                            />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                             <input
                               type="text"
-                              placeholder="Type to search (subject, course, intake)..."
+                              placeholder="Type to search..."
                               value={subjectSearchTerm}
-                              onChange={(e) =>
-                                setSubjectSearchTerm(e.target.value)
-                              }
+                              onChange={(e) => setSubjectSearchTerm(e.target.value)}
                               className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all text-sm"
                             />
                           </div>
@@ -499,42 +479,26 @@ export default function ClassManagement() {
                           <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar border border-gray-50 rounded-2xl p-2 bg-gray-50/30">
                             {ongoingSubjects
                               .filter((item) => {
-                                const subjectName = Array.isArray(
-                                  item.expand?.subject,
-                                )
+                                const subjectName = Array.isArray(item.expand?.subject)
                                   ? item.expand?.subject[0]?.name
                                   : item.expand?.subject?.name;
-
-                                const searchStr =
-                                  `${subjectName} ${item.expand?.course_intake?.expand?.course?.name} ${item.expand?.course_intake?.expand?.intake?.code}`.toLowerCase();
-                                return searchStr.includes(
-                                  subjectSearchTerm.toLowerCase(),
-                                );
+                                return `${subjectName} ${item.expand?.course_intake?.expand?.intake?.code}`
+                                  .toLowerCase()
+                                  .includes(subjectSearchTerm.toLowerCase());
                               })
                               .map((cs) => {
-                                const isSelected = selectedSubjectIds.includes(
-                                  cs.id,
-                                );
+                                const isSelected = selectedSubjectIds.includes(cs.id);
                                 return (
                                   <button
                                     key={cs.id}
                                     type="button"
                                     onClick={() => {
-                                      if (isSelected) {
-                                        setSelectedSubjectIds(
-                                          selectedSubjectIds.filter(
-                                            (id) => id !== cs.id,
-                                          ),
-                                        );
-                                      } else {
-                                        setSelectedSubjectIds([
-                                          ...selectedSubjectIds,
-                                          cs.id,
-                                        ]);
-                                      }
+                                      setSelectedSubjectIds((prev) =>
+                                        isSelected ? prev.filter((id) => id !== cs.id) : [...prev, cs.id],
+                                      );
                                     }}
                                     className={cn(
-                                      "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left group",
+                                      "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left",
                                       isSelected
                                         ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200"
                                         : "bg-white border-gray-100 text-gray-700 hover:border-indigo-300",
@@ -542,31 +506,15 @@ export default function ClassManagement() {
                                   >
                                     <div className="flex flex-col">
                                       <span className="text-xs font-black uppercase tracking-tight">
-                                        {cs.expand?.subject?.name ||
-                                          cs.expand?.subject?.[0]?.name}
+                                        {Array.isArray(cs.expand?.subject)
+                                          ? cs.expand?.subject[0]?.name
+                                          : cs.expand?.subject?.name}
                                       </span>
-                                      <span
-                                        className={cn(
-                                          "text-[10px] font-bold uppercase tracking-widest mt-1",
-                                          isSelected
-                                            ? "text-indigo-100"
-                                            : "text-gray-400",
-                                        )}
-                                      >
-                                        {
-                                          cs.expand?.course_intake?.expand
-                                            ?.course?.name
-                                        }{" "}
-                                        •{" "}
-                                        {
-                                          cs.expand?.course_intake?.expand
-                                            ?.intake?.code
-                                        }
+                                      <span className={cn("text-[10px] font-bold uppercase tracking-widest mt-1", isSelected ? "text-indigo-100" : "text-gray-400")}>
+                                        {cs.expand?.course_intake?.expand?.intake?.code}
                                       </span>
                                     </div>
-                                    {isSelected && (
-                                      <Check size={16} className="text-white" />
-                                    )}
+                                    {isSelected && <Check size={16} className="text-white" />}
                                   </button>
                                 );
                               })}
@@ -574,22 +522,14 @@ export default function ClassManagement() {
                         ) : (
                           <div className="py-12 flex flex-col items-center justify-center bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl text-center">
                             <Search size={32} className="text-gray-300 mb-2" />
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                              Search to see subjects
-                            </p>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Search to see subjects</p>
                           </div>
                         )}
 
                         {selectedSubjectIds.length > 0 && (
                           <div className="p-3 bg-indigo-50 rounded-xl flex items-center justify-between border border-indigo-100">
-                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
-                              {selectedSubjectIds.length} Subjects Selected
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedSubjectIds([])}
-                              className="text-indigo-400 hover:text-indigo-600"
-                            >
+                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{selectedSubjectIds.length} Selected</span>
+                            <button type="button" onClick={() => setSelectedSubjectIds([])} className="text-indigo-400 hover:text-indigo-600">
                               <LucideTrash2 size={14} />
                             </button>
                           </div>
@@ -597,10 +537,7 @@ export default function ClassManagement() {
                       </div>
 
                       <div className="pt-4 border-t border-gray-50 flex justify-end">
-                        <button
-                          type="submit"
-                          className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2"
-                        >
+                        <button type="submit" className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2">
                           Next Step <ArrowRight size={14} />
                         </button>
                       </div>
@@ -611,78 +548,43 @@ export default function ClassManagement() {
                         {/* Session Config */}
                         <div className="flex-1 space-y-4">
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                              Assign Lecturer (Host)
-                            </label>
-                            <Select
-                              required
-                              value={formData.lecturer}
-                              onValueChange={(val) =>
-                                setFormData({ ...formData, lecturer: val })
-                              }
-                            >
-                              <SelectTrigger className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold transition-all h-auto text-sm">
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Assign Lecturer</label>
+                            <Select required value={formData.lecturer} onValueChange={(val) => setFormData({ ...formData, lecturer: val })}>
+                              <SelectTrigger className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold h-auto text-sm">
                                 <SelectValue placeholder="Select Lecturer" />
                               </SelectTrigger>
-                              <SelectContent className="rounded-xl border-gray-100">
+                              <SelectContent className="rounded-xl">
                                 {lecturers.map((lec) => (
-                                  <SelectItem
-                                    key={lec.id}
-                                    value={lec.id}
-                                    className="rounded-lg"
-                                  >
-                                    {lec.name} (@{lec.username})
+                                  <SelectItem key={lec.id} value={lec.id} className="rounded-lg">
+                                    {lec.name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </div>
 
-                          {/* Selected Subjects Review */}
                           <div className="p-4 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl space-y-3">
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
-                              <Hash size={12} /> Selected Subjects (
-                              {selectedSubjectIds.length})
+                              <Hash size={12} /> Selected ({selectedSubjectIds.length})
                             </h3>
                             <div className="flex flex-wrap gap-2">
                               {ongoingSubjects
-                                .filter((s) =>
-                                  selectedSubjectIds.includes(s.id),
-                                )
+                                .filter((s) => selectedSubjectIds.includes(s.id))
                                 .map((s) => (
-                                  <Badge
-                                    key={s.id}
-                                    className="bg-white text-indigo-700 border-indigo-100 text-[10px] font-bold px-3 py-1 rounded-xl lowercase tracking-tight shadow-sm"
-                                  >
-                                    {s.expand?.subject?.[0]?.name ||
-                                      s.expand?.subject?.name}
-                                    <span className="text-gray-400 ml-1 font-medium">
-                                      (
-                                      {
-                                        s.expand?.course_intake?.expand?.intake
-                                          ?.code
-                                      }
-                                      )
-                                    </span>
+                                  <Badge key={s.id} className="bg-white text-indigo-700 border-indigo-100 text-[10px] font-bold px-3 py-1 rounded-xl lowercase tracking-tight shadow-sm">
+                                    {Array.isArray(s.expand?.subject) ? s.expand?.subject[0]?.name : s.expand?.subject?.name}
                                   </Badge>
                                 ))}
                             </div>
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                              Description (Optional)
-                            </label>
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Description</label>
                             <textarea
                               className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold transition-all min-h-[120px] resize-none text-sm"
-                              placeholder="Brief overview of session topics..."
+                              placeholder="Overview..."
                               value={formData.description}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  description: e.target.value,
-                                })
-                              }
+                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             />
                           </div>
                         </div>
@@ -693,31 +595,18 @@ export default function ClassManagement() {
                             <h3 className="text-[11px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
                               <Clock size={14} /> Class Timing
                             </h3>
-
                             <div className="space-y-4">
                               <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                                  Date
-                                </label>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Date</label>
                                 <Popover>
                                   <PopoverTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className={cn(
-                                        "w-full flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold text-sm text-left transition-all hover:bg-gray-50 hover:text-indigo-600",
-                                        !scheduleDate && "text-gray-400",
-                                      )}
-                                    >
-                                      <CalendarIcon className="h-4 w-4 text-indigo-500 shrink-0" />
-                                      {scheduleDate ? (
-                                        format(scheduleDate, "PPP")
-                                      ) : (
-                                        <span>Pick a date</span>
-                                      )}
+                                    <button type="button" className="w-full flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl font-bold text-sm">
+                                      <CalendarIcon className="h-4 w-4 text-indigo-500" />
+                                      {scheduleDate ? format(scheduleDate, "PPP") : "Pick a date"}
                                     </button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0 rounded-2xl border-gray-100 overflow-hidden shadow-2xl">
-                                    <CalendarPicker
+                                  <PopoverContent className="w-auto p-0 rounded-2xl border-gray-100 shadow-2xl">
+                                    <CalendarComponent
                                       mode="single"
                                       selected={scheduleDate}
                                       onSelect={(date) => setScheduleDate(date)}
@@ -730,43 +619,30 @@ export default function ClassManagement() {
 
                               <div className="grid grid-cols-3 gap-2">
                                 <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                                    Hour
-                                  </label>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Hour</label>
                                   <input
                                     type="number"
                                     min="1"
                                     max="12"
                                     value={scheduleHour}
-                                    onChange={(e) =>
-                                      setScheduleHour(e.target.value)
-                                    }
-                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                                    onChange={(e) => setScheduleHour(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center text-sm"
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                                    Min
-                                  </label>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Min</label>
                                   <input
                                     type="number"
                                     min="0"
                                     max="59"
                                     value={scheduleMinute}
-                                    onChange={(e) =>
-                                      setScheduleMinute(e.target.value)
-                                    }
-                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                                    onChange={(e) => setScheduleMinute(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center text-sm"
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                                    AM/PM
-                                  </label>
-                                  <Select
-                                    value={scheduleAmPm}
-                                    onValueChange={setScheduleAmPm}
-                                  >
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">AM/PM</label>
+                                  <Select value={scheduleAmPm} onValueChange={setScheduleAmPm}>
                                     <SelectTrigger className="px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold h-auto">
                                       <SelectValue />
                                     </SelectTrigger>
@@ -780,33 +656,25 @@ export default function ClassManagement() {
 
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                                    Dur (Hours)
-                                  </label>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Hours</label>
                                   <input
                                     type="number"
                                     min="0"
                                     max="12"
                                     value={durationHour}
-                                    onChange={(e) =>
-                                      setDurationHour(e.target.value)
-                                    }
-                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                                    onChange={(e) => setDurationHour(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center text-sm"
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                                    Dur (Mins)
-                                  </label>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Mins</label>
                                   <input
                                     type="number"
                                     min="0"
                                     max="59"
                                     value={durationMinute}
-                                    onChange={(e) =>
-                                      setDurationMinute(e.target.value)
-                                    }
-                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                                    onChange={(e) => setDurationMinute(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl font-bold text-center text-sm"
                                   />
                                 </div>
                               </div>
@@ -816,17 +684,10 @@ export default function ClassManagement() {
                       </div>
 
                       <div className="pt-6 border-t border-gray-50 flex justify-between items-center">
-                        <button
-                          type="button"
-                          onClick={() => setCurrentStep(1)}
-                          className="px-6 py-3 bg-gray-50 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition-all flex items-center gap-2"
-                        >
+                        <button type="button" onClick={() => setCurrentStep(1)} className="px-6 py-3 bg-gray-50 text-gray-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-100">
                           Back
                         </button>
-                        <button
-                          type="submit"
-                          className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95 flex items-center gap-2"
-                        >
+                        <button type="submit" className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center gap-2">
                           Schedule Class <Play size={14} className="ml-1" />
                         </button>
                       </div>
@@ -842,34 +703,10 @@ export default function ClassManagement() {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <StatsCarousel
             stats={[
-              {
-                title: "Scheduled",
-                value: stats.scheduled,
-                icon: Calendar,
-                bgColor: "bg-blue-50",
-                iconColor: "text-blue-600",
-              },
-              {
-                title: "In Progress",
-                value: stats.inProgress,
-                icon: Play,
-                bgColor: "bg-green-50",
-                iconColor: "text-green-600",
-              },
-              {
-                title: "Completed",
-                value: stats.completed,
-                icon: CheckCircle,
-                bgColor: "bg-gray-100",
-                iconColor: "text-gray-600",
-              },
-              {
-                title: "Cancelled",
-                value: stats.cancelled,
-                icon: XCircle,
-                bgColor: "bg-red-50",
-                iconColor: "text-red-600",
-              },
+              { title: "Scheduled", value: stats.scheduled, icon: Calendar, bgColor: "bg-blue-50", iconColor: "text-blue-600" },
+              { title: "In Progress", value: stats.inProgress, icon: Play, bgColor: "bg-green-50", iconColor: "text-green-600" },
+              { title: "Completed", value: stats.completed, icon: CheckCircle, bgColor: "bg-gray-100", iconColor: "text-gray-600" },
+              { title: "Cancelled", value: stats.cancelled, icon: XCircle, bgColor: "bg-red-50", iconColor: "text-red-600" },
             ]}
           />
         </div>
@@ -883,17 +720,16 @@ export default function ClassManagement() {
             action={
               <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 {[
-                  { id: "scheduled", label: "SCHEDULED", color: "blue" },
-                  { id: "completed", label: "HISTORY", color: "gray" },
+                  { id: "scheduled", label: "SCHEDULED" },
+                  { id: "completed", label: "HISTORY" },
                 ].map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setFilter(t.id)}
-                    className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap ${
-                      filter === t.id
-                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                        : "text-gray-400 bg-gray-50 hover:bg-gray-100"
-                    }`}
+                    className={cn(
+                      "px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap",
+                      filter === t.id ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "text-gray-400 bg-gray-50 hover:bg-gray-100",
+                    )}
                   >
                     {t.label}
                   </button>
@@ -908,76 +744,46 @@ export default function ClassManagement() {
           {filteredClasses.map((classItem) => (
             <div
               key={classItem.id}
-              className={`group bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm transition-all duration-500 flex flex-col gap-6 ring-1 ring-gray-950/[0.02] ${
-                classItem.status === "completed"
-                  ? "opacity-65 grayscale"
-                  : "hover:shadow-xl hover:-translate-y-1"
-              }`}
+              className={cn(
+                "group bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm transition-all duration-500 flex flex-col gap-6 ring-1 ring-gray-950/[0.02]",
+                classItem.status === "completed" ? "opacity-65 grayscale" : "hover:shadow-xl hover:-translate-y-1",
+              )}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
                   <div
-                    className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all duration-500 overflow-hidden ${
-                      classItem.status === "in_progress"
-                        ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50"
-                        : "bg-indigo-50 text-indigo-600"
-                    }`}
+                    className={cn(
+                      "w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all duration-500 overflow-hidden",
+                      classItem.status === "in_progress" ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50" : "bg-indigo-50 text-indigo-600",
+                    )}
                   >
                     <Video size={24} />
                   </div>
                   <div className="flex flex-col">
-                    <h3 className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
+                    <h3 className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight truncate border-b-2 border-transparent group-hover:border-indigo-100">
                       {classItem.title}
                     </h3>
-                    <div className="flex items-center gap-2">
-                      {(() => {
-                        const scheduledEnd =
-                          new Date(classItem.start_time).getTime() +
-                          classItem.duration * 60000;
-                        const isWithinTimeWindow = Date.now() < scheduledEnd;
-                        const isEndedEarly =
-                          classItem.status === "completed" &&
-                          isWithinTimeWindow;
-
-                        let bgColor = "bg-gray-400";
-                        let label = classItem.status.replace("_", " ");
-
-                        if (isEndedEarly) {
-                          bgColor = "bg-amber-500";
-                          label = "ended early";
-                        } else if (classItem.status === "scheduled") {
-                          bgColor = "bg-blue-600";
-                        } else if (classItem.status === "in_progress") {
-                          bgColor = "bg-green-600";
-                        } else if (classItem.status === "cancelled") {
-                          bgColor = "bg-red-600";
-                        }
-
-                        return (
-                          <Badge
-                            className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${bgColor} text-white`}
-                          >
-                            {label}
-                          </Badge>
-                        );
-                      })()}
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge className={cn(
+                        "px-4 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-white border-none",
+                        classItem.status === "scheduled" ? "bg-blue-600" : 
+                        classItem.status === "in_progress" ? "bg-green-600" : 
+                        classItem.status === "cancelled" ? "bg-red-600" : "bg-gray-400"
+                      )}>
+                        {classItem.status.replace("_", " ")}
+                      </Badge>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {classItem.status !== "completed" ? (
                     <>
-                      <button className="p-3 bg-gray-50 rounded-xl text-gray-300 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                      <button className="p-3 bg-gray-50 rounded-xl text-gray-300 hover:bg-indigo-600 hover:text-white transition-all duration-500 shadow-sm border-none">
                         <Eye size={18} />
                       </button>
                       <button
-                        onClick={() =>
-                          handleDeleteClass(
-                            classItem.id,
-                            classItem.galene_group,
-                          )
-                        }
-                        className="p-3 bg-red-50 rounded-xl text-red-500 hover:bg-red-600 hover:text-white transition-all duration-500 shadow-sm"
+                        onClick={() => handleDeleteClass(classItem.id)}
+                        className="p-3 bg-red-50 rounded-xl text-red-500 hover:bg-red-600 hover:text-white transition-all duration-500 shadow-sm border-none"
                         title="End & Archive Session"
                       >
                         <Archive size={18} />
@@ -986,10 +792,10 @@ export default function ClassManagement() {
                   ) : (
                     <button
                       onClick={() => handleReopenClass(classItem.id)}
-                      className="p-3 bg-amber-50 rounded-xl text-amber-500 hover:bg-amber-600 hover:text-white transition-all duration-500 shadow-sm flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                      className="p-3 bg-amber-50 rounded-xl text-amber-500 hover:bg-amber-600 hover:text-white transition-all duration-500 shadow-sm flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border-none"
                       title="Reopen Session"
                     >
-                      <RotateCcw size={16} /> Reopen
+                      <RotateCcw size={16} /> REOPEN
                     </button>
                   )}
                 </div>
@@ -998,19 +804,12 @@ export default function ClassManagement() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-4 rounded-2xl flex flex-col gap-1 border border-transparent group-hover:border-indigo-100/50 transition-all duration-500">
                   <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <Calendar size={12} className="text-indigo-400" /> Date &
-                    Time
+                    <Calendar size={12} className="text-indigo-400" /> Date & Time
                   </span>
                   <span className="text-sm font-bold text-gray-900">
-                    {new Date(classItem.start_time).toLocaleDateString(
-                      "en-US",
-                      { month: "short", day: "numeric" },
-                    )}
+                    {new Date(classItem.start_time).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     <span className="text-indigo-500 mx-2">•</span>
-                    {new Date(classItem.start_time).toLocaleTimeString(
-                      "en-US",
-                      { hour: "2-digit", minute: "2-digit" },
-                    )}
+                    {new Date(classItem.start_time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-2xl flex flex-col gap-1 border border-transparent group-hover:border-indigo-100/50 transition-all duration-500">
@@ -1027,47 +826,32 @@ export default function ClassManagement() {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl">
                     <Clock size={12} />
-                    <span className="text-[10px] font-black tracking-widest">
-                      {classItem.duration} MIN
-                    </span>
+                    <span className="text-[10px] font-black tracking-widest">{classItem.duration} MIN</span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <div className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-xl">
+                    <div className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-xl max-w-[150px]">
                       <Users size={12} />
-                      <span className="text-[10px] font-black tracking-widest font-mono">
+                      <span className="text-[10px] font-black tracking-widest font-mono truncate">
                         {Array.isArray(classItem.expand?.course_subject)
-                          ? classItem.expand?.course_subject
-                              .map(
-                                (cs: any) =>
-                                  cs.expand?.course_intake?.expand?.intake
-                                    ?.code,
-                              )
+                          ? (classItem.expand?.course_subject as CourseSubject[])
+                              .map((cs) => cs.expand?.course_intake?.expand?.intake?.code)
                               .filter(Boolean)
                               .join(", ")
-                          : (classItem.expand?.course_subject as any)?.expand
-                              ?.course_intake?.expand?.intake?.code}
+                          : (classItem.expand?.course_subject as CourseSubject)?.expand?.course_intake?.expand?.intake?.code}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() =>
-                      router.push(
-                        `/dashboard/classroom/${classItem.id}?role=host`,
-                      )
-                    }
-                    className="flex items-center gap-2 text-[10px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl transition-all uppercase tracking-widest"
+                    onClick={() => router.push(`/dashboard/classroom/${classItem.id}?role=host`)}
+                    className="flex items-center gap-2 text-[10px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl transition-all uppercase tracking-widest border-none"
                   >
                     Host <Play size={10} />
                   </button>
                   <button
-                    onClick={() =>
-                      router.push(
-                        `/dashboard/classroom/${classItem.id}?role=attendee`,
-                      )
-                    }
-                    className="flex items-center gap-2 text-[10px] font-black text-gray-500 bg-gray-50 hover:bg-gray-200 px-4 py-2 rounded-xl transition-all uppercase tracking-widest"
+                    onClick={() => router.push(`/dashboard/classroom/${classItem.id}?role=attendee`)}
+                    className="flex items-center gap-2 text-[10px] font-black text-gray-500 bg-gray-50 hover:bg-gray-200 px-4 py-2 rounded-xl transition-all uppercase tracking-widest border-none"
                   >
                     View <Eye size={10} />
                   </button>
@@ -1082,15 +866,12 @@ export default function ClassManagement() {
             <div className="w-20 h-20 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-200 mx-auto mb-6">
               <Video size={40} />
             </div>
-            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
-              No sessions found
-            </h3>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
-              Try clearing your filters or search terms
-            </p>
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">No sessions found</h3>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">Try clearing your filters or search terms</p>
           </div>
         )}
       </main>
     </div>
   );
 }
+

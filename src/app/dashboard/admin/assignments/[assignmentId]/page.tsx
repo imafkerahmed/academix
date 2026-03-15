@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -8,23 +8,13 @@ import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import {
   FileText,
-  Calendar,
   CheckCircle,
   Clock,
   AlertCircle,
-  Eye,
   Download,
-  Menu,
-  Plus,
-  ArrowRight,
-  User,
   Search,
   BookOpen,
-  ArrowLeft,
-  Upload,
   Hash,
-  ChevronRight,
-  ExternalLink,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -47,6 +37,35 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+interface Student {
+  id: string;
+  name: string;
+}
+
+interface Intake {
+  code: string;
+}
+
+interface Course {
+  name: string;
+}
+
+interface Subject {
+  name: string;
+}
+
+interface CourseSubject {
+  expand?: {
+    subject?: Subject | Subject[];
+    course_intake?: {
+      expand?: {
+        intake?: Intake;
+        course?: Course;
+      };
+    };
+  };
+}
+
 interface Assignment {
   id: string;
   title: string;
@@ -58,8 +77,8 @@ interface Assignment {
   total_marks?: number;
   file?: string;
   expand?: {
-    course_subject?: any;
-    marker?: any;
+    course_subject?: CourseSubject;
+    marker?: { name: string };
   };
 }
 
@@ -73,11 +92,12 @@ interface Submission {
   grade?: string;
   feedback?: string;
   expand?: {
-    student?: any;
+    student?: Student;
     assignment?: Assignment;
   };
   file?: string;
 }
+
 
 export default function AssignmentDetails() {
   const router = useRouter();
@@ -100,12 +120,11 @@ export default function AssignmentDetails() {
     feedback: "",
   });
 
-  const fetchData = async () => {
+  const fetchData = React.useCallback(async () => {
     try {
       const assignmentRecord = await pb.collection("assignments").getOne(assignmentId, {
         expand: "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
       });
-      console.log("Fetched assignment details with subject:", assignmentRecord.expand?.course_subject?.expand?.subject);
 
       const submissionsRecords = await pb.collection("assignment_submissions").getFullList({
         filter: `assignment = "${assignmentId}"`,
@@ -116,42 +135,50 @@ export default function AssignmentDetails() {
       setAssignment(assignmentRecord as unknown as Assignment);
       setSubmissions(submissionsRecords as unknown as Submission[]);
       setLoading(false);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching assignment details:", error);
       toast.error("Failed to load assignment data");
       router.push("/dashboard/admin/assignments");
     }
-  };
+  }, [assignmentId, router]);
+
+  const setupSubscription = React.useCallback(async () => {
+    try {
+      return await pb.collection("assignment_submissions").subscribe("*", (e) => {
+        if (e.record.assignment === assignmentId) {
+          fetchData();
+        }
+      });
+    } catch (error: unknown) {
+      console.error("Realtime subscription failed:", error);
+      return null;
+    }
+  }, [assignmentId, fetchData]);
 
   useEffect(() => {
     if (!assignmentId) return;
 
-    let isSubscribed = false;
+    let unsubscribe: (() => void) | null = null;
 
-    const setupSubscription = async () => {
-      try {
-        await pb.collection("assignment_submissions").subscribe("*", (e) => {
-          if (e.record.assignment === assignmentId) {
-            fetchData();
-          }
-        });
-        isSubscribed = true;
-      } catch (error) {
-        console.error("Realtime subscription failed:", error);
+    const start = async () => {
+      await fetchData();
+      const sub = await setupSubscription();
+      if (sub) {
+        unsubscribe = () => {
+          pb.collection("assignment_submissions").unsubscribe("*").catch(err => {
+            console.error("Failed to unsubscribe:", err);
+          });
+        };
       }
     };
 
-    fetchData();
-    setupSubscription();
+    start();
 
     return () => {
-      if (isSubscribed) {
-        pb.collection("assignment_submissions").unsubscribe("*").catch(err => {
-          console.error("Failed to unsubscribe:", err);
-        });
-      }
+      if (unsubscribe) unsubscribe();
     };
-  }, [assignmentId]);
+  }, [assignmentId, fetchData, setupSubscription]);
+
 
   const handleGradeSubmission = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,7 +273,9 @@ export default function AssignmentDetails() {
                     </span>
                   </div>
                   <h2 className="text-indigo-600 font-black text-sm md:text-base uppercase tracking-tight ml-5">
-                    {assignment.expand?.course_subject?.expand?.subject?.name || assignment.expand?.course_subject?.expand?.subject?.[0]?.name}
+                    {Array.isArray(assignment.expand?.course_subject?.expand?.subject) 
+                      ? assignment.expand?.course_subject?.expand?.subject[0]?.name 
+                      : assignment.expand?.course_subject?.expand?.subject?.name}
                   </h2>
                 </div>
               </div>

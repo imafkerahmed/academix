@@ -4,7 +4,7 @@ import { useState } from "react";
 import Sidebar from "@/components/student/Sidebar";
 import { SessionWarningModal } from "@/components/SessionWarningModal";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
-import { Menu, LayoutDashboard } from "lucide-react";
+import { Menu } from "lucide-react";
 
 export default function StudentLayout({
   children,

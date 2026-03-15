@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import {
   Edit,
@@ -13,14 +13,12 @@ import {
   Plus,
   Filter,
   User,
-  Calendar,
   Check,
   ArrowRight,
   ArrowLeft,
   Download,
   Info,
   Loader2,
-  DollarSign,
   ChevronDown,
   FileText,
   Youtube,
@@ -34,7 +32,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ModernModal } from "@/components/ui/modern-modal";
-import AdminActionBar from "@/components/admin/AdminActionBar";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 import { EnrollExistingStudentModal } from "@/components/admin/EnrollExistingStudentModal";
 import {
@@ -45,16 +42,106 @@ import {
 } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import pb from "@/lib/pocketbase";
+import { RecordModel } from "pocketbase";
 
-// --- Utility Functions ---
-function calculateStatus(start_date: string, end_date: string) {
-  const today = new Date();
-  const start = new Date(start_date);
-  const end = new Date(end_date);
-  if (today < start) return "upcoming";
-  if (today > end) return "completed";
-  return "ongoing";
+// --- Types ---
+interface Intake {
+  id: string;
+  code: string;
+  start_date: string;
+  end_date: string;
+  created: string;
 }
+
+interface Course {
+  id: string;
+  name: string;
+  code: string;
+  created: string;
+}
+
+interface CourseIntake {
+  id: string;
+  course: string;
+  intake: string;
+  start_date: string;
+  end_date: string;
+  is_semester_based: boolean;
+  semester_count: number | null;
+  course_status: string;
+}
+
+interface Fee {
+  id: string;
+  course_intake: string;
+  course_fee: number;
+  registration_fee: number;
+  duration: number;
+}
+
+interface UserRecord {
+  id: string;
+  name: string;
+  username: string;
+  role: string;
+  avatar?: string;
+  userId?: string;
+  email?: string;
+}
+
+interface Subject {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface CourseSubject {
+  id: string;
+  name: string;
+  code: string;
+  semester: string;
+  assignedLecturer: string;
+  credits: number;
+}
+
+interface Assignment {
+  id: string;
+  title: string;
+  subject: string;
+  subjectCode: string;
+  dueDate: string;
+  semester: string;
+  totalMarks?: number | string;
+  markingLecturer?: string;
+  rules?: string;
+  [key: string]: unknown; // To handle expanded data flexibility
+}
+
+interface EnrollmentRecord {
+  id: string;
+  created: string;
+  course_intake: string;
+  registration_number: string;
+  enrollement_status: string;
+  enrollment_date: string;
+  expand?: {
+    student?: UserRecord & { collectionId: string };
+  };
+}
+
+interface Material {
+  id: string;
+  title: string;
+  description: string;
+  type: "document" | "youtube-link" | "video-link" | "video-upload";
+  video_url: string;
+  file: string;
+  visible: boolean;
+  can_download: boolean;
+  course_subject: string | string[];
+  created: string;
+}
+
 
 function formatDate(date: string) {
   const d = new Date(date);
@@ -70,13 +157,13 @@ export default function CourseDetailsPage() {
 
   // Real data state
   const [loading, setLoading] = useState(true);
-  const [intake, setIntake] = useState<any>(null);
-  const [course, setCourse] = useState<any>(null);
-  const [courseIntake, setCourseIntake] = useState<any>(null);
-  const [fees, setFees] = useState<any>(null);
+  const [intake, setIntake] = useState<Intake | null>(null);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [courseIntake, setCourseIntake] = useState<CourseIntake | null>(null);
+  const [fees, setFees] = useState<Fee | null>(null);
   const [editLoading, setEditLoading] = useState(false);
-  const [allLecturers, setAllLecturers] = useState<any[]>([]);
-  const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
+  const [allLecturers, setAllLecturers] = useState<UserRecord[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<Subject[]>([]);
 
   // Edit form state (matching create course modal structure)
   const [editCourse, setEditCourse] = useState({
@@ -105,9 +192,9 @@ export default function CourseDetailsPage() {
       );
 
       const courseIntakeRecord = courseIntakesData[0] ?? null;
-      setIntake(intakeRecord);
-      setCourse(courseRecord);
-      setCourseIntake(courseIntakeRecord);
+      setIntake(intakeRecord as unknown as Intake);
+      setCourse(courseRecord as unknown as Course);
+      setCourseIntake(courseIntakeRecord as unknown as CourseIntake);
 
       // Fetch fees using course_intake relation
       let feesRecord = null;
@@ -120,7 +207,7 @@ export default function CourseDetailsPage() {
           .catch(() => []);
         feesRecord = feesData[0] ?? null;
       }
-      setFees(feesRecord);
+      setFees(feesRecord as unknown as Fee);
 
       // Populate edit form with current data
       const startDate = courseIntakeRecord?.start_date
@@ -165,7 +252,7 @@ export default function CourseDetailsPage() {
             sort: "semester,created",
           });
 
-        const formattedSubjects = subjectsData.map((cs: any) => {
+        const formattedSubjects: CourseSubject[] = (subjectsData as unknown as Array<RecordModel & { expand?: { subject?: Subject | Subject[]; lecturer?: UserRecord } }>).map((cs) => {
           const subjects = Array.isArray(cs.expand?.subject)
             ? cs.expand.subject
             : cs.expand?.subject
@@ -174,8 +261,8 @@ export default function CourseDetailsPage() {
 
           return {
             id: cs.id,
-            name: subjects.map((s: any) => s.name).join(", ") || "No Subject",
-            code: subjects.map((s: any) => s.code).join(", ") || "N/A",
+            name: (subjects as Subject[]).map((s) => s.name).join(", ") || "No Subject",
+            code: (subjects as Subject[]).map((s) => s.code).join(", ") || "N/A",
             semester: cs.semester || "Semester 1",
             assignedLecturer: cs.expand?.lecturer?.name || "Not Assigned",
             credits: cs.credits || 0,
@@ -189,7 +276,7 @@ export default function CourseDetailsPage() {
           filter: 'role="lecturer"',
           sort: "name",
         });
-        setAllLecturers(lecturersData);
+        setAllLecturers(lecturersData as unknown as UserRecord[]);
 
         // Fetch all available subjects for the add subject modal
         const allAvailableSubjects = await pb
@@ -197,17 +284,18 @@ export default function CourseDetailsPage() {
           .getFullList({
             sort: "name",
           });
-        setAvailableSubjects(allAvailableSubjects);
+        setAvailableSubjects(allAvailableSubjects as unknown as Subject[]);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching course details:", error);
+      const err = error as { status?: number };
       toast.error("Failed to load course details");
-      if (error?.status === 404)
+      if (err?.status === 404)
         router.push(`/dashboard/admin/intakes/${intakeId}`);
     } finally {
       setLoading(false);
     }
-  }, [intakeId, courseId, router]);
+  }, [intakeId, courseId, router]); // Added router to exhaustive-deps
 
   useEffect(() => {
     if (intakeId && courseId) fetchData();
@@ -255,7 +343,11 @@ export default function CourseDetailsPage() {
       }
 
       // Update local state
-      setCourse({ ...course, name: editCourse.name, code: editCourse.code });
+      setCourse({
+        ...course,
+        name: editCourse.name,
+        code: editCourse.code,
+      } as Course);
       setCourseIntake({
         ...courseIntake,
         start_date: editCourse.start_date,
@@ -264,17 +356,18 @@ export default function CourseDetailsPage() {
         semester_count: editCourse.isSemesterBased
           ? editCourse.semesterCount
           : null,
-      });
+      } as CourseIntake);
       setFees({
         ...fees,
         course_fee: parseFloat(editCourse.course_fee) || 0,
         registration_fee: parseFloat(editCourse.registration_fee) || 0,
-      });
+      } as Fee);
 
       toast.success("Course updated successfully");
       setShowEditModal(false);
-    } catch (error: any) {
-      console.error("Error saving course:", error);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      console.error("Error saving course:", err);
       toast.error("Failed to save course changes");
     } finally {
       setEditLoading(false);
@@ -293,33 +386,26 @@ export default function CourseDetailsPage() {
     useState(false);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
 
-  const [courseSubjects, setCourseSubjects] = useState<any[]>([]);
+  const [courseSubjects, setCourseSubjects] = useState<CourseSubject[]>([]);
   const [selectedSemester, setSelectedSemester] = useState("Semester 1");
   const [subjectSearchQuery, setSubjectSearchQuery] = useState("");
   const [selectedSubjectsInModal, setSelectedSubjectsInModal] = useState<
     { id: string; credits: number }[]
   >([]);
-  const [subjectToAssign, setSubjectToAssign] = useState<any>(null);
+  const [subjectToAssign, setSubjectToAssign] = useState<CourseSubject | null>(
+    null,
+  );
   const [lecturerSearchQuery, setLecturerSearchQuery] = useState("");
 
-  const [courseAssignments, setCourseAssignments] = useState<any[]>([]);
+  const [courseAssignments] = useState<Assignment[]>([]);
   const [selectedAdminAssignment, setSelectedAdminAssignment] =
-    useState<any>(null);
+    useState<Assignment | null>(null);
   const [assignmentModalSemester, setAssignmentModalSemester] =
     useState("Semester 1");
   const [assignmentModalSubject, setAssignmentModalSubject] = useState<
     string | null
   >(null);
   const [assignmentModalStage, setAssignmentModalStage] = useState(1);
-  const [assignmentForm, setAssignmentForm] = useState<any>({
-    title: "",
-    totalMarks: 100,
-    rules: "",
-    unlockDate: "2026-05-01",
-    dueDate: "2026-06-01",
-    markingLecturer: "",
-    assignmentSheet: null,
-  });
 
   if (loading) {
     return (
@@ -343,7 +429,7 @@ export default function CourseDetailsPage() {
             Course Not Found
           </h2>
           <p className="text-gray-500 mb-6">
-            This course or intake could not be found.
+            Please double check all fields before saving. You can&apos;t undo once confirmed.
           </p>
           <button
             onClick={() => router.push(`/dashboard/admin/intakes/${intakeId}`)}
@@ -363,17 +449,22 @@ export default function CourseDetailsPage() {
     { label: "Materials", icon: Video },
   ];
 
-  const groupedSubjects = courseSubjects.reduce((acc: any, subj) => {
-    if (!acc[subj.semester]) acc[subj.semester] = [];
-    acc[subj.semester].push(subj);
-    return acc;
-  }, {});
+  const groupedSubjects = courseSubjects.reduce<Record<string, CourseSubject[]>>(
+    (acc, subj) => {
+      if (!acc[subj.semester]) acc[subj.semester] = [];
+      acc[subj.semester].push(subj);
+      return acc;
+    },
+    {},
+  );
 
-  const groupedAssignments = courseAssignments.reduce((acc: any, asgn) => {
+  const groupedAssignments = courseAssignments.reduce<
+    Record<string, Assignment[]>
+  >((acc, asgn) => {
     if (!acc[asgn.semester]) acc[asgn.semester] = [];
     acc[asgn.semester].push(asgn);
     return acc;
-  }, {});
+  }, {}); // Removed courseIntakeId from exhaustive-deps
 
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans">
@@ -487,7 +578,7 @@ export default function CourseDetailsPage() {
           <SubjectsTab
             groupedSubjects={groupedSubjects}
             onAdd={() => setShowAddSubjectModal(true)}
-            onAssign={(subj: any) => {
+            onAssign={(subj: CourseSubject) => {
               setSubjectToAssign(subj);
               setShowLecturerModal(true);
             }}
@@ -497,7 +588,7 @@ export default function CourseDetailsPage() {
           <AssignmentsTab
             groupedAssignments={groupedAssignments}
             onAdd={() => setShowAddAssignmentModal(true)}
-            onView={(asgn: any) => {
+            onView={(asgn: Assignment) => {
               setSelectedAdminAssignment(asgn);
               setShowAssignmentDetailModal(true);
             }}
@@ -773,7 +864,7 @@ export default function CourseDetailsPage() {
               type="button"
               onClick={() => setShowEditModal(false)}
               disabled={editLoading}
-              className="w-full py-2 font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest disabled:opacity-50"
+              className="w-full py-2 font-bold text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest"
             >
               CANCEL
             </button>
@@ -990,20 +1081,22 @@ export default function CourseDetailsPage() {
                   key={lecturer.id}
                   onClick={async () => {
                     try {
-                      await pb
-                        .collection("course_subjects")
-                        .update(subjectToAssign.id, {
-                          lecturer: lecturer.id,
-                        });
+                      if (subjectToAssign) {
+                        await pb
+                          .collection("course_subjects")
+                          .update(subjectToAssign.id, {
+                            lecturer: lecturer.id,
+                          });
 
-                      // Update local state
-                      setCourseSubjects((prev) =>
-                        prev.map((s) =>
-                          s.id === subjectToAssign.id
-                            ? { ...s, assignedLecturer: lecturer.name }
-                            : s,
-                        ),
-                      );
+                        // Update local state
+                        setCourseSubjects((prev) =>
+                          prev.map((s) =>
+                            s.id === (subjectToAssign as CourseSubject).id
+                              ? { ...s, assignedLecturer: lecturer.name }
+                              : s,
+                          ),
+                        );
+                      }
 
                       toast.success(
                         `${lecturer.name} assigned to ${subjectToAssign?.name}`,
@@ -1017,11 +1110,13 @@ export default function CourseDetailsPage() {
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-50 bg-white hover:bg-indigo-50 hover:border-indigo-100 transition-all group"
                 >
                   {lecturer.avatar ? (
-                    <img
+                    <Image
                       src={pb.files.getURL(lecturer, lecturer.avatar, {
                         thumb: "100x100",
                       })}
                       alt={lecturer.name}
+                      width={40}
+                      height={40}
                       className="w-10 h-10 rounded-xl object-cover ring-2 ring-indigo-100 group-hover:ring-indigo-400 transition-all"
                     />
                   ) : (
@@ -1071,12 +1166,13 @@ export default function CourseDetailsPage() {
       >
         <div className="space-y-6">
           <div className="flex gap-2 mb-4">
-            <div
-              className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${assignmentModalStage >= 1 ? "bg-indigo-600" : "bg-gray-100"}`}
-            />
-            <div
-              className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${assignmentModalStage === 2 ? "bg-indigo-600" : "bg-gray-100"}`}
-            />
+            {["#f9fafb", "#f3f4f6"].map((color) => (
+              <div
+                key={color}
+                className="h-1 flex-1 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+            ))}
           </div>
 
           {assignmentModalStage === 1 && (
@@ -1103,7 +1199,7 @@ export default function CourseDetailsPage() {
                 </label>
                 <div className="grid grid-cols-1 gap-2">
                   {groupedSubjects[assignmentModalSemester]?.map(
-                    (subj: any) => (
+                    (subj: CourseSubject) => (
                       <button
                         key={subj.code}
                         onClick={() => setAssignmentModalSubject(subj.code)}
@@ -1336,32 +1432,23 @@ function StudentsList({
   onAdd,
   refreshKey,
 }: {
-  courseIntakeId?: string;
-  courseEndDate?: string;
-  onAdd?: () => void;
-  refreshKey?: number;
+  courseIntakeId: string | undefined;
+  courseEndDate: string | undefined;
+  onAdd: () => void;
+  refreshKey: number;
 }) {
   const router = useRouter();
-  const [students, setStudents] = React.useState<any[]>([]);
+  const [students, setStudents] = React.useState<
+    { id: string; studentId: string; reg: string; name: string; avatar: string; collectionId: string; date: string; status: string; }[]
+  >([]);
   const [loading, setLoading] = React.useState(true);
 
-  const isCourseOver = React.useMemo(() => {
-    if (!courseEndDate) return false;
-    return new Date() > new Date(courseEndDate);
-  }, [courseEndDate]);
-
-  React.useEffect(() => {
-    if (courseIntakeId) {
-      fetchEnrolledStudents();
-    }
-  }, [courseIntakeId, refreshKey]);
-
-  async function fetchEnrolledStudents() {
+  const fetchEnrolledStudents = React.useCallback(async () => {
     if (!courseIntakeId) return;
 
     try {
       setLoading(true);
-      const enrollments = await pb.collection("enrollments").getFullList({
+      const enrollments = await pb.collection("enrollments").getFullList<RecordModel & { expand?: { student?: UserRecord } }>({
         filter: `course_intake="${courseIntakeId}"`,
         expand: "student",
         sort: "-created",
@@ -1372,12 +1459,12 @@ function StudentsList({
         ? new Date() > new Date(courseEndDate)
         : false;
       if (courseOver) {
-        const toComplete = enrollments.filter(
-          (e: any) => e.enrollement_status === "enrolled",
+        const toComplete = (enrollments as unknown as EnrollmentRecord[]).filter(
+          (e) => e.enrollement_status === "enrolled",
         );
         if (toComplete.length > 0) {
           await Promise.all(
-            toComplete.map((e: any) =>
+            toComplete.map((e) =>
               pb.collection("enrollments").update(e.id, {
                 enrollement_status: "completed",
               }),
@@ -1386,13 +1473,14 @@ function StudentsList({
         }
       }
 
-      const formattedStudents = enrollments.map((enrollment: any) => {
+      const formattedStudents = (enrollments as unknown as EnrollmentRecord[]).map((enrollment) => {
         const student = enrollment.expand?.student;
         // If course is over and status was "enrolled", reflect as "completed"
+        const status = enrollment.enrollement_status;
         const effectiveStatus =
-          courseOver && enrollment.enrollement_status === "enrolled"
+          courseOver && status === "enrolled"
             ? "completed"
-            : enrollment.enrollement_status || "enrolled";
+            : status || "enrolled";
         return {
           id: enrollment.id,
           studentId: student?.id || "",
@@ -1418,7 +1506,11 @@ function StudentsList({
     } finally {
       setLoading(false);
     }
-  }
+  }, [courseIntakeId, courseEndDate]);
+
+  React.useEffect(() => {
+    fetchEnrolledStudents();
+  }, [fetchEnrolledStudents, refreshKey]);
 
   return (
     <div className="space-y-6">
@@ -1457,7 +1549,7 @@ function StudentsList({
               No students enrolled yet
             </p>
             <p className="text-xs text-gray-400 mt-2">
-              Click "ADD STUDENT" to enroll students in this course
+              Click &quot;ADD STUDENT&quot; to enroll students in this course
             </p>
           </div>
         ) : (
@@ -1485,16 +1577,18 @@ function StudentsList({
                     <td className="px-10 py-6">
                       <div className="flex items-center gap-4">
                         {s.avatar ? (
-                          <img
+                          <Image
                             src={pb.files.getURL(
                               {
                                 id: s.studentId,
                                 collectionId: s.collectionId,
-                              } as any,
+                              } as unknown as RecordModel,
                               s.avatar,
                               { thumb: "100x100" },
                             )}
                             alt={s.name}
+                            width={40}
+                            height={40}
                             className="w-10 h-10 rounded-xl object-cover ring-2 ring-gray-100 group-hover:ring-indigo-300 transition-all"
                           />
                         ) : (
@@ -1589,7 +1683,15 @@ function StudentsList({
   );
 }
 
-function SubjectsTab({ groupedSubjects, onAdd, onAssign }: any) {
+function SubjectsTab({
+  groupedSubjects,
+  onAdd,
+  onAssign,
+}: {
+  groupedSubjects: Record<string, CourseSubject[]>;
+  onAdd: () => void;
+  onAssign: (subj: CourseSubject) => void;
+}) {
   // Sort semesters numerically/alphabetically
   const sortedSemesters = Object.entries(groupedSubjects).sort(([a], [b]) => {
     // Attempt to extract numbers for sorting (e.g. "Semester 1", "Semester 10")
@@ -1610,7 +1712,7 @@ function SubjectsTab({ groupedSubjects, onAdd, onAssign }: any) {
         </button>
       </div>
       {sortedSemesters.length > 0 ? (
-        sortedSemesters.map(([sem, subjects]: any) => (
+        sortedSemesters.map(([sem, subjects]) => (
           <div
             key={sem}
             className="bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm"
@@ -1619,7 +1721,7 @@ function SubjectsTab({ groupedSubjects, onAdd, onAssign }: any) {
               <div className="w-2 h-8 bg-indigo-600 rounded-full" /> {sem}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {subjects.map((subj: any, i: number) => (
+              {subjects.map((subj, i) => (
                 <div
                   key={i}
                   className="p-6 bg-gray-50/50 border border-gray-100 rounded-3xl flex items-center justify-between group hover:bg-white hover:shadow-md hover:border-indigo-100 transition-all"
@@ -1665,7 +1767,17 @@ function SubjectsTab({ groupedSubjects, onAdd, onAssign }: any) {
   );
 }
 
-function AssignmentsTab({ groupedAssignments, onAdd, onView, router }: any) {
+function AssignmentsTab({
+  groupedAssignments,
+  onAdd,
+  onView,
+  router,
+}: {
+  groupedAssignments: Record<string, Assignment[]>;
+  onAdd: () => void;
+  onView: (asgn: Assignment) => void;
+  router: ReturnType<typeof useRouter>;
+}) {
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
@@ -1676,7 +1788,7 @@ function AssignmentsTab({ groupedAssignments, onAdd, onView, router }: any) {
           <Plus size={18} /> ADD ASSIGNMENT
         </button>
       </div>
-      {Object.entries(groupedAssignments).map(([sem, assignments]: any) => (
+      {Object.entries(groupedAssignments).map(([sem, assignments]) => (
         <div
           key={sem}
           className="bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm"
@@ -1685,7 +1797,7 @@ function AssignmentsTab({ groupedAssignments, onAdd, onView, router }: any) {
             <div className="w-2 h-8 bg-indigo-600 rounded-full" /> {sem}
           </h3>
           <div className="space-y-3">
-            {assignments.map((asgn: any, i: number) => (
+            {assignments.map((asgn, i) => (
               <div
                 key={i}
                 className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-gray-50/50 border border-gray-100 rounded-3xl hover:bg-white hover:shadow-md hover:border-indigo-100 transition-all group"
@@ -1742,10 +1854,10 @@ function MaterialsTab({
   courseSubjects,
   courseIntakeId,
 }: {
-  courseSubjects: any[];
-  courseIntakeId: string;
+  courseSubjects: CourseSubject[];
+  courseIntakeId: string | undefined;
 }) {
-  const [materials, setMaterials] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1756,7 +1868,7 @@ function MaterialsTab({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Preview
-  const [previewMaterial, setPreviewMaterial] = useState<any | null>(null);
+  const [previewMaterial, setPreviewMaterial] = useState<Material | null>(null);
 
   const defaultForm = {
     title: "",
@@ -1782,21 +1894,18 @@ function MaterialsTab({
     }
     try {
       setLoading(true);
-      const subjectIds = courseSubjects.map((s) => s.id);
-      const filterParts = subjectIds.map((id) => `course_subject ~ "${id}"`);
-      const filter = filterParts.join(" || ");
-      const records = await pb.collection("study_materials").getFullList({
-        filter,
+      const materialsData = await pb.collection("study_materials").getFullList({
+        filter: `course_subject.course_intake = "${courseIntakeId}"`,
         sort: "-created",
       });
-      setMaterials(records);
-    } catch (err: any) {
+      setMaterials(materialsData as unknown as Material[]);
+    } catch (err: unknown) {
       console.error("Error fetching materials:", err);
       toast.error("Failed to load materials");
     } finally {
       setLoading(false);
     }
-  }, [courseSubjects]);
+  }, [courseSubjects, courseIntakeId]);
 
   useEffect(() => {
     fetchMaterials();
@@ -1812,7 +1921,7 @@ function MaterialsTab({
 
   // Subject lookup
   const subjectMap = React.useMemo(() => {
-    const map: Record<string, any> = {};
+    const map: Record<string, CourseSubject> = {};
     courseSubjects.forEach((s) => {
       map[s.id] = s;
     });
@@ -1872,8 +1981,8 @@ function MaterialsTab({
 
       resetForm();
       await fetchMaterials();
-    } catch (err: any) {
-      console.error("Error saving material:", err);
+    } catch (error: unknown) {
+      console.error("Error saving material:", error);
       toast.error(
         editingId ? "Failed to update material" : "Failed to add material",
       );
@@ -1883,7 +1992,7 @@ function MaterialsTab({
   };
 
   // Start editing
-  const startEdit = (mat: any) => {
+  const startEdit = (mat: Material) => {
     setEditingId(mat.id);
     setFormData({
       title: mat.title || "",
@@ -1895,14 +2004,14 @@ function MaterialsTab({
       courseSubjectId:
         Array.isArray(mat.course_subject) && mat.course_subject.length > 0
           ? mat.course_subject[0]
-          : mat.course_subject || "",
+          : (mat.course_subject as string) || "",
       file: null,
     });
     setShowModal(true);
   };
 
   // Toggle visibility
-  const toggleVisibility = async (mat: any) => {
+  const toggleVisibility = async (mat: Material) => {
     const newVal = !mat.visible;
     setMaterials((prev) =>
       prev.map((m) => (m.id === mat.id ? { ...m, visible: newVal } : m)),
@@ -1920,7 +2029,7 @@ function MaterialsTab({
   };
 
   // Toggle download
-  const toggleDownload = async (mat: any) => {
+  const toggleDownload = async (mat: Material) => {
     const newVal = !mat.can_download;
     setMaterials((prev) =>
       prev.map((m) => (m.id === mat.id ? { ...m, can_download: newVal } : m)),
@@ -1940,7 +2049,7 @@ function MaterialsTab({
   };
 
   // Delete material
-  const handleDelete = async (mat: any) => {
+  const handleDelete = async (mat: Material) => {
     if (!window.confirm(`Delete "${mat.title}"? This cannot be undone.`))
       return;
     try {
@@ -1984,9 +2093,9 @@ function MaterialsTab({
   };
 
   // File URL from PocketBase
-  const getFileUrl = (record: any) => {
+  const getFileUrl = (record: Material) => {
     if (!record.file) return null;
-    return pb.files.getURL(record, record.file);
+    return pb.files.getURL(record as unknown as RecordModel, record.file as string);
   };
 
   // Type categories for accordion content
@@ -2020,7 +2129,7 @@ function MaterialsTab({
   // Group materials by subject, filtered by search
   const materialsBySubject = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const result: Record<string, any[]> = {};
+    const result: Record<string, Material[]> = {};
     courseSubjects.forEach((s) => {
       result[s.id] = [];
     });
@@ -2036,7 +2145,7 @@ function MaterialsTab({
   }, [materials, courseSubjects, searchQuery]);
 
   // Material card renderer
-  const renderMaterialCard = (mat: any) => {
+  const renderMaterialCard = (mat: Material) => {
     return (
       <div
         key={mat.id}
@@ -2208,10 +2317,10 @@ function MaterialsTab({
           {courseSubjects.map((subj) => {
             const subjMats = materialsBySubject[subj.id] || [];
             const docCount = subjMats.filter(
-              (m: any) => m.type === "document",
+              (m: Material) => m.type === "document",
             ).length;
             const vidCount = subjMats.filter(
-              (m: any) =>
+              (m: Material) =>
                 m.type === "youtube-link" ||
                 m.type === "video-link" ||
                 m.type === "video-upload",
@@ -2220,7 +2329,7 @@ function MaterialsTab({
 
             // Figure out which tabs have content
             const availableTabs = typeCategories.filter((cat) =>
-              subjMats.some((m: any) => m.type === cat.key),
+              subjMats.some((m: Material) => m.type === cat.key),
             );
             const defaultTab =
               availableTabs.length > 0 ? availableTabs[0].key : "document";
@@ -2271,7 +2380,7 @@ function MaterialsTab({
                       <TabsList className="mb-4 bg-gray-100/80 rounded-xl p-1 gap-1">
                         {typeCategories.map((cat) => {
                           const count = subjMats.filter(
-                            (m: any) => m.type === cat.key,
+                            (m: Material) => m.type === cat.key,
                           ).length;
                           if (count === 0) return null;
                           return (
@@ -2291,13 +2400,13 @@ function MaterialsTab({
                       </TabsList>
                       {typeCategories.map((cat) => {
                         const catMats = subjMats.filter(
-                          (m: any) => m.type === cat.key,
+                          (m: Material) => m.type === cat.key,
                         );
                         if (catMats.length === 0) return null;
                         return (
                           <TabsContent key={cat.key} value={cat.key}>
                             <div className="space-y-2">
-                              {catMats.map((mat: any) =>
+                              {catMats.map((mat: Material) =>
                                 renderMaterialCard(mat),
                               )}
                             </div>
@@ -2644,10 +2753,7 @@ function MaterialsTab({
 
                 {mat.type === "document" && !isPdf && fileUrl && (
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
-                    <FileText
-                      size={32}
-                      className="text-blue-400 mx-auto mb-2"
-                    />
+                    <FileText size={32} className="text-blue-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-500 mb-1 font-medium">
                       {mat.file}
                     </p>

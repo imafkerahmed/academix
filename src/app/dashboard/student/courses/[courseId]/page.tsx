@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Card,
@@ -15,68 +15,106 @@ import pb from "@/lib/pocketbase";
 import { Loader2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 
+interface Subject {
+  id: string;
+  name: string;
+  code: string;
+  instructor: string;
+  progress: number;
+}
+
+interface Semester {
+  id: string;
+  name: string;
+  status: string;
+  subjects: Subject[];
+}
+
+interface Course {
+  id: string;
+  name: string;
+  registrationNumber: string;
+  description: string;
+  courseStatus: string;
+  certificateStatus: string;
+  intakeCode: string;
+  startDate: string;
+  endDate: string;
+  semesters: Semester[];
+}
+
+// PocketBase Record Interfaces
+interface CourseRecord {
+  name: string;
+  description?: string;
+}
+
+interface IntakeRecord {
+  code: string;
+}
+
+interface CourseIntakeRecord {
+  id: string;
+  is_semester_based?: boolean;
+  semester_count?: number;
+  start_date?: string;
+  end_date?: string;
+  expand?: {
+    course?: CourseRecord;
+    intake?: IntakeRecord;
+  };
+}
+
+interface EnrollmentRecord {
+  id: string;
+  enrollement_status?: string;
+  certificate_status?: string;
+  registration_number?: string;
+  enrollment_date?: string;
+  created: string;
+  expand?: {
+    course_intake?: CourseIntakeRecord;
+  };
+}
+
+interface CourseSubjectRecord {
+  id: string;
+  semester?: string;
+  expand?: {
+    subject?: { id: string; name: string; code: string } | Array<{ id: string; name: string; code: string }>;
+    lecturer?: { name?: string; full_name?: string };
+  };
+}
+
+interface AssignmentRecord {
+  id: string;
+  course_subject: string;
+}
+
+interface SubmissionRecord {
+  assignment: string;
+}
+
 export default function CoursePage() {
   const params = useParams();
   const router = useRouter();
   const courseId = (params?.courseId as string) || "";
   const [loading, setLoading] = useState(true);
-  const [course, setCourse] = useState<any>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [showLogout, setShowLogout] = useState(false);
-  const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+  const [course, setCourse] = useState<Course | null>(null);
   const [activeSemester, setActiveSemester] = useState(0);
   const [disabledSemesters, setDisabledSemesters] = useState<string[]>([]);
   const [disabledSubjects, setDisabledSubjects] = useState<string[]>([]);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
 
-  useEffect(() => {
-    const currentUser = pb.authStore.model;
-    if (!currentUser || currentUser.role !== "student") {
-      router.push("/login");
-      return;
-    }
-
-    // Check if account is disabled
-    if (currentUser.accountStatus === "disabled") {
-      setIsAccountDisabled(true);
-      return;
-    }
-
-    fetchCourseData();
-  }, [courseId, router]);
-
-  // Periodic check for account status changes (every 30 seconds)
-  useEffect(() => {
-    const intervalId = setInterval(async () => {
-      const currentUser = pb.authStore.model;
-      if (!currentUser) return;
-
-      try {
-        // Refresh auth to get latest account status
-        await pb.collection("users").authRefresh();
-        const latestUser = pb.authStore.model;
-
-        if (latestUser && latestUser.accountStatus === "disabled") {
-          setIsAccountDisabled(true);
-        }
-      } catch (error) {
-        // Silently handle errors - user may be logged out
-      }
-    }, 30000);
-
-    return () => clearInterval(intervalId);
-  }, []);
-
-  const fetchCourseData = async () => {
+  const fetchCourseData = useCallback(async () => {
     try {
       // Fetch enrollment by ID with expanded relations
-      const enrollment = await pb
+      const enrollment = (await pb
         .collection("enrollments")
         .getOne(courseId, {
           expand: "course_intake.course,course_intake.intake",
         })
-        .catch(() => null);
+        .catch(() => null)) as EnrollmentRecord | null;
 
       if (!enrollment) {
         setLoading(false);
@@ -84,21 +122,21 @@ export default function CoursePage() {
       }
 
       const courseIntake = enrollment.expand?.course_intake;
-      const course = courseIntake?.expand?.course;
-      const intake = courseIntake?.expand?.intake;
+      const courseData = courseIntake?.expand?.course;
+      const intakeData = courseIntake?.expand?.intake;
 
       // Fetch course subjects for this course_intake
-      let semesters: any[] = [];
+      let semesters: Semester[] = [];
       if (courseIntake?.id) {
-        const courseSubjects = await pb
+        const courseSubjects = (await pb
           .collection("course_subjects")
           .getFullList({
             filter: `course_intake="${courseIntake.id}"`,
             expand: "subject,lecturer",
-          });
+          })) as unknown as CourseSubjectRecord[];
 
         // Group subjects by semester
-        const semesterGroups: Record<string, any[]> = {};
+        const semesterGroups: Record<string, Subject[]> = {};
 
         if (courseIntake.is_semester_based && courseIntake.semester_count) {
           // Initialize semesters
@@ -112,35 +150,35 @@ export default function CoursePage() {
         const courseSubjectIds = courseSubjects.map((cs) => cs.id);
 
         // Fetch ALL assignments for these course_subjects
-        let allAssignments: any[] = [];
+        let allAssignments: AssignmentRecord[] = [];
         if (courseSubjectIds.length > 0) {
           const assignmentFilter = courseSubjectIds
             .map((id) => `course_subject = "${id}"`)
             .join(" || ");
-          allAssignments = await pb.collection("assignments").getFullList({
+          allAssignments = (await pb.collection("assignments").getFullList({
             filter: `(${assignmentFilter})`,
-          });
+          })) as unknown as AssignmentRecord[];
         }
 
         // Fetch ALL submissions for these assignments for the student
         const studentId = pb.authStore.model?.id;
-        let allSubmissions: any[] = [];
+        let allSubmissions: SubmissionRecord[] = [];
         if (allAssignments.length > 0 && studentId) {
           const assignmentIds = allAssignments.map((a) => a.id);
           const submissionFilter = `student = "${studentId}" && (${assignmentIds.map((id) => `assignment = "${id}"`).join(" || ")})`;
-          allSubmissions = await pb
+          allSubmissions = (await pb
             .collection("assignment_submissions")
             .getFullList({
               filter: submissionFilter,
-            });
+            })) as unknown as SubmissionRecord[];
         }
 
-        courseSubjects.forEach((cs: any) => {
+        courseSubjects.forEach((cs) => {
           const subjectData = cs.expand?.subject;
           const lecturerData = cs.expand?.lecturer;
 
           // Handle both single subject and array of subjects
-          const subjects = Array.isArray(subjectData)
+          const subjectsRaw = Array.isArray(subjectData)
             ? subjectData
             : subjectData
               ? [subjectData]
@@ -157,8 +195,8 @@ export default function CoursePage() {
           const progressValue =
             totalAs > 0 ? Math.round((completedAs / totalAs) * 100) : 0;
 
-          subjects.forEach((subject: any) => {
-            const subjectEntry = {
+          subjectsRaw.forEach((subject) => {
+            const subjectEntry: Subject = {
               id: subject.id,
               name: subject.name,
               code: subject.code,
@@ -177,7 +215,7 @@ export default function CoursePage() {
 
         // Convert to array format expected by UI
         semesters = Object.entries(semesterGroups)
-          .filter(([_, subjects]) => subjects.length > 0)
+          .filter(([, subjects]) => subjects.length > 0)
           .map(([name, subjects], index) => ({
             id: `sem-${index + 1}`,
             name,
@@ -208,12 +246,12 @@ export default function CoursePage() {
 
       setCourse({
         id: enrollment.id,
-        name: course?.name || "Unknown Course",
+        name: courseData?.name || "Unknown Course",
         registrationNumber: enrollment.registration_number || "",
-        description: course?.description || "",
+        description: courseData?.description || "",
         courseStatus,
         certificateStatus,
-        intakeCode: intake?.code || "",
+        intakeCode: intakeData?.code || "",
         startDate:
           courseIntake?.start_date ||
           enrollment.enrollment_date ||
@@ -222,14 +260,52 @@ export default function CoursePage() {
         semesters,
       });
     } catch (error) {
-      console.error("Error fetching course:", error);
+       console.error("Error fetching course:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseId]);
+
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "student") {
+      router.push("/login");
+      return;
+    }
+
+    // Check if account is disabled
+    if (currentUser.accountStatus === "disabled") {
+      setIsAccountDisabled(true);
+      return;
+    }
+
+    fetchCourseData();
+  }, [router, fetchCourseData]);
+
+  // Periodic check for account status changes (every 30 seconds)
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      const currentUser = pb.authStore.model;
+      if (!currentUser) return;
+
+      try {
+        // Refresh auth to get latest account status
+        await pb.collection("users").authRefresh();
+        const latestUser = pb.authStore.model;
+
+        if (latestUser && latestUser.accountStatus === "disabled") {
+          setIsAccountDisabled(true);
+        }
+      } catch {
+        // Silently handle errors - user may be logged out
+      }
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Load disabled states from localStorage
-  React.useEffect(() => {
+  useEffect(() => {
     const savedSemesters = localStorage.getItem(
       `disabled_semesters_${courseId}`,
     );
@@ -242,36 +318,6 @@ export default function CoursePage() {
     }
   }, [courseId]);
 
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Animation durations (ms)
-  const OPEN_DURATION = 900;
-  const CLOSE_DURATION = 1500;
-
-  // Handle animation mount/unmount
-  React.useEffect(() => {
-    if (showNotifications) {
-      setDrawerVisible(true);
-      // Small delay to ensure the drawer is mounted before animation starts
-      const animationTimeout = setTimeout(() => {
-        // This forces a reflow, allowing the animation to play
-      }, 10);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      return () => clearTimeout(animationTimeout);
-    } else if (drawerVisible) {
-      timeoutRef.current = setTimeout(
-        () => setDrawerVisible(false),
-        CLOSE_DURATION,
-      );
-    }
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [showNotifications, drawerVisible]);
-
-  const handleCloseNotifications = () => {
-    setShowNotifications(false);
-  };
 
   // Show disabled account message if account is disabled (BEFORE loading check)
   if (isAccountDisabled) {
@@ -442,11 +488,12 @@ export default function CoursePage() {
         {course.semesters && course.semesters.length > 0 && (
           <div className="flex gap-3 mb-8 overflow-x-auto pb-2 custom-scrollbar">
             {course.semesters
-              .filter((s: any) => !disabledSemesters.includes(s.name))
-              .map((semester: any, index: number) => {
-                const displayIndex = course.semesters
-                  .filter((s: any) => !disabledSemesters.includes(s.name))
-                  .indexOf(semester);
+              .filter((s) => !disabledSemesters.includes(s.name))
+              .map((semester) => {
+                const availableSemesters = course.semesters.filter(
+                  (s) => !disabledSemesters.includes(s.name),
+                );
+                const displayIndex = availableSemesters.indexOf(semester);
 
                 return (
                   <button
@@ -459,8 +506,8 @@ export default function CoursePage() {
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span>{semester.name}</span>
-                      <span
+                       <span>{semester.name}</span>
+                       <span
                         className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
                           activeSemester === displayIndex
                             ? "bg-white/20 text-white"
@@ -479,11 +526,11 @@ export default function CoursePage() {
         {/* Subjects Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {course.semesters
-            .filter((s: any) => !disabledSemesters.includes(s.name))
+            .filter((s) => !disabledSemesters.includes(s.name))
             [activeSemester]?.subjects?.filter(
-              (subject: any) => !disabledSubjects.includes(subject.code),
+              (subject) => !disabledSubjects.includes(subject.code),
             )
-            ?.map((subject: any) => (
+            ?.map((subject) => (
               <RouteLink
                 key={subject.id}
                 href={`/dashboard/student/courses/${courseId}/subjects/${subject.id}`}
@@ -494,19 +541,19 @@ export default function CoursePage() {
                     <div className="flex items-start justify-between mb-4">
                       <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300 shadow-sm">
                         <span className="font-black text-lg">
-                          {subject.name.charAt(0)}
+                           {subject.name.charAt(0)}
                         </span>
                       </div>
                       <Badge
                         variant="outline"
                         className="text-[10px] font-bold uppercase tracking-widest border-indigo-100 text-indigo-400 bg-indigo-50/50"
                       >
-                        {subject.code}
+                         {subject.code}
                       </Badge>
                     </div>
 
                     <CardTitle className="text-lg font-black text-gray-900 group-hover:text-indigo-600 transition-colors mb-2 line-clamp-2">
-                      {subject.name}
+                       {subject.name}
                     </CardTitle>
 
                     <CardDescription className="space-y-4">
@@ -532,7 +579,7 @@ export default function CoursePage() {
                         <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
                           <span>Completion</span>
                           <span className="text-indigo-600">
-                            {subject.progress}%
+                             {subject.progress}%
                           </span>
                         </div>
                         <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">

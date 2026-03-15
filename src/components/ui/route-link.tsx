@@ -2,7 +2,6 @@
 
 import React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 interface RouteLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
   href: string;
@@ -15,7 +14,6 @@ export const RouteLink: React.FC<RouteLinkProps> = ({
   href,
   children,
   className,
-  showLoader = true,
   ...props
 }) => {
   return (

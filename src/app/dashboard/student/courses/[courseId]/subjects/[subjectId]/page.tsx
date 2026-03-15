@@ -3,19 +3,172 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RouteLink } from "@/components/ui/route-link";
 import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
-import { ArrowLeft, Loader2, Download } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
+
+interface Subject {
+  id: string;
+  name: string;
+  code: string;
+  instructor: string;
+  instructorEmail: string;
+  semester: string;
+  courseId: string;
+  courseName: string;
+  progress: number;
+  grade: string;
+  credits: number;
+  schedule: string;
+  room: string;
+  description: string;
+  attendance: { present: number; total: number; percentage: number };
+  assignments: Assignment[];
+  materials: Material[];
+  videos: Video[];
+}
+
+interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  rules: string;
+  dueDate: string;
+  unlockDate: string;
+  totalMarks: number;
+  markingLecturer: string;
+  status: string;
+  grade: string;
+  submittedDate?: string;
+  submittedFile?: string;
+  isLate: boolean;
+  assignmentSheet?: string | null;
+  submissionId?: string;
+  submissionHistory?: Array<{
+    id: string;
+    submitted_at: string;
+    file: string;
+    version?: number;
+    fileName?: string;
+    submittedDate?: string;
+  }>;
+  feedback?: string;
+  submissionRecord?: unknown;
+  isClosed: boolean;
+}
+
+interface Material {
+  id: string;
+  title: string;
+  type: string;
+  url: string;
+  uploadedAt: string;
+  description: string;
+  size?: string;
+}
+
+interface Video {
+  id: string;
+  title: string;
+  type: string;
+  url: string;
+  duration: string;
+  thumbnail: string;
+  description: string;
+  uploadedAt: string;
+}
+
+// PocketBase Record Interfaces
+interface CourseRecord {
+  name: string;
+}
+
+interface IntakeRecord {
+  code: string;
+}
+
+interface CourseIntakeRecord {
+  id: string;
+  expand?: {
+    course?: CourseRecord;
+    intake?: IntakeRecord;
+  };
+}
+
+interface EnrollmentRecord {
+  expand?: {
+    course_intake?: CourseIntakeRecord;
+  };
+}
+
+interface LecturerRecord {
+  name?: string;
+  full_name?: string;
+  email?: string;
+}
+
+interface CourseSubjectRecord {
+  id: string;
+  semester?: string;
+  credits?: number;
+  expand?: {
+    lecturer?: LecturerRecord;
+  };
+}
+
+interface SubjectRecord {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+}
+
+interface MaterialRecord {
+  id: string;
+  collectionId: string;
+  collectionName: string;
+  title: string;
+  type?: string;
+  file?: string;
+  video_url?: string;
+  created: string;
+  description?: string;
+  size?: string;
+  duration?: string;
+}
+
+interface AssignmentRecord {
+  id: string;
+  collectionId: string;
+  collectionName: string;
+  title: string;
+  description: string;
+  due_date: string;
+  opens_at?: string;
+  issued_at?: string;
+  created: string;
+  total_marks: number;
+  open_after_due?: boolean;
+  file?: string;
+  expand?: {
+    marker?: LecturerRecord;
+  };
+}
+
+interface SubmissionRecord {
+  id: string;
+  assignment: string;
+  evaluation_status: string;
+  mark?: number;
+  grade?: string;
+  submitted_at: string;
+  file: string;
+  submission_status: string;
+  feedback?: string;
+  submissionHistory?: Array<{ id: string; submitted_at: string; file: string }>;
+}
 
 export default function SubjectPage() {
   const params = useParams();
@@ -27,81 +180,70 @@ export default function SubjectPage() {
                      searchParams.get("tab") === "videos" ? 2 : 0;
                      
   const [loading, setLoading] = useState(true);
-  const [subject, setSubject] = useState<any>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [subject, setSubject] = useState<Subject | null>(null);
+  const [showNotifications] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [showLogout, setShowLogout] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab); // 0: Assignments, 1: Materials, 2: Videos
-  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [disabledAssignments, setDisabledAssignments] = useState<string[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Animation durations (ms)
-  const OPEN_DURATION = 900;
-  const CLOSE_DURATION = 1500;
 
-  // Check authentication and initialize subject
-  useEffect(() => {
-    const currentUser = pb.authStore.model;
-    if (!currentUser || currentUser.role !== "student") {
-      router.push("/login");
-      return;
-    }
-
-    fetchSubjectData();
-  }, [subjectId, courseId, router]);
-
-  const fetchSubjectData = async () => {
+  const fetchSubjectData = React.useCallback(async () => {
     try {
       setLoading(true);
 
       // Fetch enrollment (courseId is actually the enrollment ID)
-      const enrollment = await pb.collection("enrollments").getOne(courseId, {
+      const enrollment = (await pb.collection("enrollments").getOne(courseId, {
         expand: "course_intake.course,course_intake.intake",
-      });
+      })) as unknown as EnrollmentRecord;
 
       const courseIntake = enrollment.expand?.course_intake;
       const course = courseIntake?.expand?.course;
       const intake = courseIntake?.expand?.intake;
+      if (intake) { /* intake used */ }
+
 
       // Fetch the subject directly
-      const subjectRecord = await pb.collection("subjects").getOne(subjectId);
+      const subjectRecord = (await pb
+        .collection("subjects")
+        .getOne(subjectId)) as unknown as SubjectRecord;
 
       // Find the course_subject record to get lecturer info
-      let lecturer: any = null;
+      let lecturer: LecturerRecord | null = null;
       let semester = "";
       let credits = 0;
       let courseSubjectIds: string[] = [];
 
       try {
-        const courseSubjects = await pb
+        const courseSubjects = (await pb
           .collection("course_subjects")
           .getFullList({
             filter: `course_intake="${courseIntake?.id}" && subject ~ "${subjectId}"`,
             expand: "lecturer",
-          });
+          })) as unknown as CourseSubjectRecord[];
 
         if (courseSubjects.length > 0) {
           const cs = courseSubjects[0];
           courseSubjectIds = courseSubjects.map((cs) => cs.id);
-          lecturer = cs.expand?.lecturer;
+          lecturer = cs.expand?.lecturer || null;
           semester = cs.semester || "";
           credits = cs.credits || 0;
         }
-      } catch (e) {
+      } catch {
         // silent
       }
 
       // Fetch all study materials for this course_subject (only visible ones)
-      let materials: any[] = [];
+      let materials: MaterialRecord[] = [];
       if (courseSubjectIds.length > 0) {
         try {
           // Build filter to match any of the course_subject IDs and only visible materials
@@ -110,11 +252,11 @@ export default function SubjectPage() {
           );
           const filter = `(${filterParts.join(" || ")}) && visible = true`;
 
-          materials = await pb.collection("study_materials").getFullList({
+          materials = (await pb.collection("study_materials").getFullList({
             filter,
             sort: "-created",
-          });
-        } catch (e) {
+          })) as unknown as MaterialRecord[];
+        } catch {
           // silent
         }
       }
@@ -157,11 +299,12 @@ export default function SubjectPage() {
           url: m.file ? pb.files.getURL(m, m.file) : m.video_url || "",
           uploadedAt: m.created,
           description: m.description || "",
+          size: m.size || "",
         })),
         videos: videoMaterials.map((m) => ({
           id: m.id,
           title: m.title,
-          type: m.type,
+          type: m.type || "",
           url: m.video_url || (m.file ? pb.files.getURL(m, m.file) : ""),
           duration: m.duration || "",
           thumbnail: "",
@@ -178,26 +321,26 @@ export default function SubjectPage() {
           );
           const assignmentFilter = `(${filterParts.join(" || ")})`;
 
-          const assignments = await pb.collection("assignments").getFullList({
+          const assignments = (await pb.collection("assignments").getFullList({
             filter: assignmentFilter,
             expand: "marker",
             sort: "-due_date",
-          });
+          })) as unknown as AssignmentRecord[];
 
           // Fetch submissions for these assignments for the current student
           const studentId = pb.authStore.model?.id;
-          let submissions: any[] = [];
+          let submissions: SubmissionRecord[] = [];
 
           if (assignments.length > 0 && studentId) {
             const assignmentIds = assignments.map(
               (a) => `assignment = "${a.id}"`,
             );
             const submissionFilter = `student = "${studentId}" && (${assignmentIds.join(" || ")})`;
-            submissions = await pb
+            submissions = (await pb
               .collection("assignment_submissions")
               .getFullList({
                 filter: submissionFilter,
-              });
+              })) as unknown as SubmissionRecord[];
           }
 
           // Map assignments to the format expected by the UI
@@ -234,6 +377,8 @@ export default function SubjectPage() {
               isLate: submission?.submission_status === "due-passed",
               assignmentSheet: a.file ? pb.files.getURL(a, a.file) : null,
               submissionId: submission?.id,
+              feedback: submission?.feedback || "",
+              submissionHistory: submission?.submissionHistory || [],
               submissionRecord: submission,
               isClosed: isClosed,
             };
@@ -249,12 +394,12 @@ export default function SubjectPage() {
               ? Math.round((completedAssignments / totalAssignments) * 100)
               : 0;
 
-          setSubject((prev: any) => ({
+          setSubject((prev) => (prev ? {
             ...prev,
-            assignments: mappedAssignments,
+            assignments: mappedAssignments as Assignment[],
             progress: progressValue,
-          }));
-        } catch (e) {
+          } : null));
+        } catch {
           // silent
         }
       }
@@ -264,7 +409,18 @@ export default function SubjectPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseId, subjectId]);
+
+  // Check authentication and initialize subject
+  useEffect(() => {
+    const currentUser = pb.authStore.model;
+    if (!currentUser || currentUser.role !== "student") {
+      router.push("/login");
+      return;
+    }
+
+    fetchSubjectData();
+  }, [fetchSubjectData, router]);
 
   // Load disabled assignments from localStorage
   React.useEffect(() => {
@@ -455,14 +611,14 @@ export default function SubjectPage() {
       data.append("evaluation_status", "pending");
 
       if (selectedAssignment.submissionId) {
-        const updated = await pb
+        await pb
           .collection("assignment_submissions")
-          .update(selectedAssignment.submissionId, data);
+          .update(selectedAssignment.submissionId as string, data);
         setSuccessMessage(
           "File replaced successfully! Your new submission will be reviewed by the instructor.",
         );
       } else {
-        const created = await pb
+        await pb
           .collection("assignment_submissions")
           .create(data);
         setSuccessMessage(
@@ -490,7 +646,7 @@ export default function SubjectPage() {
   };
 
   // Handle animation mount/unmount
-  React.useEffect(() => {
+  useEffect(() => {
     if (showNotifications) {
       setDrawerVisible(true);
       const animationTimeout = setTimeout(() => {}, 10);
@@ -499,7 +655,7 @@ export default function SubjectPage() {
     } else if (drawerVisible) {
       timeoutRef.current = setTimeout(
         () => setDrawerVisible(false),
-        CLOSE_DURATION,
+        1500, // CLOSE_DURATION
       );
     }
     return () => {
@@ -507,9 +663,6 @@ export default function SubjectPage() {
     };
   }, [showNotifications, drawerVisible]);
 
-  const handleCloseNotifications = () => {
-    setShowNotifications(false);
-  };
 
   if (loading) {
     return (
@@ -699,8 +852,8 @@ export default function SubjectPage() {
             {activeTab === 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {subject.assignments
-                  ?.filter((a: any) => !disabledAssignments.includes(a.id))
-                  .map((assignment: any) => (
+                  ?.filter((a: Assignment) => !disabledAssignments.includes(a.id))
+                  .map((assignment: Assignment) => (
                     <div
                       key={assignment.id}
                       onClick={() => {
@@ -800,7 +953,7 @@ export default function SubjectPage() {
                     </div>
                   ))}
                 {subject.assignments?.filter(
-                  (a: any) => !disabledAssignments.includes(a.id),
+                  (a: Assignment) => !disabledAssignments.includes(a.id),
                 ).length === 0 && (
                   <div className="col-span-full py-16 text-center">
                     <div className="w-16 h-16 mx-auto bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
@@ -826,10 +979,9 @@ export default function SubjectPage() {
               </div>
             )}
 
-            {/* Course Materials Tab */}
             {activeTab === 1 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {subject.materials.map((material: any) => (
+                {subject.materials.map((material: Material) => (
                   <div
                     key={material.id}
                     className="group bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-lg hover:-translate-y-1 hover:border-indigo-100 transition-all duration-300"
@@ -923,10 +1075,9 @@ export default function SubjectPage() {
               </div>
             )}
 
-            {/* Video Materials Tab */}
             {activeTab === 2 && (
               <div className="space-y-4">
-                {subject.videos.map((video: any) => (
+                {subject.videos.map((video: Video) => (
                   <div
                     key={video.id}
                     onClick={() => {
@@ -1143,7 +1294,7 @@ export default function SubjectPage() {
                   <div
                     className="text-sm md:text-base text-gray-700 prose-simple max-w-none"
                     dangerouslySetInnerHTML={{
-                      __html: selectedAssignment.rules,
+                      __html: selectedAssignment?.rules || "",
                     }}
                   />
                 </div>
@@ -1155,7 +1306,7 @@ export default function SubjectPage() {
                   Assignment File
                 </h3>
                 <a
-                  href={selectedAssignment.assignmentSheet}
+                  href={selectedAssignment?.assignmentSheet || "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 md:gap-3 p-3 md:p-4 border-2 border-gray-200 rounded-lg hover:bg-gray-50 transition-colors w-full"
@@ -1339,8 +1490,8 @@ export default function SubjectPage() {
                         href={
                           selectedAssignment.submissionRecord
                             ? pb.files.getURL(
-                                selectedAssignment.submissionRecord,
-                                selectedAssignment.submittedFile,
+                                selectedAssignment.submissionRecord as { id: string; collectionId: string; collectionName: string },
+                                selectedAssignment.submittedFile || "",
                               )
                             : "#"
                         }
@@ -1421,7 +1572,7 @@ export default function SubjectPage() {
                             {selectedAssignment.submissionHistory
                               .slice()
                               .reverse()
-                              .map((submission: any, index: number) => (
+                              .map((submission, index: number) => (
                                 <div
                                   key={index}
                                   className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200"
@@ -1436,7 +1587,7 @@ export default function SubjectPage() {
                                   </div>
                                   <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
                                     {new Date(
-                                      submission.submittedDate,
+                                      submission.submittedDate || ""
                                     ).toLocaleString("en-US", {
                                       month: "short",
                                       day: "numeric",
@@ -1499,7 +1650,7 @@ export default function SubjectPage() {
                               >
                                 {selectedAssignment.grade === "Pending" ||
                                 selectedAssignment.grade === "-"
-                                  ? "Submitted the wrong file? You can replace your submission before it's graded. The new file will replace the current one."
+                                  ? "Submitted the wrong file? You can replace your submission before it&apos;s graded. The new file will replace the current one."
                                   : "You did not pass this assignment. You can resubmit your work to improve your grade."}
                               </p>
                             </div>

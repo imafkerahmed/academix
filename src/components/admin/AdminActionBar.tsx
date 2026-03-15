@@ -8,7 +8,11 @@ interface AdminActionBarProps {
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
   children?: React.ReactNode;
-  action?: React.ReactElement<any, any>;
+  action?: React.ReactElement<{
+    className?: string;
+    style?: React.CSSProperties;
+    onClick?: () => void;
+  }>;
 }
 
 export default function AdminActionBar({

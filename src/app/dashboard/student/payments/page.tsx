@@ -15,6 +15,34 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
+import { useCallback, useMemo } from "react";
+
+interface EnrolledCourse {
+  id: string;
+  name: string;
+  registration_number?: string;
+  icon: React.ElementType;
+  color: string;
+  bg: string;
+}
+
+interface Payment {
+  id: string;
+  enrollment: string;
+  verified: boolean;
+  status: string;
+  amount: number;
+  payment_type: string;
+  date_paid: string;
+}
+
+interface Installment {
+  id: string;
+  enrollment: string;
+  amount: number;
+  due_date: string;
+  status: string;
+}
 
 export default function StudentPaymentsPage() {
   const router = useRouter();
@@ -22,9 +50,9 @@ export default function StudentPaymentsPage() {
   const [selectedCourse, setSelectedCourse] = React.useState<string | null>(
     null,
   );
-  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
-  const [installments, setInstallments] = useState<any[]>([]);
+  const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [installments, setInstallments] = useState<Installment[]>([]);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
 
   // compute totals for selected course
@@ -33,7 +61,7 @@ export default function StudentPaymentsPage() {
       amount,
     );
 
-  const { totalPaid, totalBalance, totalDueThisMonth } = React.useMemo(() => {
+  const { totalPaid, totalBalance, totalDueThisMonth } = useMemo(() => {
     const course = selectedCourse;
     const courseInstallments = installments.filter((i) =>
       enrolledCourses.find((c) => c.name === course && c.id === i.enrollment),
@@ -79,6 +107,65 @@ export default function StudentPaymentsPage() {
     };
   }, [selectedCourse, installments, payments, enrolledCourses]);
 
+  const fetchEnrollments = useCallback(async (studentId: string) => {
+    try {
+      const enrollmentRecords = await pb.collection("enrollments").getFullList({
+        filter: `student = "${studentId}"`,
+        expand: "course_intake.course",
+      });
+      const courseList: EnrolledCourse[] = enrollmentRecords.map((enrollment) => ({
+        id: enrollment.id,
+        name: enrollment.expand?.course_intake?.expand?.course?.name || enrollment.id,
+        registration_number: enrollment.registration_number,
+        icon: BookOpen,
+        color: "text-indigo-600",
+        bg: "bg-indigo-50",
+      }));
+      setEnrolledCourses(courseList);
+      if (courseList.length === 1) {
+        setSelectedCourse(courseList[0].name);
+      }
+
+      const enrollmentIds = enrollmentRecords.map((e) => e.id);
+      if (enrollmentIds.length === 0) {
+        setInstallments([]);
+        setPayments([]);
+        return;
+      }
+
+      const installmentsData = await pb.collection("installments").getFullList<Installment>({
+        filter: enrollmentIds
+          .map((id) => `enrollment = "${id}"`)
+          .join(" || "),
+        sort: "due_date",
+      });
+      setInstallments(installmentsData);
+
+      const paymentsData = await pb.collection("payments").getFullList<Payment>({
+        filter: enrollmentIds
+          .map((id) => `enrollment = "${id}"`)
+          .join(" || "),
+        sort: "date_paid",
+      });
+      setPayments(paymentsData);
+    } catch (error: unknown) {
+      console.error("Error fetching enrollments/payments/installments:", error);
+      const err = error as { status?: number };
+      if (err?.status === 403 || err?.status === 404) {
+        toast.error("Permission denied. Please log in again.");
+        setLoading(false);
+        await pb.authStore.clear();
+        router.push("/login");
+        return;
+      }
+      setEnrolledCourses([]);
+      setInstallments([]);
+      setPayments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
   useEffect(() => {
     const checkAccountStatus = async () => {
       const currentUser = pb.authStore.model;
@@ -111,64 +198,7 @@ export default function StudentPaymentsPage() {
     };
 
     checkAccountStatus();
-  }, [router]);
-
-  const fetchEnrollments = async (studentId: string) => {
-    try {
-      // Fetch enrollments for the student
-      const enrollmentRecords = await pb.collection("enrollments").getFullList({
-        filter: `student = "${studentId}"`,
-        expand: "course_intake.course",
-      });
-      // Transform enrollments into course format
-      const courseList = enrollmentRecords.map((enrollment: any) => ({
-        id: enrollment.id,
-        name: enrollment.expand?.course_intake?.expand?.course?.name || enrollment.id,
-        registration_number: enrollment.registration_number,
-        icon: BookOpen,
-        color: "text-indigo-600",
-        bg: "bg-indigo-50",
-      }));
-      setEnrolledCourses(courseList);
-      // Auto-select if only one course
-      if (courseList.length === 1) {
-        setSelectedCourse(courseList[0].name);
-      }
-
-      // Fetch installments for all enrollments
-      const enrollmentIds = enrollmentRecords.map((e: any) => e.id);
-      const installmentsData = await pb.collection("installments").getFullList({
-        filter: enrollmentIds
-          .map((id: string) => `enrollment = "${id}"`)
-          .join(" || "),
-        sort: "due_date",
-      });
-      setInstallments(installmentsData);
-
-      // Fetch payments for all enrollments
-      const paymentsData = await pb.collection("payments").getFullList({
-        filter: enrollmentIds
-          .map((id: string) => `enrollment = "${id}"`)
-          .join(" || "),
-        sort: "date_paid",
-      });
-      setPayments(paymentsData);
-    } catch (error: any) {
-      console.error("Error fetching enrollments/payments/installments:", error);
-      if (error?.status === 403 || error?.status === 404) {
-        toast.error("Permission denied. Please log in again.");
-        setLoading(false);
-        await pb.authStore.clear();
-        router.push("/login");
-        return;
-      }
-      setEnrolledCourses([]);
-      setInstallments([]);
-      setPayments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [router, fetchEnrollments]);
 
   if (loading) {
     return (

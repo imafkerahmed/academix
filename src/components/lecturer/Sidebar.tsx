@@ -9,7 +9,6 @@ import {
   GraduationCap,
   FileEdit,
   FolderOpen,
-  Settings,
   LogOut,
   ChevronRight,
 } from "lucide-react";

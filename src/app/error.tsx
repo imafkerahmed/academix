@@ -27,7 +27,7 @@ export default function Error({
         </h1>
         
         <p className="text-gray-500 font-medium leading-relaxed mb-10">
-          An unexpected error occurred. Don't worry, our team has been notified. 
+          An unexpected error occurred. Don&apos;t worry, our team has been notified. 
           {error.digest && (
             <span className="block mt-2 text-[10px] font-mono text-gray-400">
               Error ID: {error.digest}

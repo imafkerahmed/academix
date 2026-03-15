@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Clock, Timer } from "lucide-react";
+import { Clock } from "lucide-react";
 import pb from "@/lib/pocketbase";
 import { useRouter } from "next/navigation";
 

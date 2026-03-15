@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
@@ -23,7 +22,6 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationLink,
   PaginationPrevious,
   PaginationNext,
 } from "@/components/ui/pagination";
@@ -50,6 +48,9 @@ interface CourseIntake {
   intake: string;
   start_date: string;
   end_date: string;
+  expand?: {
+    course?: Course;
+  };
 }
 interface CourseTemplate {
   id: string;
@@ -108,13 +109,13 @@ export default function IntakeDetailsPage() {
   // State management
   const [loading, setLoading] = useState(true);
   const [intake, setIntake] = useState<Intake | null>(null);
-  const [courses, setCourses] = useState<any[]>([]);
+  const [courses, setCourses] = useState<CourseIntake[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
   // Course management state
-  const [courseTemplates, setCourseTemplates] = useState<any[]>([]);
+  const [courseTemplates, setCourseTemplates] = useState<CourseTemplate[]>([]);
   const [templateForm, setTemplateForm] = useState({
     templateId: "",
     code: "",
@@ -140,13 +141,7 @@ export default function IntakeDetailsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Fetch intake data
-  useEffect(() => {
-    if (intakeId) {
-      fetchIntakeData();
-    }
-  }, [intakeId]);
-
-  async function fetchIntakeData() {
+  const fetchIntakeData = React.useCallback(async () => {
     try {
       setLoading(true);
       const intakeRecord = await pb.collection("intakes").getOne(intakeId);
@@ -161,18 +156,26 @@ export default function IntakeDetailsPage() {
         }),
       ]);
 
-      setCourseTemplates(templatesData);
-      setCourses(courseIntakesData);
-    } catch (error: any) {
+      setCourseTemplates(templatesData as unknown as CourseTemplate[]);
+      setCourses(courseIntakesData as unknown as CourseIntake[]);
+    } catch (error: unknown) {
       console.error("Error fetching intake:", error);
       toast.error("Failed to load intake details");
-      if (error?.status === 404) {
+      const err = error as { status?: number };
+      if (err?.status === 404) {
         router.push("/dashboard/admin/intakes");
       }
     } finally {
       setLoading(false);
     }
-  }
+  }, [intakeId, router]);
+
+  // Fetch intake data
+  useEffect(() => {
+    if (intakeId) {
+      fetchIntakeData();
+    }
+  }, [intakeId, fetchIntakeData]);
 
   if (loading) {
     return (
@@ -268,9 +271,10 @@ export default function IntakeDetailsPage() {
 
       // Refresh data
       fetchIntakeData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating intake:", error);
-      toast.error(error?.message || "Failed to update intake");
+      const err = error as { message?: string };
+      toast.error(err?.message || "Failed to update intake");
     }
   }
 
@@ -295,9 +299,10 @@ export default function IntakeDetailsPage() {
 
       // Refresh data
       fetchIntakeData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error toggling intake status:", error);
-      toast.error(error?.message || "Failed to toggle intake status");
+      const err = error as { message?: string };
+      toast.error(err?.message || "Failed to toggle intake status");
     }
   }
 
@@ -381,9 +386,10 @@ export default function IntakeDetailsPage() {
       toast.success("Course-intake created successfully!");
       setShowCreateModal(false);
       fetchIntakeData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating course-intake from template:", error);
-      toast.error(error?.message || "Failed to create course-intake");
+      const err = error as { message?: string };
+      toast.error(err?.message || "Failed to create course-intake");
     }
   }
 

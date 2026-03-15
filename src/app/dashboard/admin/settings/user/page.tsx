@@ -1,23 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Shield,
   GraduationCap,
   User,
   Plus,
   Search,
-  Filter,
-  Mail,
-  Phone,
-  Building2,
-  Calendar,
-  ArrowLeft,
-  MoreVertical,
   Pencil,
   Loader2,
-  Briefcase,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
@@ -54,7 +46,6 @@ interface StaffUser {
 }
 
 export default function UserManagementPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "lecturer">(
@@ -268,9 +259,11 @@ export default function UserManagementPage() {
                           <div className="flex items-center gap-4">
                             <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
                               {avatarUrl ? (
-                                <img
+                                <Image
                                   src={avatarUrl}
                                   alt={user.name}
+                                  width={40}
+                                  height={40}
                                   className="w-full h-full object-cover"
                                 />
                               ) : (

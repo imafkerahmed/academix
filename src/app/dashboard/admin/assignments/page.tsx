@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import pb, { logout } from "@/lib/pocketbase";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -12,9 +12,6 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Eye,
-  Download,
-  Menu,
   Plus,
   ArrowRight,
   User,
@@ -45,14 +42,47 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { Calendar as CalendarPicker } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+
+interface Student {
+  id: string;
+  name: string;
+}
+
+interface Intake {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface Course {
+  id: string;
+  name: string;
+}
+
+interface Subject {
+  id: string;
+  name: string;
+}
+
+interface CourseSubject {
+  id: string;
+  expand?: {
+    subject?: Subject | Subject[];
+    course_intake?: {
+      expand?: {
+        intake?: Intake;
+        course?: Course;
+      };
+    };
+  };
+}
+
+interface Lecturer {
+  id: string;
+  name: string;
+  username: string;
+}
 
 interface Assignment {
   id: string;
@@ -65,8 +95,8 @@ interface Assignment {
   total_marks?: number;
   file?: string;
   expand?: {
-    course_subject?: any;
-    marker?: any;
+    course_subject?: CourseSubject;
+    marker?: Lecturer;
   };
 }
 
@@ -79,11 +109,12 @@ interface Submission {
   mark?: number;
   grade?: string;
   expand?: {
-    student?: any;
+    student?: Student;
     assignment?: Assignment;
   };
   file?: string;
 }
+
 
 export default function AssignmentManagement() {
   const router = useRouter();
@@ -94,48 +125,45 @@ export default function AssignmentManagement() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const nowTimestamp = useMemo(() => Date.now(), []);
+
 
   // Create Assignment Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [ongoingSubjects, setOngoingSubjects] = useState<any[]>([]);
-  const [markers, setMarkers] = useState<any[]>([]);
+  const [ongoingSubjects, setOngoingSubjects] = useState<CourseSubject[]>([]);
+  const [markers, setMarkers] = useState<Lecturer[]>([]);
+
   const [selectedIntakeId, setSelectedIntakeId] = useState<string>("");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
-  const [subjectSearchTerm, setSubjectSearchTerm] = useState("");
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    total_marks: "",
-    marker: "",
-    open_after_due: false,
-    issued_at: new Date().toISOString().split("T")[0],
-    due_date: new Date(nowTimestamp + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0],
-    opens_at: new Date().toISOString().split("T")[0],
-  });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [subjectSearchTerm, setSubjectSearchTerm] = useState<string>(""); // Added subject search term state
 
-  // Grading Modal State
-  const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
-  const [selectedSubmission, setSelectedSubmission] =
-    useState<Submission | null>(null);
-  const [gradeData, setGradeData] = useState({
-    mark: "",
-    grade: "",
-    feedback: "",
+  const [formData, setFormData] = useState(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+    return {
+      title: "",
+      description: "",
+      total_marks: "",
+      marker: "",
+      open_after_due: false,
+      issued_at: today,
+      due_date: sevenDaysLater,
+      opens_at: today,
+    };
   });
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const fetchMarkers = useCallback(async () => {
     try {
       const records = await pb.collection("users").getFullList({
         filter: 'role = "lecturer"',
       });
-      setMarkers(records);
-    } catch (error) {
+      setMarkers(records as unknown as Lecturer[]);
+    } catch (error: unknown) {
       console.error("Error fetching markers:", error);
     }
   }, []);
@@ -146,8 +174,8 @@ export default function AssignmentManagement() {
         filter: 'course_intake.course_status = "ongoing"',
         expand: "subject,course_intake.course,course_intake.intake",
       });
-      setOngoingSubjects(records);
-    } catch (error) {
+      setOngoingSubjects(records as unknown as CourseSubject[]);
+    } catch (error: unknown) {
       console.error("Error fetching ongoing subjects:", error);
     }
   }, []);
@@ -175,10 +203,10 @@ export default function AssignmentManagement() {
         submissionsPromise,
       ]);
 
-      setAssignments((assignmentsData as any) || []);
-      setSubmissions((submissionsData as any) || []);
+      setAssignments((assignmentsData as unknown as Assignment[]) || []);
+      setSubmissions((submissionsData as unknown as Submission[]) || []);
       setLoading(false);
-    } catch (error) {
+    } catch {
       setAssignments([]);
       setSubmissions([]);
       setLoading(false);
@@ -188,20 +216,21 @@ export default function AssignmentManagement() {
   useEffect(() => {
     let isSubscribed = false;
 
-    const setupSubscriptions = async () => {
+    const start = async () => {
+      await fetchData();
+      await fetchMarkers();
+      await fetchOngoingSubjects();
+      
       try {
         await pb.collection("assignments").subscribe("*", () => fetchData());
         await pb.collection("assignment_submissions").subscribe("*", () => fetchData());
         isSubscribed = true;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Realtime subscriptions failed:", error);
       }
     };
 
-    fetchData();
-    fetchMarkers();
-    fetchOngoingSubjects();
-    setupSubscriptions();
+    start();
 
     return () => {
       if (isSubscribed) {
@@ -254,38 +283,16 @@ export default function AssignmentManagement() {
       marker: "",
       open_after_due: false,
       issued_at: new Date().toISOString().split("T")[0],
-      due_date: new Date(nowTimestamp + 7 * 24 * 60 * 60 * 1000)
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0],
       opens_at: new Date().toISOString().split("T")[0],
     });
+
     setSelectedFile(null);
   };
 
-  const handleGradeSubmission = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedSubmission) return;
 
-    try {
-      await pb.collection("assignment_submissions").update(selectedSubmission.id, {
-        mark: gradeData.mark,
-        grade: gradeData.grade,
-        feedback: gradeData.feedback,
-        evaluation_status: "marked",
-        marked_at: new Date().toISOString(),
-        marked_by: pb.authStore.model?.id,
-      });
-
-      toast.success("Submission graded successfully!");
-      setIsGradeModalOpen(false);
-      setSelectedSubmission(null);
-      setGradeData({ mark: "", grade: "", feedback: "" });
-      fetchData();
-    } catch (error) {
-      console.error("Error grading submission:", error);
-      toast.error("Failed to submit grade");
-    }
-  };
 
   const handleLogout = () => {
     logout();
@@ -392,9 +399,14 @@ export default function AssignmentManagement() {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {Array.from(
                           new Set(
-                            ongoingSubjects.map(
-                              (s) => s.expand?.course_intake?.expand?.intake?.id
-                            )
+                            ongoingSubjects
+                              .filter((subject) => {
+                                const subjectName = Array.isArray(subject.expand?.subject) 
+                                  ? subject.expand?.subject[0]?.name 
+                                  : subject.expand?.subject?.name;
+                                return subjectName?.toLowerCase().includes(subjectSearchTerm.toLowerCase());
+                              })
+                              .map((s) => s.expand?.course_intake?.expand?.intake?.id)
                           )
                         )
                           .map((intakeId) => {
@@ -522,8 +534,9 @@ export default function AssignmentManagement() {
                                   )}
                                 >
                                   <span className="text-xs font-black uppercase tracking-tight block">
-                                    {cs.expand?.subject?.name ||
-                                      cs.expand?.subject?.[0]?.name}
+                                    {Array.isArray(cs.expand?.subject) 
+                                      ? cs.expand?.subject[0]?.name 
+                                      : cs.expand?.subject?.name}
                                   </span>
                                   {isSelected && (
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -862,7 +875,9 @@ export default function AssignmentManagement() {
                           {assignment.expand?.course_subject?.expand?.course_intake?.expand?.course?.name}
                         </span>
                         <span className="text-indigo-600 font-black text-xs mt-0.5 line-clamp-1 uppercase tracking-tight">
-                          {assignment.expand?.course_subject?.expand?.subject?.name || assignment.expand?.course_subject?.expand?.subject?.[0]?.name}
+                          {Array.isArray(assignment.expand?.course_subject?.expand?.subject) 
+                            ? assignment.expand?.course_subject?.expand?.subject[0]?.name 
+                            : assignment.expand?.course_subject?.expand?.subject?.name}
                         </span>
                       </div>
                     </div>
@@ -902,8 +917,8 @@ export default function AssignmentManagement() {
                             await pb.collection("assignments").delete(assignment.id);
                             toast.success("Assignment deleted");
                             fetchData();
-                          } catch (e) {
-                            toast.error("Failed to delete");
+                          } catch {
+                            toast.error("Failed to delete assignment");
                           }
                         }
                       }}

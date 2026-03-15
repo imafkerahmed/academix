@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -311,7 +312,13 @@ export function RaisePaymentModal({
                                 key={i}
                                 className="relative group/doc aspect-square rounded-[2rem] overflow-hidden border-2 border-gray-100 shadow-sm bg-gray-50 flex items-center justify-center"
                               >
-                                <img src={src} className="w-full h-full object-cover" alt={`Receipt ${i + 1}`} />
+                                <Image 
+                                  src={src} 
+                                  className="w-full h-full object-cover" 
+                                  alt={`Receipt ${i + 1}`}
+                                  fill
+                                  unoptimized
+                                />
                                 <div className="absolute inset-0 bg-gray-900/60 opacity-0 group-hover/doc:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
                                   <button
                                     onClick={(e) => {

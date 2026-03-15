@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { GraduationCap, TrendingUp, Layout } from "lucide-react";
+import { GraduationCap, TrendingUp } from "lucide-react";
 import IntakesTree, { type Intake } from "@/components/lecturer/IntakesTree";
 
 const mockIntakes: Intake[] = [

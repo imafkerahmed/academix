@@ -13,7 +13,10 @@ export default function Home() {
       router.push("/login");
     } else {
       // If user is logged in, redirect to their dashboard based on role
-      const role = (pb.authStore.model as any)?.role;
+      interface AuthModel {
+        role?: string;
+      }
+      const role = (pb.authStore.model as unknown as AuthModel)?.role;
       if (role === "admin") {
         router.push("/dashboard/admin");
       } else if (role === "lecturer") {

@@ -4,7 +4,6 @@ import {
   X,
   Clock,
   Calendar as CalendarIcon,
-  BookOpen,
   Info,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -12,42 +11,42 @@ import pb from "@/lib/pocketbase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 // Badge color mapping (referenced from Calendar.tsx)
-const typeBadge: Record<string, string> = {
-  "Online Zoom Class": "bg-blue-100 text-blue-700 border-blue-200",
-  "Physical Class": "bg-yellow-100 text-yellow-700 border-yellow-200",
-  Holiday: "bg-purple-100 text-purple-700 border-purple-200",
-  Assignment: "bg-green-100 text-green-700 border-green-200",
-};
 
-interface EventType {
-  id: number;
-  title: string;
-  topic?: string;
-  type: string;
-  date: string;
-  startTime?: string;
-  endTime?: string;
-  platform?: string;
+
+interface ExpandedSubject {
+  expand?: {
+    subject?: Array<{ name: string }> | { name: string };
+    course_intake?: {
+      expand?: {
+        course?: { name: string };
+        intake?: { code: string };
+      };
+    };
+  };
+  course_intake: string | { id: string };
 }
 
-function getUpcomingSchedules(events: EventType[]): EventType[] {
-  const today = new Date().toISOString().slice(0, 10);
-  // Only future or today events
-  return events
-    .filter((e: EventType) => e.date >= today)
-    .sort((a: EventType, b: EventType) => {
-      // Today first, then by date ascending
-      if (a.date === today && b.date !== today) return -1;
-      if (b.date === today && a.date !== today) return 1;
-      return a.date.localeCompare(b.date);
-    });
+interface ScheduleItem {
+  id: string;
+  title: string;
+  subject: string;
+  type: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  course: string;
+  intakeCode: string;
+  lecturer: string;
+  status: string;
+  rawStartTime: string;
+  duration: number;
 }
 
 export default function Section5Schedules() {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [upcoming, setUpcoming] = useState<any[]>([]);
+  const [upcoming, setUpcoming] = useState<ScheduleItem[]>([]);
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
@@ -77,7 +76,7 @@ export default function Section5Schedules() {
       if (!resp.ok) throw new Error("Failed to fetch enrollments");
       const { enrollments } = await resp.json();
 
-      const intakeIds = enrollments.map((e: any) => e.course_intake);
+      const intakeIds = enrollments.map((e: { course_intake: string }) => e.course_intake);
       if (intakeIds.length === 0) {
         setUpcoming([]);
         setLoading(false);
@@ -120,13 +119,13 @@ export default function Section5Schedules() {
         sort: "start_time",
       });
 
-      const formatted = classes.map((c: any) => {
+      const formatted: ScheduleItem[] = classes.map((c) => {
         const subjectsArr = Array.isArray(c.expand?.course_subject)
           ? c.expand.course_subject
           : [c.expand?.course_subject].filter(Boolean);
 
         // Find all matching subject records for this student's enrollment
-        const mySubjectRecords = subjectsArr.filter((cs: any) => {
+        const mySubjectRecords = (subjectsArr as ExpandedSubject[]).filter((cs) => {
           const csIntakeId =
             typeof cs.course_intake === "string"
               ? cs.course_intake
@@ -139,8 +138,10 @@ export default function Section5Schedules() {
           new Set(
             mySubjectRecords
               .map(
-                (cs: any) =>
-                  cs.expand?.subject?.[0]?.name || cs.expand?.subject?.name,
+                (cs) => {
+                  const subject = cs.expand?.subject;
+                  return Array.isArray(subject) ? subject[0]?.name : subject?.name;
+                },
               )
               .filter(Boolean),
           ),
@@ -149,7 +150,7 @@ export default function Section5Schedules() {
         const myCourseName = Array.from(
           new Set(
             mySubjectRecords
-              .map((cs: any) => cs.expand?.course_intake?.expand?.course?.name)
+              .map((cs) => cs.expand?.course_intake?.expand?.course?.name)
               .filter(Boolean),
           ),
         ).join(" & ");
@@ -157,14 +158,15 @@ export default function Section5Schedules() {
         const myIntakeCode = Array.from(
           new Set(
             mySubjectRecords
-              .map((cs: any) => cs.expand?.course_intake?.expand?.intake?.code)
+              .map((cs) => cs.expand?.course_intake?.expand?.intake?.code)
               .filter(Boolean),
           ),
         ).join(", ");
 
         return {
           id: c.id,
-          title: mySubjectName, // User requested to show only their subject, not merged title
+          title: (c as unknown as { title?: string }).title || mySubjectName,
+          subject: mySubjectName,
           type: "Class",
           date: new Date(c.start_time).toISOString().slice(0, 10),
           startTime: new Date(c.start_time).toLocaleTimeString([], {
@@ -172,22 +174,22 @@ export default function Section5Schedules() {
             minute: "2-digit",
           }),
           endTime: new Date(
-            new Date(c.start_time).getTime() + c.duration * 60000,
+            new Date(c.start_time).getTime() + (c as unknown as { duration: number }).duration * 60000,
           ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           course: myCourseName || "Course",
           intakeCode: myIntakeCode || "N/A",
-          lecturer: c.expand?.lecturer?.name || "Lecturer",
-          status: c.status,
-          rawStartTime: c.start_time,
-          duration: c.duration,
+          lecturer: (c.expand?.lecturer as { name: string })?.name || "Lecturer",
+          status: (c as unknown as { status: string }).status,
+          rawStartTime: c.start_time as string,
+          duration: (c as unknown as { duration: number }).duration,
         };
       });
 
       const now = Date.now();
-      const activeUpcoming: any[] = [];
-      const ended: any[] = [];
+      const activeUpcoming: ScheduleItem[] = [];
+      const ended: ScheduleItem[] = [];
 
-      formatted.forEach((item: any) => {
+      formatted.forEach((item: ScheduleItem) => {
         const scheduledEnd =
           new Date(item.rawStartTime).getTime() + item.duration * 60000;
         if (now >= scheduledEnd) {
@@ -226,7 +228,7 @@ export default function Section5Schedules() {
     );
   }
 
-  const activeClasses = upcoming.filter((item: any) => {
+  const activeClasses = upcoming.filter((item: ScheduleItem) => {
     const scheduledEnd =
       new Date(item.rawStartTime).getTime() + (item.duration || 60) * 60000;
     return Date.now() < scheduledEnd;
@@ -244,7 +246,7 @@ export default function Section5Schedules() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {activeClasses.map((ev: any, idx: number) => {
+            {activeClasses.map((ev: ScheduleItem, idx: number) => {
               const themeClass = "border-indigo-100 bg-indigo-50/20";
               const isToday = ev.date === today;
               const scheduledEnd =
@@ -384,7 +386,7 @@ export default function Section5Schedules() {
 
               <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-gray-50/30 no-scrollbar">
                 {upcoming.length > 0 ? (
-                  upcoming.map((ev: any) => {
+                  upcoming.map((ev: ScheduleItem) => {
                     const scheduledEnd =
                       new Date(ev.rawStartTime).getTime() +
                       (ev.duration || 60) * 60000;

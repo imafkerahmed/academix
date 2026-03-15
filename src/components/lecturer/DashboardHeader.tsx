@@ -1,7 +1,5 @@
-"use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 import GradientText from "@/components/ui/GradientText";
 import NotificationButton from "@/components/ui/notification-button";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";

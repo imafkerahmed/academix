@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, Fragment } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import pb from "@/lib/pocketbase";
 import type {
   Course,
@@ -23,14 +22,10 @@ import {
   FileText,
   Calendar,
   DollarSign,
-  Loader2,
   ChevronDown,
   ChevronUp,
-  X,
-  Check,
 } from "lucide-react";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
-import AdminActionBar from "@/components/admin/AdminActionBar";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,7 +41,6 @@ import {
 type Tab = "courses" | "courseIntakes" | "fees" | "templates";
 
 export default function AcademicStructurePage() {
-  const router = useRouter();
   const [tab, setTab] = useState<Tab>("courses");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -67,7 +61,7 @@ export default function AcademicStructurePage() {
   const [fees, setFees] = useState<CourseIntakeFee[]>([]);
   const [intakes, setIntakes] = useState<Intake[]>([]);
   const [courseTemplates, setCourseTemplates] = useState<CourseTemplate[]>([]);
-  const [courseStatusFilter, setCourseStatusFilter] =
+  const [courseStatusFilter] =
     useState<string>("active");
 
   // Modal states for Courses
@@ -133,24 +127,112 @@ export default function AcademicStructurePage() {
     "courses",
   );
 
-  useEffect(() => {
-    fetchAllData();
+  // Auto-status calculation
+  const calculateCourseIntakeStatus = useCallback((
+    start_date: string,
+    end_date: string,
+  ): "upcoming" | "ongoing" | "completed" => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+
+    if (today < start) return "upcoming";
+    if (today > end) return "completed";
+    return "ongoing";
   }, []);
 
-  // Reset pagination when search query changes
-  useEffect(() => {
-    setCoursesPage(1);
-    setSubjectsPage(1);
-    setCourseIntakesPage(1);
-    setFeesPage(1);
-  }, [searchQuery]);
+  const updateExpiredCourseIntakes = useCallback(async (courseIntakesData: CourseIntake[]) => {
+    try {
+      const updates: Promise<unknown>[] = [];
+      let updateCount = 0;
 
-  // Reset pagination when tab changes
-  useEffect(() => {
-    setSearchQuery("");
-  }, [tab]);
+      for (const ci of courseIntakesData) {
+        const calculatedStatus = calculateCourseIntakeStatus(
+          ci.start_date,
+          ci.end_date,
+        );
+        if (ci.course_status !== calculatedStatus) {
+          updates.push(
+            pb.collection("course_intakes").update(ci.id, {
+              course_status: calculatedStatus,
+            }),
+          );
+          updateCount++;
+        }
+      }
 
-  async function fetchAllData() {
+      if (updates.length > 0) {
+        await Promise.all(updates);
+        console.log(`Auto-updated ${updateCount} course-intake statuses`);
+        // Refresh data after updates
+        const updatedCourseIntakes = await pb
+          .collection("course_intakes")
+          .getFullList<CourseIntake>({
+            sort: "-created",
+            expand: "course,intake",
+          });
+        setCourseIntakes(updatedCourseIntakes);
+      }
+    } catch (error: unknown) {
+      console.error("Error updating course-intake statuses:", error);
+    }
+  }, [calculateCourseIntakeStatus]);
+
+  const updateCourseStatuses = useCallback(async (
+    coursesData: Course[],
+    courseIntakesData: CourseIntake[],
+  ) => {
+    try {
+      const updates: Promise<unknown>[] = [];
+
+      for (const course of coursesData) {
+        // Get all course-intakes for this course
+        const courseIntakesForCourse = courseIntakesData.filter(
+          (ci) => ci.course === course.id,
+        );
+
+        if (courseIntakesForCourse.length === 0) continue;
+
+        // Check if all are completed
+        const allCompleted = courseIntakesForCourse.every(
+          (ci) => ci.course_status === "completed",
+        );
+        const hasActive = courseIntakesForCourse.some(
+          (ci) =>
+            ci.course_status === "ongoing" || ci.course_status === "upcoming",
+        );
+
+        const newStatus = allCompleted
+          ? "completed"
+          : hasActive
+            ? "active"
+            : "completed";
+
+        if (course.status !== newStatus) {
+          updates.push(
+            pb.collection("courses").update(course.id, {
+              status: newStatus,
+            }),
+          );
+        }
+      }
+
+      if (updates.length > 0) {
+        await Promise.all(updates);
+        console.log(`Auto-updated ${updates.length} course statuses`);
+        // Refresh courses data after updates
+        const updatedCourses = await pb
+          .collection("courses")
+          .getFullList<Course>({ sort: "-created" });
+        setCourses(updatedCourses);
+      }
+    } catch (error: unknown) {
+      console.error("Error updating course statuses:", error);
+    }
+  }, []);
+
+  const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
       const [
@@ -191,13 +273,31 @@ export default function AcademicStructurePage() {
       // Auto-update statuses after loading data
       await updateExpiredCourseIntakes(courseIntakesData);
       await updateCourseStatuses(coursesData, courseIntakesData);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Failed to load data");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     } finally {
       setLoading(false);
     }
-  }
+  }, [updateExpiredCourseIntakes, updateCourseStatuses]);
+
+  useEffect(() => {
+    void fetchAllData();
+  }, [fetchAllData]);
+
+  // Reset pagination when search query changes
+  useEffect(() => {
+    setCoursesPage(1);
+    setSubjectsPage(1);
+    setCourseIntakesPage(1);
+    setFeesPage(1);
+  }, [searchQuery]);
+
+  // Reset pagination when tab changes
+  useEffect(() => {
+    setSearchQuery("");
+  }, [tab]);
 
   // Course CRUD
   async function handleCreateCourse() {
@@ -226,9 +326,10 @@ export default function AcademicStructurePage() {
       setShowCourseModal(false);
       setCourseForm({ template: "", code: "", name: "" });
       fetchAllData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating course:", error);
-      toast.error(error?.message || "Failed to create course");
+      const err = error as { message?: string };
+      toast.error(err?.message || "Failed to create course");
     }
   }
 
@@ -249,9 +350,10 @@ export default function AcademicStructurePage() {
       setEditingCourse(null);
       setCourseForm({ template: "", code: "", name: "" });
       fetchAllData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating course:", error);
-      toast.error(error?.message || "Failed to update course");
+      const err = error as { message?: string };
+      toast.error(err?.message || "Failed to update course");
     }
   }
 
@@ -268,9 +370,10 @@ export default function AcademicStructurePage() {
       await pb.collection("courses").delete(courseId);
       toast.success("Course deleted successfully!");
       fetchAllData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting course:", error);
-      toast.error(error?.message || "Failed to delete course");
+      const err = error as { message?: string };
+      toast.error(err?.message || "Failed to delete course");
     }
   }
 
@@ -292,9 +395,10 @@ export default function AcademicStructurePage() {
       setShowSubjectModal(false);
       setSubjectForm({ code: "", name: "", description: "" });
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error creating subject:", error);
-      toast.error(error?.message || "Failed to create subject");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -316,9 +420,10 @@ export default function AcademicStructurePage() {
       setEditingSubject(null);
       setSubjectForm({ code: "", name: "", description: "" });
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error updating subject:", error);
-      toast.error(error?.message || "Failed to update subject");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -335,9 +440,10 @@ export default function AcademicStructurePage() {
       await pb.collection("subjects").delete(subjectId);
       toast.success("Subject deleted successfully!");
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error deleting subject:", error);
-      toast.error(error?.message || "Failed to delete subject");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -403,9 +509,10 @@ export default function AcademicStructurePage() {
       toast.success("Course-intake created successfully!");
       resetCourseIntakeModal();
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error creating course-intake:", error);
-      toast.error(error?.message || "Failed to create course-intake");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -462,9 +569,10 @@ export default function AcademicStructurePage() {
       toast.success("Course-intake updated successfully!");
       resetCourseIntakeModal();
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error updating course-intake:", error);
-      toast.error(error?.message || "Failed to update course-intake");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -481,9 +589,10 @@ export default function AcademicStructurePage() {
       await pb.collection("course_intakes").delete(courseIntakeId);
       toast.success("Course-intake deleted successfully!");
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error deleting course-intake:", error);
-      toast.error(error?.message || "Failed to delete course-intake");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -527,9 +636,10 @@ export default function AcademicStructurePage() {
         duration: 0,
       });
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error creating fee:", error);
-      toast.error(error?.message || "Failed to create fee");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -553,9 +663,10 @@ export default function AcademicStructurePage() {
         duration: 0,
       });
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error updating fee:", error);
-      toast.error(error?.message || "Failed to update fee");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -568,116 +679,13 @@ export default function AcademicStructurePage() {
       await pb.collection("course_intake_fees").delete(feeId);
       toast.success("Fee deleted successfully!");
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error deleting fee:", error);
-      toast.error(error?.message || "Failed to delete fee");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
-  // Auto-status calculation
-  function calculateCourseIntakeStatus(
-    start_date: string,
-    end_date: string,
-  ): "upcoming" | "ongoing" | "completed" {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const start = new Date(start_date);
-    const end = new Date(end_date);
-
-    if (today < start) return "upcoming";
-    if (today > end) return "completed";
-    return "ongoing";
-  }
-
-  async function updateExpiredCourseIntakes(courseIntakesData: CourseIntake[]) {
-    try {
-      const updates: Promise<any>[] = [];
-      let updateCount = 0;
-
-      for (const ci of courseIntakesData) {
-        const calculatedStatus = calculateCourseIntakeStatus(
-          ci.start_date,
-          ci.end_date,
-        );
-        if (ci.course_status !== calculatedStatus) {
-          updates.push(
-            pb.collection("course_intakes").update(ci.id, {
-              course_status: calculatedStatus,
-            }),
-          );
-          updateCount++;
-        }
-      }
-
-      if (updates.length > 0) {
-        await Promise.all(updates);
-        console.log(`Auto-updated ${updateCount} course-intake statuses`);
-        // Refresh data after updates
-        const updatedCourseIntakes = await pb
-          .collection("course_intakes")
-          .getFullList<CourseIntake>({
-            sort: "-created",
-            expand: "course,intake",
-          });
-        setCourseIntakes(updatedCourseIntakes);
-      }
-    } catch (error) {
-      console.error("Error updating course-intake statuses:", error);
-    }
-  }
-
-  async function updateCourseStatuses(
-    coursesData: Course[],
-    courseIntakesData: CourseIntake[],
-  ) {
-    try {
-      const updates: Promise<any>[] = [];
-
-      for (const course of coursesData) {
-        // Get all course-intakes for this course
-        const courseIntakesForCourse = courseIntakesData.filter(
-          (ci) => ci.course === course.id,
-        );
-
-        if (courseIntakesForCourse.length === 0) continue;
-
-        // Check if all are completed
-        const allCompleted = courseIntakesForCourse.every(
-          (ci) => ci.course_status === "completed",
-        );
-        const hasActive = courseIntakesForCourse.some(
-          (ci) =>
-            ci.course_status === "ongoing" || ci.course_status === "upcoming",
-        );
-
-        const newStatus = allCompleted
-          ? "completed"
-          : hasActive
-            ? "active"
-            : "completed";
-
-        if (course.status !== newStatus) {
-          updates.push(
-            pb.collection("courses").update(course.id, {
-              status: newStatus,
-            }),
-          );
-        }
-      }
-
-      if (updates.length > 0) {
-        await Promise.all(updates);
-        console.log(`Auto-updated ${updates.length} course statuses`);
-        // Refresh courses data after updates
-        const updatedCourses = await pb
-          .collection("courses")
-          .getFullList<Course>({ sort: "-created" });
-        setCourses(updatedCourses);
-      }
-    } catch (error) {
-      console.error("Error updating course statuses:", error);
-    }
-  }
 
   // Template CRUD
   async function handleCreateTemplate() {
@@ -701,9 +709,10 @@ export default function AcademicStructurePage() {
         course_description: "",
       });
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error creating template:", error);
-      toast.error(error?.message || "Failed to create template");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -730,9 +739,10 @@ export default function AcademicStructurePage() {
         course_description: "",
       });
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error updating template:", error);
-      toast.error(error?.message || "Failed to update template");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -743,9 +753,10 @@ export default function AcademicStructurePage() {
       await pb.collection("course_templates").delete(id);
       toast.success("Template deleted successfully!");
       fetchAllData();
-    } catch (error: any) {
-      console.error("Error deleting template:", error);
-      toast.error(error?.message || "Failed to delete template");
+    } catch (error: unknown) {
+      console.error("Error:", error);
+      const err = error as { message?: string };
+      toast.error(err?.message || "Operation failed");
     }
   }
 
@@ -2677,7 +2688,11 @@ export default function AcademicStructurePage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  editingCourse ? handleUpdateCourse() : handleCreateCourse();
+                  if (editingCourse) {
+                    void handleUpdateCourse();
+                  } else {
+                    void handleCreateCourse();
+                  }
                 }}
                 className="space-y-6"
               >
@@ -2800,9 +2815,11 @@ export default function AcademicStructurePage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  editingSubject
-                    ? handleUpdateSubject()
-                    : handleCreateSubject();
+                  if (editingSubject) {
+                    void handleUpdateSubject();
+                  } else {
+                    void handleCreateSubject();
+                  }
                 }}
                 className="space-y-6"
               >
@@ -2897,9 +2914,11 @@ export default function AcademicStructurePage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  editingCourseIntake
-                    ? handleUpdateCourseIntake()
-                    : handleCreateCourseIntake();
+                  if (editingCourseIntake) {
+                    void handleUpdateCourseIntake();
+                  } else {
+                    void handleCreateCourseIntake();
+                  }
                 }}
                 className="space-y-6"
               >
@@ -3016,7 +3035,7 @@ export default function AcademicStructurePage() {
                         onChange={(e) =>
                           setCourseIntakeForm({
                             ...courseIntakeForm,
-                            course_status: e.target.value as any,
+                            course_status: e.target.value as "ongoing" | "completed" | "upcoming",
                           })
                         }
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20 font-bold"
@@ -3193,7 +3212,11 @@ export default function AcademicStructurePage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  editingFee ? handleUpdateFee() : handleCreateFee();
+                  if (editingFee) {
+                    void handleUpdateFee();
+                  } else {
+                    void handleCreateFee();
+                  }
                 }}
                 className="space-y-6"
               >
@@ -3345,9 +3368,11 @@ export default function AcademicStructurePage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  editingTemplate
-                    ? handleUpdateTemplate()
-                    : handleCreateTemplate();
+                  if (editingTemplate) {
+                    void handleUpdateTemplate();
+                  } else {
+                    void handleCreateTemplate();
+                  }
                 }}
                 className="space-y-6"
               >

@@ -18,9 +18,6 @@ interface AssignmentsListProps {
 }
 
 export default function AssignmentsList({ assignments }: AssignmentsListProps) {
-  const handleMarkSubmissions = (assignmentId: string) => {
-    // Placeholder for marking functionality
-  };
 
   if (assignments.length === 0) {
     return (
@@ -75,7 +72,7 @@ export default function AssignmentsList({ assignments }: AssignmentsListProps) {
                 </div>
               </div>
               <button
-                onClick={() => handleMarkSubmissions(assignment.id)}
+                onClick={() => window.location.href = `/dashboard/lecturer/assignments/${assignment.id}`}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition whitespace-nowrap"
                 aria-label={`Mark submissions for ${assignment.title}`}
               >

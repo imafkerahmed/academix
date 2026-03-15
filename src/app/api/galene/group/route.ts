@@ -66,10 +66,11 @@ export async function POST(request: Request) {
       message: `Galene group ${classId} created successfully.`,
       path: filePath,
     });
-  } catch (error: any) {
-    console.error("Failed to create Galene group:", error);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Failed to create Galene group:", err);
     return NextResponse.json(
-      { error: "Failed to create Galene group", details: error.message },
+      { error: "Failed to create Galene group", details: err.message },
       { status: 500 },
     );
   }
@@ -98,10 +99,11 @@ export async function DELETE(request: Request) {
       success: true,
       message: `Galene group ${classId} deleted successfully.`,
     });
-  } catch (error: any) {
-    console.error("Failed to delete Galene group:", error);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Failed to delete Galene group:", err);
     return NextResponse.json(
-      { error: "Failed to delete Galene group", details: error.message },
+      { error: "Failed to delete Galene group", details: err.message },
       { status: 500 },
     );
   }

@@ -5,8 +5,6 @@ import {
   BookOpen,
   CheckCircle,
   Clock,
-  GraduationCap,
-  Library,
 } from "lucide-react";
 
 interface BentoStatsProps {

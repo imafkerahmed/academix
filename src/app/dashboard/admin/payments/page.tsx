@@ -1,23 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import pb, { isSuperuserOnlyError, logout } from "@/lib/pocketbase";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
-import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 import {
-  DollarSign,
   CheckCircle,
-  XCircle,
   Clock,
   Eye,
   Download,
   TrendingUp,
-  Menu,
   Plus,
-  ArrowRight,
   ShieldCheck,
   CreditCard,
   Building2,
@@ -28,8 +20,9 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
-interface Payment {
+interface PaymentBase {
   id: string;
   reference_Id: string;
   date_paid: string;
@@ -38,9 +31,21 @@ interface Payment {
   bank_name: string;
   verified: boolean;
   remarks?: string;
+}
+
+interface Payment extends PaymentBase {
   expand?: {
-    student?: any;
-    enrollment?: any;
+    student?: {
+      name: string;
+      email: string;
+    };
+    enrollment?: unknown;
+    intake?: {
+      name: string;
+    };
+    course?: {
+      name: string;
+    };
   };
 }
 
@@ -51,60 +56,61 @@ interface Installment {
   amount: number;
   status: string;
   expand?: {
-    enrollment?: any;
+    enrollment?: unknown;
+    student?: {
+      name: string;
+    };
   };
 }
 
 export default function PaymentManagement() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [filter, setFilter] = useState<string>("all");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  useEffect(() => {
-    fetchData();
-  }, [router]);
 
   const fetchData = async () => {
     try {
       const paymentsPromise = pb
         .collection("payments")
-        .getFullList({
+        .getFullList<Payment>({
           expand: "student,intake,course",
           sort: "-payment_date",
         })
-        .catch(() => []);
+        .catch(() => [] as Payment[]);
 
       const installmentsPromise = pb
         .collection("installments")
-        .getFullList({
+        .getFullList<Installment>({
           expand: "student",
           sort: "due_date",
         })
-        .catch(() => []);
+        .catch(() => [] as Installment[]);
 
       const [paymentsData, installmentsData] = await Promise.all([
         paymentsPromise,
         installmentsPromise,
       ]);
 
-      setPayments((paymentsData as any) || []);
-      setInstallments((installmentsData as any) || []);
+      setPayments(paymentsData || []);
+      setInstallments(installmentsData || []);
       setLoading(false);
-    } catch (error) {
+    } catch {
       setPayments([]);
       setInstallments([]);
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
+  useEffect(() => {
+    // Call fetchData asynchronously to avoid cascading renders warning
+    const init = async () => {
+      await fetchData();
+    };
+    init();
+  }, []);
+
 
   const handleVerifyPayment = async (id: string) => {
     try {
@@ -112,7 +118,7 @@ export default function PaymentManagement() {
       setPayments(
         payments.map((p) => (p.id === id ? { ...p, verified: true } : p)),
       );
-    } catch (error) {
+    } catch (error: unknown) {
       if (isSuperuserOnlyError(error)) {
         toast.error("You don't have permission to verify this payment.");
         return;
@@ -129,8 +135,8 @@ export default function PaymentManagement() {
   };
 
   const filteredPayments = payments.filter((payment) => {
-    const studentName = (payment as any).expand?.student?.name || "";
-    const courseName = (payment as any).expand?.course?.name || "";
+    const studentName = payment.expand?.student?.name || "";
+    const courseName = payment.expand?.course?.name || "";
     const matchesSearch =
       studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       courseName.toLowerCase().includes(searchQuery.toLowerCase()) ||

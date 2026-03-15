@@ -65,10 +65,11 @@ export async function GET(request: Request) {
       success: true,
       message: `Nightly cleanup finished. Deleted ${deletedCount} Galene groups and ${chatFilesDeleted} chat uploads.`,
     });
-  } catch (error: any) {
-    console.error("Cron Cleanup Error:", error);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Cron Cleanup Error:", err);
     return NextResponse.json(
-      { error: "Failed to run scheduled cleanup", details: error.message },
+      { error: "Failed to run scheduled cleanup", details: err.message },
       { status: 500 },
     );
   }

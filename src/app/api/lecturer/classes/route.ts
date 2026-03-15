@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ records });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching lecturer classes:", error);
     return NextResponse.json(
       { error: "Failed to fetch classes" },

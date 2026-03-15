@@ -4,12 +4,10 @@ import React from "react";
 import {
   LayoutDashboard,
   BookOpen,
-  CalendarDays,
   CreditCard,
   User,
   LogOut,
   ChevronRight,
-  Menu,
 } from "lucide-react";
 import { RouteLink } from "@/components/ui/route-link";
 import { useRouter } from "next/navigation";

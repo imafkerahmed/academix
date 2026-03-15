@@ -4,15 +4,13 @@ import React, { useState, useEffect } from "react";
 
 import { ModernModal } from "@/components/ui/modern-modal";
 import {
-  X,
-  CheckCircle,
   Clock,
   Calendar as CalendarIcon,
   Info,
 } from "lucide-react";
 
 // Event data structure (empty - to be loaded from database)
-const mockEvents: any[] = [];
+const mockEvents: CalendarEvent[] = [];
 
 // Helper to get days in month
 function getDaysInMonth(year: number, month: number) {
@@ -68,7 +66,6 @@ function EventItem({ event }: { event: (typeof mockEvents)[0] }) {
 // DayCell component
 function DayCell({
   day,
-  date,
   events,
   isToday,
   isSelected,
@@ -76,7 +73,7 @@ function DayCell({
 }: {
   day: number;
   date: string;
-  events: typeof mockEvents;
+  events: CalendarEvent[];
   isToday: boolean;
   isSelected: boolean;
   onClick: () => void;

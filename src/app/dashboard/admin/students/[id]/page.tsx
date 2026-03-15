@@ -1,31 +1,25 @@
-// ...existing code...
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import pb, { isSuperuserOnlyError, logout } from "@/lib/pocketbase";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import Image from "next/image";
+import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
+import { RecordModel } from "pocketbase";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
 import {
   User,
   BookOpen,
   CreditCard,
-  Award,
   Calendar,
   Mail,
   Phone,
   MapPin,
-  Clock,
-  ArrowLeft,
   Edit,
   ShieldCheck,
-  TrendingUp,
   FileText,
   Plus,
-  History,
   CheckCircle,
   XCircle,
-  AlertCircle,
   ExternalLink,
   Upload,
   Archive,
@@ -113,9 +107,10 @@ function ResetPasswordControl({
       // Clear passwords after successful reset
       setPassword("");
       setPasswordConfirm("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Password reset error:", error);
-      const message = error?.message || "Failed to reset password.";
+      const err = error as { message?: string };
+      const message = err?.message || "Failed to reset password.";
       setFeedback(message);
       toast.error(message);
     } finally {
@@ -256,6 +251,7 @@ interface Enrollment {
   installment_amount?: number;
   payment_option?: string;
   certificate_status?: string;
+  enrollement_status?: string;
   expand?: {
     course_intake?: {
       id: string;
@@ -271,6 +267,44 @@ interface Enrollment {
     };
   };
 }
+
+interface CourseSubject {
+  id: string;
+  semester: string;
+  credits: number;
+  expand?: {
+    subject?: {
+      id: string;
+      name: string;
+      code: string;
+    } | {
+      id: string;
+      name: string;
+      code: string;
+    }[];
+    lecturer?: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
+interface Assignment {
+  id: string;
+  title: string;
+  due_date: string;
+  course_subject: string;
+  expand?: {
+    course_subject?: {
+      expand?: {
+        subject?: {
+          name: string;
+        };
+      };
+    };
+  };
+}
+
 
 interface StudentAssignmentSubmission {
   id: string;
@@ -312,12 +346,12 @@ interface Payment {
   };
 }
 
-const DOCUMENT_TYPE_BY_CATEGORY: Record<string, Document["document_type"]> = {
+const DOCUMENT_TYPE_BY_CATEGORY = {
   nic: "nic",
   ol: "ol_transcript",
   al: "al_transcript",
   birth: "birth_certificate",
-};
+} as const;
 
 function CertificateStatusControl({
   initialStatus = "pending",
@@ -349,11 +383,12 @@ function CertificateStatusControl({
       toast.success(`Status updated to ${newStatus.toUpperCase()}`);
       onUpdated();
       setIsOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (isSuperuserOnlyError(error)) {
         toast.error("You don't have permission to update status.");
       } else {
-        toast.error(error?.message || "Failed to update status");
+        const err = error as { message?: string };
+        toast.error(err?.message || "Failed to update status");
       }
     } finally {
       setSaving(false);
@@ -492,7 +527,7 @@ function UpdateProfileControl({
       whatsapp: student.whatsapp || "",
     });
     setAvatarPreview(
-      student.avatar ? pb.files.getUrl(student as any, student.avatar) : null,
+      student.avatar ? pb.files.getURL(student as unknown as RecordModel, student.avatar, { thumb: "100x100" }) : null,
     );
     setAvatarFile(null);
   }, [isOpen, student]);
@@ -531,11 +566,12 @@ function UpdateProfileControl({
       const updatedRecord = await pb
         .collection("users")
         .update(student.id, data);
-      onUpdated(updatedRecord as any);
+      onUpdated(updatedRecord as unknown as StudentDetails);
       toast.success("Profile updated successfully");
       setIsOpen(false);
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to update profile");
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast.error(err?.message || "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -566,13 +602,17 @@ function UpdateProfileControl({
             <div className="flex items-center gap-6">
               <div className="relative group">
                 <div className="w-24 h-24 rounded-3xl bg-indigo-50 border-2 border-dashed border-indigo-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-indigo-400">
-                  {avatarPreview ? (
-                    <img
-                      src={avatarPreview}
-                      alt="Avatar Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
+                    {avatarPreview ? (
+                      <div className="w-full h-full relative">
+                        <Image
+                          src={avatarPreview}
+                          alt="Avatar Preview"
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
                     <User className="text-indigo-300" size={32} />
                   )}
                 </div>
@@ -847,7 +887,7 @@ function RecordPaymentControl() {
             Record Payment
           </DialogTitle>
           <p className="text-xs font-bold text-gray-400">
-            Attach bank slip to log this month's payment.
+            Attach bank slip to log this month&apos;s payment.
           </p>
         </DialogHeader>
 
@@ -927,27 +967,28 @@ function UploadDocumentControl({
       return;
     }
 
-    const docType = DOCUMENT_TYPE_BY_CATEGORY[documentType];
+    const docType = DOCUMENT_TYPE_BY_CATEGORY[documentType as keyof typeof DOCUMENT_TYPE_BY_CATEGORY];
     setUploading(true);
 
     try {
-      const payload = new FormData();
-      payload.append("field", studentId);
-      payload.append("document", selectedFile);
-      payload.append("document_type", docType);
-      payload.append("status_", "verified");
+      const data = new FormData();
+      data.append("field", studentId);
+      data.append("document_type", docType);
+      data.append("document", selectedFile);
+      data.append("status_", "pending");
 
-      await pb.collection("documents").create(payload);
+      await pb.collection("documents").create(data);
 
       toast.success("Document uploaded successfully.");
       setSelectedFile(null);
       setIsOpen(false);
       await onUploaded();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (isSuperuserOnlyError(error)) {
         toast.error("You don't have permission to upload documents.");
       } else {
-        toast.error(error?.message || "Failed to upload document.");
+        const err = error as { message?: string };
+        toast.error(err?.message || "Failed to upload document.");
       }
     } finally {
       setUploading(false);
@@ -1007,71 +1048,10 @@ function UploadDocumentControl({
   );
 }
 
-function PaymentPreviewControl({ payment }: { payment: any }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <button className="w-8 h-8 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 transition-colors shadow-sm">
-          <ExternalLink size={14} />
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md p-8 rounded-[2.5rem] border-none shadow-2xl">
-        <DialogHeader className="mb-8 border-b border-gray-100 pb-6 flex flex-col items-center">
-          <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center mb-4">
-            <CheckCircle size={32} />
-          </div>
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight text-gray-900 text-center">
-            Payment Verified
-          </DialogTitle>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">
-            {payment.id}
-          </p>
-        </DialogHeader>
-
-        <div className="space-y-4 mb-8">
-          <div className="flex justify-between items-center py-3 border-b border-gray-50">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Course
-            </span>
-            <span className="text-xs font-bold text-gray-900">
-              {payment.courseName}
-            </span>
-          </div>
-          <div className="flex justify-between items-center py-3 border-b border-gray-50">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Data & Time
-            </span>
-            <span className="text-xs font-bold text-gray-900">
-              {payment.date}
-            </span>
-          </div>
-          <div className="flex justify-between items-center py-3 border-b border-gray-50">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Amount Paid
-            </span>
-            <span className="text-lg font-black text-indigo-600">
-              LKR {payment.amount.toLocaleString()}
-            </span>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setIsOpen(false)}
-          className="w-full py-4 rounded-2xl bg-indigo-50 text-indigo-600 font-black text-[10px] tracking-widest hover:bg-indigo-600 hover:text-white transition-all uppercase active:scale-95 flex items-center justify-center gap-2"
-        >
-          <Archive size={16} /> Download PDF Receipt
-        </button>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function StudentDetail() {
   const router = useRouter();
-  const params = useParams();
-  const studentId = params.id as string;
+  const { id } = useParams<{ id: string }>();
+  const studentId = id;
 
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<StudentDetails | null>(null);
@@ -1087,28 +1067,23 @@ export default function StudentDetail() {
   // Enrollment Modal state
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (studentId) {
-      fetchStudentDetails();
-    }
-  }, [studentId]);
-
-  const fetchStudentDetails = async () => {
+  const fetchStudentDetails = useCallback(async () => {
     try {
       setLoading(true);
       const record = await pb
         .collection("users")
-        .getFirstListItem(`id = "${studentId}" && role = "student"`, {
+        .getFirstListItem<StudentDetails>(`id = "${studentId}" && role = "student"`, {
           expand: "enrollments_via_student.course_intake.course",
         });
 
       let paymentRecords: Payment[] = [];
       try {
-        paymentRecords = (await pb.collection("payments").getFullList({
-          filter: `student = "${studentId}"`,
-          expand: "course",
-          sort: "-date_paid",
-        })) as any;
+        const filterString = `student = "${studentId}"`;
+        paymentRecords = await pb.collection("payments").getFullList<Payment>({
+          filter: filterString,
+          sort: "-created",
+          expand: "enrollment.course_intake.course",
+        });
       } catch (paymentError) {
         if (!isSuperuserOnlyError(paymentError)) {
           console.error("Error fetching student payments:", paymentError);
@@ -1117,32 +1092,31 @@ export default function StudentDetail() {
 
       let mappedDocuments: Document[] = [];
       try {
-        const docRecords = await pb.collection("documents").getFullList({
+        const docRecords = await pb.collection("documents").getFullList<Document>({
           filter: `field = "${studentId}"`,
           sort: "-created",
         });
-
-        mappedDocuments = docRecords as any;
-      } catch (documentsError: any) {
-        if (
-          documentsError?.status !== 404 &&
-          !isSuperuserOnlyError(documentsError)
-        ) {
+        mappedDocuments = docRecords;
+      } catch (documentsError) {
+        if (!isSuperuserOnlyError(documentsError)) {
           console.error("Error fetching student documents:", documentsError);
         }
       }
 
-      setStudent({ ...(record as any), documents: mappedDocuments } as any);
-      const studentData = record as any;
-      
+      setStudent({
+        ...record,
+        documents: mappedDocuments,
+      });
+      const studentData = record;
+
       // Fetch Assignments
       try {
         const enrollments = studentData.expand?.enrollments_via_student || [];
-        const intakeIds = enrollments.map((e: any) => e.course_intake);
+        const intakeIds = enrollments.map((e) => e.course_intake);
         
         if (intakeIds.length > 0) {
           // 1. Get all subjects for these intakes
-          const subjects = await pb.collection("course_subjects").getFullList({
+          const subjects = await pb.collection("course_subjects").getFullList<CourseSubject>({
             filter: intakeIds.map((id: string) => `course_intake = "${id}"`).join(" || "),
             expand: "subject"
           });
@@ -1151,21 +1125,21 @@ export default function StudentDetail() {
           
           if (subjectIds.length > 0) {
             // 2. Get assignments for these subjects
-            const assignmentsRecords = await pb.collection("assignments").getFullList({
+            const assignmentsRecords = await pb.collection("assignments").getFullList<Assignment>({
               filter: subjectIds.map((id: string) => `course_subject = "${id}"`).join(" || "),
               expand: "course_subject.subject",
               sort: "-due_date"
             });
             
             // 3. Get student's submissions
-            const studentSubmissions = await pb.collection("assignment_submissions").getFullList({
+            const studentSubmissions = await pb.collection("assignment_submissions").getFullList<StudentAssignmentSubmission>({
               filter: `student = "${studentId}"`
             });
             
             // Map them together
             const mappedAssignments: StudentAssignment[] = assignmentsRecords.map(a => ({
-              ...(a as any),
-              submission: (studentSubmissions as any[]).find(s => s.assignment === a.id)
+              ...a,
+              submission: studentSubmissions.find(s => s.assignment === a.id)
             }));
             
             setStudentAssignments(mappedAssignments);
@@ -1175,7 +1149,7 @@ export default function StudentDetail() {
         console.error("Error fetching student assignments:", err);
       }
 
-      const remoteNote = (record as any).internalNote || "";
+      const remoteNote = (record as StudentDetails).internalNote || "";
       const localNote =
         typeof window !== "undefined"
           ? window.localStorage.getItem(noteStorageKey) || ""
@@ -1189,22 +1163,28 @@ export default function StudentDetail() {
       }
       router.push("/dashboard/admin/students");
     }
-  };
+  }, [studentId, router, noteStorageKey]);
+
+  useEffect(() => {
+    if (studentId) {
+      fetchStudentDetails();
+    }
+  }, [studentId, fetchStudentDetails]);
 
   const saveInternalNote = async () => {
     if (!student) return;
 
     try {
       setSavingInternalNote(true);
-      const updated = await pb.collection("users").update(student.id, {
+      const updated = await pb.collection("users").update<StudentDetails>(student.id, {
         internalNote,
       });
-      setStudent(updated as any);
+      setStudent(updated);
       if (typeof window !== "undefined") {
         window.localStorage.setItem(noteStorageKey, internalNote);
       }
       toast.success("Remarks saved");
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(noteStorageKey, internalNote);
       }
@@ -1225,18 +1205,19 @@ export default function StudentDetail() {
 
     try {
       setUpdatingAccountStatus(true);
-      const updated = await pb.collection("users").update(student.id, {
+      const updated = await pb.collection("users").update<StudentDetails>(student.id, {
         accountStatus: nextStatus,
       });
-      setStudent(updated as any);
+      setStudent(updated);
       toast.success(
         `Student ${nextStatus === "active" ? "enabled" : "disabled"}`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       if (isSuperuserOnlyError(error)) {
         toast.error("You don't have permission to update account status.");
       } else {
-        toast.error(error?.message || "Failed to update account status");
+        toast.error(err?.message || "Failed to update account status");
       }
     } finally {
       setUpdatingAccountStatus(false);
@@ -1323,10 +1304,12 @@ export default function StudentDetail() {
             <div className="relative group/avatar">
               {student.avatar ? (
                 <div className="w-32 h-32 rounded-[2.5rem] overflow-hidden shadow-2xl ring-8 ring-indigo-50 border-4 border-white">
-                  <img
-                    src={pb.files.getUrl(student as any, student.avatar)}
+                  <Image
+                    src={pb.files.getURL(student, student.avatar, { thumb: "128x128" })}
                     alt={student.name}
-                    className="w-full h-full object-cover"
+                    width={128}
+                    height={128}
+                    className="w-full h-h object-cover"
                   />
                 </div>
               ) : (
@@ -1625,7 +1608,7 @@ export default function StudentDetail() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {studentAssignments.length > 0 ? (
-                    studentAssignments.map((assign, idx) => (
+                    studentAssignments.map((assign) => (
                       <div
                         key={assign.id}
                         className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 flex flex-col gap-4 group hover:bg-white hover:shadow-xl hover:shadow-indigo-50/50 transition-all duration-300"
@@ -1698,7 +1681,7 @@ export default function StudentDetail() {
                                <Mail size={10} /> Lecturer Feedback
                              </p>
                              <p className="text-[10px] font-bold text-gray-600 italic">
-                               "{assign.submission.feedback}"
+                               &quot;{assign.submission.feedback}&quot;
                              </p>
                            </div>
                         )}
@@ -1834,7 +1817,7 @@ export default function StudentDetail() {
                   { id: "al", label: "AL TRANSCRIPTS" },
                   { id: "birth", label: "BIRTH CERTIFICATE" },
                 ].map((docDef) => {
-                  const docType = DOCUMENT_TYPE_BY_CATEGORY[docDef.id];
+                  const docType = DOCUMENT_TYPE_BY_CATEGORY[docDef.id as keyof typeof DOCUMENT_TYPE_BY_CATEGORY];
                   const doc = student.documents?.find(
                     (d) => d.document_type === docType,
                   );

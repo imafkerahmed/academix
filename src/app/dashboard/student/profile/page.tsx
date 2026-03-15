@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -15,7 +15,6 @@ import {
   Calendar,
   ShieldCheck,
   Upload,
-  CheckCircle2,
   AlertCircle,
   FileText,
   X,
@@ -26,27 +25,112 @@ import { motion, AnimatePresence } from "framer-motion";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
 
+interface StudentData {
+  fullName: string;
+  email: string;
+  mobile: string;
+  dob: string;
+  nic: string;
+  studentId: string;
+  avatarUrl: string;
+  academicAdvisor: string;
+}
+
+interface Document {
+  id?: string;
+  document_type: string;
+  name?: string;
+  status_?: string | null;
+  field: string;
+  updated?: string;
+}
+
+interface PocketBaseDocument {
+  id: string;
+  document_type: string;
+  status_: string;
+  updated: string;
+  [key: string]: unknown;
+}
+
 export default function StudentProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [studentData, setStudentData] = useState<any>(null);
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [studentData, setStudentData] = useState<StudentData | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
-  // Required document types
-  const requiredDocuments = [
-    { type: "NIC / Identification", key: "nic" },
-    { type: "OL Transcripts", key: "ol_transcript" },
-    { type: "AL Transcripts", key: "al_transcript" },
-    { type: "Birth Certificate", key: "birth_certificate" },
-  ];
+  const requiredDocuments = useMemo(
+    () => [
+      { type: "NIC / Identification", key: "nic" },
+      { type: "OL Transcripts", key: "ol_transcript" },
+      { type: "AL Transcripts", key: "al_transcript" },
+      { type: "Birth Certificate", key: "birth_certificate" },
+    ],
+    [],
+  );
+
+  const fetchDocuments = useCallback(
+    async (studentId: string) => {
+      try {
+        const token = pb.authStore.token;
+        const response = await fetch("/api/student/documents", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw { status: response.status, message: response.statusText };
+        }
+
+        const data = await response.json();
+        const docs = data.documents as PocketBaseDocument[];
+
+        const mergedDocs: Document[] = requiredDocuments.map((reqDoc) => {
+          const existingDoc = docs.find((d) => d.document_type === reqDoc.key);
+          if (existingDoc) {
+            return {
+              id: existingDoc.id,
+              document_type: existingDoc.document_type,
+              status_: existingDoc.status_,
+              field: studentId,
+              updated: existingDoc.updated,
+            };
+          }
+          return {
+            document_type: reqDoc.key,
+            name: reqDoc.type,
+            status_: null,
+            field: studentId,
+          };
+        });
+
+        setDocuments(mergedDocs);
+      } catch (error: unknown) {
+        console.error("Error fetching documents:", error);
+        const err = error as { status?: number };
+        if (err?.status === 403 || err?.status === 404) {
+          toast.error("Permission denied. Please log in again.");
+          setLoading(false);
+          await pb.authStore.clear();
+          router.push("/login");
+          return;
+        }
+        setDocuments([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [router, requiredDocuments],
+  );
 
   useEffect(() => {
     const checkAccountStatus = async () => {
@@ -94,62 +178,13 @@ export default function StudentProfilePage() {
     };
 
     checkAccountStatus();
-  }, [router]);
-
-  const fetchDocuments = async (studentId: string) => {
-    try {
-      // Fetch documents via API endpoint
-      const token = pb.authStore.token;
-      const response = await fetch("/api/student/documents", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw { status: response.status, message: response.statusText };
-      }
-
-      const data = await response.json();
-      const docs = data.documents;
-
-      // Merge required documents with fetched documents
-      const mergedDocs = requiredDocuments.map((reqDoc) => {
-        const existingDoc = docs.find(
-          (d: any) => d.document_type === reqDoc.key,
-        );
-        return (
-          existingDoc || {
-            document_type: reqDoc.key,
-            name: reqDoc.type,
-            status_: null,
-            field: studentId,
-          }
-        );
-      });
-
-      setDocuments(mergedDocs);
-    } catch (error: any) {
-      console.error("Error fetching documents:", error);
-      // Handle permission errors by redirecting to login
-      if (error?.status === 403 || error?.status === 404) {
-        toast.error("Permission denied. Please log in again.");
-        setLoading(false);
-        await pb.authStore.clear();
-        router.push("/login");
-        return;
-      }
-      setDocuments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [router, fetchDocuments]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleUploadClick = (doc: any) => {
+  const handleUploadClick = (doc: Document) => {
     // Don't allow upload if document is already verified
     if (doc.status_ === "verified") {
       return;
@@ -231,7 +266,7 @@ export default function StudentProfilePage() {
       y: 0,
       transition: {
         duration: 0.6,
-        ease: [0.22, 1, 0.36, 1] as any,
+        ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
       },
     },
   };
@@ -290,7 +325,7 @@ export default function StudentProfilePage() {
         ref={fileInputRef}
         className="hidden"
         accept="image/*"
-        onChange={(e) => {
+        onChange={() => {
           // File selected
         }}
       />
@@ -507,7 +542,7 @@ export default function StudentProfilePage() {
                 <Badge doc={doc} />
               </div>
               <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight mb-2">
-                {doc.name || doc.documentType || "Document"}
+                {doc.name || doc.document_type || "Document"}
               </h4>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">
                 Modified:{" "}
@@ -691,7 +726,7 @@ function Modal({
   );
 }
 
-function Badge({ doc }: { doc: any }) {
+function Badge({ doc }: { doc: Document }) {
   const statusMap: Record<string, string> = {
     verified: "Verified",
     pending: "Pending",

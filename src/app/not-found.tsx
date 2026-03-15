@@ -26,8 +26,8 @@ export default function NotFound() {
         </h1>
         
         <p className="text-lg text-gray-500 font-medium leading-relaxed mb-12 max-w-md mx-auto">
-          Oops! The page you're looking for seems to have vanished into thin air. 
-          Let's get you back on track.
+          Oops! The page you&apos;re looking for seems to have vanished into thin air. 
+          Let&apos;s get you back on track.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

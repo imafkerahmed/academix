@@ -107,17 +107,6 @@ const mockAssignments: AssignmentDetails[] = [
   },
 ];
 
-function getStatusBadgeClasses(status: Submission["status"]) {
-  switch (status) {
-    case "submitted":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-    case "marked":
-      return "bg-green-50 text-green-700 border-green-200";
-    case "not_submitted":
-    default:
-      return "bg-gray-50 text-gray-600 border-gray-200";
-  }
-}
 
 function getGradeFromMarks(marks: number, maxMarks: number): string {
   if (!Number.isFinite(marks) || maxMarks <= 0) return "";
@@ -288,17 +277,6 @@ export default function AssignmentMarkingPage() {
     (s) => s.id === selectedSubmissionId,
   );
 
-  const handleAllowResubmission = () => {
-    if (!selectedSubmission) return;
-
-    setAssignment((prev) => {
-      if (!prev) return prev;
-      const updated = prev.submissions.map((s) =>
-        s.id === selectedSubmission.id ? { ...s, canResubmit: true } : s,
-      );
-      return { ...prev, submissions: updated };
-    });
-  };
 
   const handleSave = (grade: string, feedback: string) => {
     if (!selectedSubmission) return;
@@ -350,26 +328,22 @@ export default function AssignmentMarkingPage() {
     setMarksInput(
       selectedSubmission?.marks != null ? String(selectedSubmission.marks) : "",
     );
-  }, [selectedSubmission?.id]);
+  }, [
+    selectedSubmission?.id,
+    selectedSubmission?.grade,
+    selectedSubmission?.feedback,
+    selectedSubmission?.marks,
+  ]);
 
-  const hasValidMarks = React.useMemo(() => {
-    if (!assignment) return false;
-    const raw = marksInput.trim();
-    if (!raw) return false;
-    const numeric = Number(raw);
-    if (!Number.isFinite(numeric)) return false;
-    if (numeric < 0) return false;
-    if (numeric > assignment.maxMarks) return false;
-    return true;
-  }, [marksInput, assignment]);
+  const rawMarks = marksInput.trim();
+  const numericMarksInput = Number(rawMarks);
+  const hasValidMarks =
+    assignment &&
+    rawMarks !== "" &&
+    Number.isFinite(numericMarksInput) &&
+    numericMarksInput >= 0 &&
+    numericMarksInput <= assignment.maxMarks;
 
-  const gradePercentageLabel = React.useMemo(() => {
-    if (!assignment) return "0.0%";
-    const numeric = Number(marksInput);
-    if (!Number.isFinite(numeric) || assignment.maxMarks <= 0) return "0.0%";
-    const pct = (numeric / assignment.maxMarks) * 100;
-    return `${pct.toFixed(1)}%`;
-  }, [marksInput, assignment]);
 
   if (!assignment) {
     return (

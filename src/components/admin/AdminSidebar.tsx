@@ -12,9 +12,8 @@ import {
   Settings,
   LogOut,
   ChevronRight,
-  Shield,
-  Layers,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 type ProfileDropdownProps = {
   adminName: string;
@@ -83,7 +82,6 @@ export default function AdminSidebar({
   isSidebarOpen = false,
   setIsSidebarOpen,
 }: AdminSidebarProps) {
-  const { usePathname } = require("next/navigation");
   const pathname = usePathname();
   function getActiveTab(path: string) {
     if (path.startsWith("/dashboard/admin/students")) return "students";

@@ -115,7 +115,9 @@ export function EnrollExistingStudentModal({
         fields: "student",
       });
 
-      const enrolledStudentIds = (enrollments as unknown as { student: string }[]).map((e) => e.student);
+      const enrolledStudentIds = (
+        enrollments as unknown as { student: string }[]
+      ).map((e) => e.student);
 
       // Filter out already enrolled students and map to Student interface
       const availableStudents: Student[] = (allStudents as unknown as PBUser[])
