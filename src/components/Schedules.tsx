@@ -59,26 +59,22 @@ export default function Section5Schedules({ enrollments }: Section5SchedulesProp
   const [upcoming, setUpcoming] = useState<ScheduleItem[]>([]);
   const today = new Date().toISOString().slice(0, 10);
 
-  const fetchSchedules = React.useCallback(async (providedEnrollments?: EnrollmentRecord[]) => {
+  const fetchSchedules = React.useCallback(async () => {
     try {
       setLoading(true);
       const user = pb.authStore.model;
       if (!user) return;
 
-      // 1. Fetch enrollments (if not provided)
-      let enrollmentRecords = providedEnrollments || enrollments;
+      // 1. Use enrollments from props
+      const enrollmentRecords = enrollments;
       
-      if (!enrollmentRecords) {
-        const token = pb.authStore.token;
-        const resp = await fetch("/api/student/enrollments", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!resp.ok) throw new Error("Failed to fetch enrollments");
-        const data = await resp.json();
-        enrollmentRecords = data.enrollments;
+      if (!enrollmentRecords || enrollmentRecords.length === 0) {
+        setUpcoming([]);
+        setLoading(false);
+        return;
       }
 
-      const intakeIds = enrollmentRecords!.map((e: { course_intake: string }) => e.course_intake);
+      const intakeIds = enrollmentRecords.map((e: { course_intake: string }) => e.course_intake);
       if (intakeIds.length === 0) {
         setUpcoming([]);
         setLoading(false);

@@ -130,6 +130,7 @@ export default function StudentDashboard() {
       // 1. Fetch enrollments
       let enrollmentRecords = providedEnrollments || enrollments;
       if (!enrollmentRecords || enrollmentRecords.length === 0) {
+        // Only fetch if not provided and not in state
         const token = pb.authStore.token;
         const resp = await fetch("/api/student/enrollments", {
           headers: { Authorization: `Bearer ${token}` },
@@ -137,7 +138,7 @@ export default function StudentDashboard() {
         if (!resp.ok) throw new Error("Failed to fetch enrollments");
         const data = await resp.json();
         enrollmentRecords = data.enrollments;
-        setEnrollments(enrollmentRecords!);
+        setEnrollments(enrollmentRecords || []);
       }
 
       const intakeIds = enrollmentRecords.map((e: { course_intake: string }) => e.course_intake);
@@ -256,6 +257,7 @@ export default function StudentDashboard() {
 
   const fetchStudentData = React.useCallback(async (studentId: string) => {
     try {
+      setLoading(true);
       // Fetch enrollments via API endpoint for central state
       const token = pb.authStore.token;
       const response = await fetch("/api/student/enrollments", {
@@ -264,9 +266,12 @@ export default function StudentDashboard() {
 
       if (response.ok) {
         const data = await response.json();
-        setEnrollments(data.enrollments);
+        const records = data.enrollments || [];
+        setEnrollments(records);
         // Also trigger calendar fetch with these enrollments to be efficient
-        fetchCalendarEvents(data.enrollments);
+        fetchCalendarEvents(records);
+      } else {
+        throw new Error("Failed to fetch student data");
       }
 
       console.log("Fetching data for student:", studentId);
@@ -276,7 +281,6 @@ export default function StudentDashboard() {
       const err = error as { status?: number; message?: string };
       if (err?.status === 403 || err?.status === 404) {
         toast.error("Permission denied. Please log in again.");
-        setLoading(false);
         await pb.authStore.clear();
         router.push("/login");
         return;
