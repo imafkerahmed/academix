@@ -15,6 +15,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN mkdir -p public
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
@@ -34,6 +35,10 @@ ENV NODE_ENV production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Create public folder and copy only if it exists in builder
+# This avoids "not found" errors if the folder is empty/missing in Git
+COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/package.json ./
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
