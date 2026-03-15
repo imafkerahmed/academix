@@ -68,7 +68,8 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           
           # Use -v for verbose output to help debug connection issues
-          ssh -v -o StrictHostKeyChecking=no -o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}" -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+          # Switched to 'access tcp' as it is more reliable in ProxyCommand for CI/CD
+          ssh -v -o StrictHostKeyChecking=no -o ProxyCommand="/usr/local/bin/cloudflared access tcp --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}" -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             cd '/DATA/Web Projects/Academix'
             sudo docker compose pull
             sudo docker compose up -d
