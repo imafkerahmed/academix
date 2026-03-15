@@ -50,25 +50,20 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# --- Infrastructure & Services (Keep these on the server only) ---
-services/
-docker-compose.yml
+# --- Infrastructure & Services ---
+# Allow the services folder itself so Dockerfiles can be tracked
+!services/
+
+# But ignore the sensitive data and binaries inside them
+services/pocketbase/pb_data/
+services/pocketbase/pocketbase
+
+
+# We want the docker-compose.yml in Git to manage deployment
+!docker-compose.yml
 docker-compose.override.yml
 
-# --- PocketBase Specifics ---
-# Ignore all database files and backups
-pocketbase/pb_data/
+# --- Data & Logs ---
 *.db
 *.db-shm
 *.db-wal
-
-# Only allow migrations and hooks if you are using them for version control
-# Otherwise, it is safer to ignore these too if you manage them manually on the server
-# !pocketbase/pb_migrations/
-# !pocketbase/pb_hooks/
-
-# --- Galene Specifics ---
-# Already covered by ignoring the /services folder, but adding as a backup:
-galene/data/
-galene/groups/
-galene/recordings/
