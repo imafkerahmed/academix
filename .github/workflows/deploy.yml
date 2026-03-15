@@ -61,9 +61,14 @@ jobs:
       - name: Execute Remote SSH Commands
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          # Use a heredoc to ensure the key is written with correct newlines
+          cat <<EOF > ~/.ssh/id_rsa
+          ${{ secrets.SSH_PRIVATE_KEY }}
+          EOF
           chmod 600 ~/.ssh/id_rsa
-          ssh -o StrictHostKeyChecking=no -o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+          
+          # Use -v for verbose output to help debug connection issues
+          ssh -v -o StrictHostKeyChecking=no -o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             cd '/DATA/Web Projects/Academix'
             sudo docker compose pull
             sudo docker compose up -d
