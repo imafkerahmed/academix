@@ -61,15 +61,21 @@ jobs:
       - name: Execute Remote SSH Commands
         run: |
           mkdir -p ~/.ssh
-          # Use a heredoc to ensure the key is written with correct newlines
           cat <<EOF > ~/.ssh/id_rsa
           ${{ secrets.SSH_PRIVATE_KEY }}
           EOF
           chmod 600 ~/.ssh/id_rsa
           
-          # Use -v for verbose output to help debug connection issues
-          # Switched to 'access tcp' as it is more reliable in ProxyCommand for CI/CD
-          ssh -v -o StrictHostKeyChecking=no -o ProxyCommand="/usr/local/bin/cloudflared access tcp --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}" -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+          # Create SSH config for clean proxying
+          cat <<EOF > ~/.ssh/config
+          Host ${{ secrets.SERVER_IP }}
+            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}
+            StrictHostKeyChecking no
+            IdentityFile ~/.ssh/id_rsa
+          EOF
+          
+          # SSH into the server using the config
+          ssh -v ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             cd '/DATA/Web Projects/Academix'
             sudo docker compose pull
             sudo docker compose up -d
