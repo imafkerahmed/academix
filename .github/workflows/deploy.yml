@@ -59,15 +59,13 @@ jobs:
           sudo chmod +x /usr/local/bin/cloudflared
 
       - name: Execute Remote SSH Commands
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          proxy_command: /usr/local/bin/cloudflared access ssh --hostname %h
-          script: |
-            cd "/DATA/Web Projects/Academix"
-            # This pulls BOTH academix-app and academix-galene
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -o StrictHostKeyChecking=no -o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            cd '/DATA/Web Projects/Academix'
             sudo docker compose pull
             sudo docker compose up -d
             sudo docker image prune -f
+          "
