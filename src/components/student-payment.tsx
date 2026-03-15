@@ -92,7 +92,7 @@ export default function StudentPayment({
     };
 
   // Real data will be fetched from PocketBase via props
-  const courseOptions = enrolledCourses.map((c) => c.name);
+  const courseOptions = useMemo(() => enrolledCourses.map((c) => c.name), [enrolledCourses]);
 
   const closePayModal = () => {
     setShowPayModal(false);
@@ -100,9 +100,9 @@ export default function StudentPayment({
 
   useEffect(() => {
     if (selectedCourse && selectedCourse !== activeCourse) {
-      Promise.resolve().then(() => setActiveCourse(selectedCourse));
+      setTimeout(() => setActiveCourse(selectedCourse), 0);
     } else if (courseOptions.length === 1 && !activeCourse) {
-      Promise.resolve().then(() => setActiveCourse(courseOptions[0]));
+      setTimeout(() => setActiveCourse(courseOptions[0]), 0);
     }
   }, [selectedCourse, courseOptions, activeCourse]);
 
@@ -126,36 +126,41 @@ export default function StudentPayment({
 
   // Group installments and payments by course
   const course = selectedCourse;
-  const courseInstallments = installments.filter((i) =>
-    enrolledCourses.find((c) => c.name === course && c.id === i.enrollment),
-  );
-  const coursePayments = payments.filter((p) =>
-    enrolledCourses.find((c) => c.name === course && c.id === p.enrollment),
-  );
   // Map installments to feed items
-  const installmentFeed = courseInstallments.map((i) => ({
-    id: i.id,
-    date: i.due_date,
-    description: i.remarks || "Installment Due",
-    amount: i.amount,
-    currency: "USD",
-    status: i.status === "paid" ? "Paid" : "Pending",
-    course,
-    payment_type: i.payment_type || "installment", // Ensure payment_type exists
-    reference_Id: undefined as string | undefined,
-  }));
+  const installmentFeed = useMemo(() => {
+    const relevantInstallments = installments.filter((i) =>
+      enrolledCourses.find((c) => c.name === course && c.id === i.enrollment),
+    );
+    return relevantInstallments.map((i) => ({
+      id: i.id,
+      date: i.due_date,
+      description: i.remarks || "Installment Due",
+      amount: i.amount,
+      currency: "USD",
+      status: i.status === "paid" ? "Paid" : "Pending",
+      course,
+      payment_type: i.payment_type || "installment", // Ensure payment_type exists
+      reference_Id: undefined as string | undefined,
+    }));
+  }, [installments, enrolledCourses, course]);
+
   // Map payments to feed items
-  const paymentFeed = coursePayments.map((p) => ({
-    id: p.id,
-    date: p.date_paid || p.created || "",
-    description: p.remarks || "Payment",
-    amount: p.amount,
-    currency: "USD",
-    status: p.verified ? "Paid" : "Pending",
-    course,
-    payment_type: p.payment_type,
-    reference_Id: p.reference_Id,
-  }));
+  const paymentFeed = useMemo(() => {
+    const relevantPayments = payments.filter((p) =>
+      enrolledCourses.find((c) => c.name === course && c.id === p.enrollment),
+    );
+    return relevantPayments.map((p) => ({
+      id: p.id,
+      date: p.date_paid || p.created || "",
+      description: p.remarks || "Payment",
+      amount: p.amount,
+      currency: "USD",
+      status: p.verified ? "Paid" : "Pending",
+      course,
+      payment_type: p.payment_type,
+      reference_Id: p.reference_Id,
+    }));
+  }, [payments, enrolledCourses, course]);
 
   // derive combined history from installments and payments feeds
   const history = useMemo(
@@ -480,7 +485,7 @@ function PaymentHistoryModal({
 
   useEffect(() => {
     if (selectedCourse && selectedCourse !== filterCourse) {
-      Promise.resolve().then(() => setFilterCourse(selectedCourse));
+      setTimeout(() => setFilterCourse(selectedCourse), 0);
     }
   }, [selectedCourse, filterCourse]);
 

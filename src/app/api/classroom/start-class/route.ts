@@ -57,14 +57,29 @@ export async function POST(request: Request) {
       );
       const filePath = path.join(groupsDir, `${classRecord.galene_group}.json`);
 
+      interface GaleneConfig {
+        users: {
+          [key: string]: {
+            password: string;
+            permissions: string[];
+          };
+        };
+        "wildcard-user"?: {
+          password: string;
+          permissions: string[];
+        };
+        autolock: boolean;
+        "max-history-age": number;
+      }
+
       // If configuration missing or needs patching
       let shouldCreate = !fs.existsSync(filePath);
-      let config: any = null;
+      let config: GaleneConfig | null = null;
 
       if (!shouldCreate) {
         try {
           config = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-          if (config.users?.lecturer && !config.users?.admin) {
+          if (config && config.users?.lecturer && !config.users?.admin) {
             config.users.admin = { ...config.users.lecturer };
             shouldCreate = true; // Trigger write for patch
           }
@@ -77,16 +92,19 @@ export async function POST(request: Request) {
         config = {
           users: {
             lecturer: {
-              password: process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123",
+              password:
+                process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123",
               permissions: ["op", "present", "message", "record"],
             },
             admin: {
-              password: process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123",
+              password:
+                process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123",
               permissions: ["op", "present", "message", "record"],
             },
           },
           "wildcard-user": {
-            password: process.env.NEXT_PUBLIC_GALENE_STUDENT_PASSWORD || "student123",
+            password:
+              process.env.NEXT_PUBLIC_GALENE_STUDENT_PASSWORD || "student123",
             permissions: ["present", "message"],
           },
           autolock: false,

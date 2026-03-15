@@ -252,7 +252,7 @@ export default function StudentDashboard() {
     } finally {
       setIsCalendarLoading(false);
     }
-  }, []);
+  }, [enrollments]);
 
   const fetchStudentData = React.useCallback(async (studentId: string) => {
     try {
@@ -284,7 +284,7 @@ export default function StudentDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [fetchCalendarEvents]);
+  }, [fetchCalendarEvents, router]);
 
   // Check account status on initial load
   useEffect(() => {
