@@ -5,7 +5,7 @@ import React from "react";
 interface AdminStatsCardProps {
   title: string;
   value: string | number;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
   bgColor: string;
   iconColor: string;
   trend?: {
