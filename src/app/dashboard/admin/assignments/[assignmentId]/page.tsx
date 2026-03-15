@@ -2,12 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import pb, { logout } from "@/lib/pocketbase";
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import StatsCarousel from "@/components/admin/StatsCarousel";
+import pb from "@/lib/pocketbase";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import {
-  FileText,
   CheckCircle,
   Clock,
   AlertCircle,
@@ -15,7 +12,9 @@ import {
   Search,
   BookOpen,
   Hash,
+  FileText,
 } from "lucide-react";
+import StatsCarousel from "@/components/admin/StatsCarousel";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
@@ -108,7 +107,6 @@ export default function AssignmentDetails() {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [filter, setFilter] = useState<string>("all");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Grading Modal State
@@ -236,18 +234,7 @@ export default function AssignmentDetails() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans text-gray-900">
-      <AdminSidebar 
-        isSidebarOpen={isSidebarOpen} 
-        setIsSidebarOpen={setIsSidebarOpen} 
-        adminName={pb.authStore.model?.name}
-        onLogout={() => {
-          logout();
-          router.push("/");
-        }}
-      />
-      
-      <main className="p-4 md:p-6 lg:p-8 space-y-8">
+    <div className="space-y-8">
         {/* Navigation & Header */}
         <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
 
@@ -550,7 +537,7 @@ export default function AssignmentDetails() {
             </div>
           </DialogContent>
         </Dialog>
-      </main>
+
     </div>
   );
 }

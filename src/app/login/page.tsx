@@ -15,6 +15,8 @@ export default function LoginPage() {
   const [loginError, setLoginError] = useState("");
 
   useEffect(() => {
+    if (!pb.authStore.isValid) return;
+
     interface AuthModel {
       role?: string;
     }
@@ -29,8 +31,7 @@ export default function LoginPage() {
       case "lecturer":
         router.replace("/dashboard/lecturer");
         break;
-      default:
-        router.replace("/dashboard");
+      // No default redirect to /dashboard to avoid 404
     }
   }, [router]);
 
@@ -73,7 +74,7 @@ export default function LoginPage() {
           router.push("/dashboard/lecturer");
           break;
         default:
-          router.push("/dashboard");
+          toast.error("User role not recognized. Please contact admin.");
       }
     } catch (error: unknown) {
       // Generic but clear error for authentication failures

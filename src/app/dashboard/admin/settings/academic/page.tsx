@@ -922,8 +922,7 @@ export default function AcademicStructurePage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
-      <main className="p-4 md:p-6 lg:p-8">
+    <div className="space-y-8">
         {/* Compact Header */}
         <div className="mb-6">
           <AdminBreadcrumbs
@@ -3461,7 +3460,6 @@ export default function AcademicStructurePage() {
             </ModernModal>
           </div>
         </div>
-      </main>
     </div>
   );
 }

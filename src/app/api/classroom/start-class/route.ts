@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Backward compatibility: ensure admin user exists in Galene config for older classes
+    // Ensure Galene group configuration exists
     if (classRecord.galene_group) {
       const groupsDir = path.join(
         process.cwd(),
@@ -56,18 +56,55 @@ export async function POST(request: Request) {
         "groups",
       );
       const filePath = path.join(groupsDir, `${classRecord.galene_group}.json`);
-      if (fs.existsSync(filePath)) {
+
+      // If configuration missing or needs patching
+      let shouldCreate = !fs.existsSync(filePath);
+      let config: any = null;
+
+      if (!shouldCreate) {
         try {
-          const config = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+          config = JSON.parse(fs.readFileSync(filePath, "utf-8"));
           if (config.users?.lecturer && !config.users?.admin) {
             config.users.admin = { ...config.users.lecturer };
-            fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
-            console.log(
-              `[Classroom] Patched admin user into ${classRecord.galene_group}`,
-            );
+            shouldCreate = true; // Trigger write for patch
           }
         } catch (err) {
-          console.error("Failed to patch galene group config:", err);
+          console.error("Failed to read galene group config:", err);
+          shouldCreate = true;
+        }
+      } else {
+        // Create new config
+        config = {
+          users: {
+            lecturer: {
+              password: process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123",
+              permissions: ["op", "present", "message", "record"],
+            },
+            admin: {
+              password: process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123",
+              permissions: ["op", "present", "message", "record"],
+            },
+          },
+          "wildcard-user": {
+            password: process.env.NEXT_PUBLIC_GALENE_STUDENT_PASSWORD || "student123",
+            permissions: ["present", "message"],
+          },
+          autolock: false,
+          "max-history-age": (classRecord.duration || 60) * 60 + 3600,
+        };
+      }
+
+      if (shouldCreate && config) {
+        try {
+          if (!fs.existsSync(groupsDir)) {
+            fs.mkdirSync(groupsDir, { recursive: true });
+          }
+          fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
+          console.log(
+            `[Classroom] Created/Patched Galene group config for ${classRecord.galene_group}`,
+          );
+        } catch (err) {
+          console.error("Failed to write galene group config:", err);
         }
       }
     }

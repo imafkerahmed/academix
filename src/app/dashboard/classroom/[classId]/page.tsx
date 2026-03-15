@@ -380,11 +380,14 @@ export default function VirtualClassroom() {
 
     setIsJoining(true);
 
-    const groupName = classData.galene_group || "test-classroom";
+    const groupPrefix = process.env.NEXT_PUBLIC_GALENE_GROUP_PREFIX || "";
+    const groupName = groupPrefix + (classData.galene_group || "test-classroom");
     let username = currentUser.name || currentUser.username || "Guest";
 
     setIsHost(hostMode);
-    const password = hostMode ? "lecturer123" : "student123";
+    const hostPassword = process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123";
+    const studentPassword = process.env.NEXT_PUBLIC_GALENE_STUDENT_PASSWORD || "student123";
+    const password = hostMode ? hostPassword : studentPassword;
 
     if (hostMode) {
       username = currentUser.role === "admin" || currentUser.role === "superuser" ? "admin" : "lecturer";

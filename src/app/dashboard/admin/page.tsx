@@ -257,26 +257,23 @@ export default function AdminDashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-gray-50 flex font-sans">
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden transition-all duration-300">
-        <main className="p-4 md:p-6 lg:p-8 flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
-          {/* Header Section - Consistent with subpages */}
-          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
-                <Layout size={40} />
-              </div>
-              <div>
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                  Dashboard <span className="text-indigo-600">Overview</span>
-                </h1>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
-                  <TrendingUp size={14} className="text-indigo-400" />
-                  Insights & Quick Stats
-                </p>
-              </div>
-            </div>
+    <div className="flex flex-col gap-8">
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex items-center gap-6">
+          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
+            <Layout size={40} />
           </div>
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+              Dashboard <span className="text-indigo-600">Overview</span>
+            </h1>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+              <TrendingUp size={14} className="text-indigo-400" />
+              Insights & Quick Stats
+            </p>
+          </div>
+        </div>
+      </div>
 
           {/* Stats Section with Premium Styling */}
           <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -379,9 +376,6 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-        </main>
-      </div>
-
       <AllSchedulesModal
         isOpen={isAllSchedulesOpen}
         onClose={() => setIsAllSchedulesOpen(false)}

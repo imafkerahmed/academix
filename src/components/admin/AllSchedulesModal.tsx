@@ -140,7 +140,10 @@ export default function AllSchedulesModal({
                           {classItem.status.toUpperCase()}
                         </span>
                       </div>
-                      <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                      <h3 
+                        className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2"
+                        title={classItem.classTitle}
+                      >
                         {classItem.classTitle}
                       </h3>
                       <p className="text-sm text-gray-600 mt-1">

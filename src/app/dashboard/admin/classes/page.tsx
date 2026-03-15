@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import pb, { logout } from "@/lib/pocketbase";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import pb from "@/lib/pocketbase";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import {
@@ -123,7 +122,6 @@ export default function ClassManagement() {
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<ZoomClass[]>([]);
   const [filter, setFilter] = useState<string>("scheduled");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -347,11 +345,6 @@ export default function ClassManagement() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
-
   const stats = {
     scheduled: classes.filter((c) => c.status === "scheduled").length,
     inProgress: classes.filter((c) => c.status === "in_progress").length,
@@ -395,16 +388,9 @@ export default function ClassManagement() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
-      <AdminSidebar
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-        adminName={pb.authStore.model?.name}
-        onLogout={handleLogout}
-      />
-      <main className="p-4 md:p-6 lg:p-8 space-y-8">
-        {/* Page Header Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+    <div className="space-y-8">
+      {/* Page Header Card */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-6">
             <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
               <Monitor size={40} />
@@ -759,8 +745,11 @@ export default function ClassManagement() {
                   >
                     <Video size={24} />
                   </div>
-                  <div className="flex flex-col">
-                    <h3 className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight truncate border-b-2 border-transparent group-hover:border-indigo-100">
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <h3 
+                      className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight line-clamp-2 border-b-2 border-transparent group-hover:border-indigo-100 whitespace-normal"
+                      title={classItem.title}
+                    >
                       {classItem.title}
                     </h3>
                     <div className="flex items-center gap-2 mt-1">
@@ -870,7 +859,6 @@ export default function ClassManagement() {
             <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">Try clearing your filters or search terms</p>
           </div>
         )}
-      </main>
     </div>
   );
 }

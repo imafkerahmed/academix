@@ -1,11 +1,6 @@
 "use client";
 
-import { useState } from "react";
-
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import pb, { logout } from "@/lib/pocketbase";
-import AdminSidebar from "@/components/admin/AdminSidebar";
 import {
   User,
   BookOpen,
@@ -21,14 +16,8 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
-  const router = useRouter();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
 
 
 
@@ -96,16 +85,9 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
-      <AdminSidebar 
-        isSidebarOpen={isSidebarOpen} 
-        setIsSidebarOpen={setIsSidebarOpen} 
-        adminName={pb.authStore.model?.name}
-        onLogout={handleLogout}
-      />
-      <main className="p-4 md:p-6 lg:p-8 space-y-8">
-        {/* Page Header Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+    <div className="space-y-8">
+      {/* Page Header Card */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-6">
             <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
               <Shield size={40} />
@@ -218,7 +200,6 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-      </main>
     </div>
   );
 }

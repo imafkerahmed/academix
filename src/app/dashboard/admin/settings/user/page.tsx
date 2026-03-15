@@ -102,8 +102,7 @@ export default function UserManagementPage() {
   const lecturerCount = users.filter((u) => u.role === "lecturer").length;
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
-      <main className="p-4 md:p-6 lg:p-8 space-y-8">
+    <div className="space-y-8">
         {/* Breadcrumbs */}
         <AdminBreadcrumbs
           items={[
@@ -332,7 +331,6 @@ export default function UserManagementPage() {
             </div>
           )}
         </div>
-      </main>
 
       {/* Create / Edit Staff Modal */}
       <RegisterStaffModal

@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import pb, { logout } from "@/lib/pocketbase";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import pb from "@/lib/pocketbase";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import {
@@ -122,7 +121,6 @@ export default function AssignmentManagement() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [filter, setFilter] = useState<string>("all");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
 
@@ -294,11 +292,6 @@ export default function AssignmentManagement() {
 
 
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
-
   const getAssignmentStatus = (assignmentId: string) => {
     const assignmentSubmissions = submissions.filter((s) => s.assignment === assignmentId);
     if (assignmentSubmissions.length === 0) return "none";
@@ -331,14 +324,7 @@ export default function AssignmentManagement() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans text-gray-900">
-      <AdminSidebar 
-        isSidebarOpen={isSidebarOpen} 
-        setIsSidebarOpen={setIsSidebarOpen} 
-        adminName={pb.authStore.model?.name}
-        onLogout={handleLogout}
-      />
-      <main className="p-4 md:p-6 lg:p-8 space-y-8">
+    <div className="space-y-8">
         {/* Page Header Card */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-6">
@@ -946,7 +932,6 @@ export default function AssignmentManagement() {
             </div>
           )}
         </div>
-      </main>
     </div>
   );
 }

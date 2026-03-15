@@ -6,6 +6,7 @@ import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import { logout } from "@/lib/pocketbase";
+import { cn } from "@/lib/utils";
 
 export default function AdminDashboardLayout({
   children,
@@ -71,7 +72,13 @@ export default function AdminDashboardLayout({
             </div>
           </div>
         )}
-        <main className="flex-1 bg-gray-50 p-6 overflow-x-hidden">
+        {/* Content Area - Automatically offset by sidebar on large screens */}
+        <main
+          className={cn(
+            "flex-1 bg-gray-50 p-6 overflow-x-hidden transition-all duration-300",
+            !hideSidebar && "lg:ml-64",
+          )}
+        >
           {children}
         </main>
       </div>

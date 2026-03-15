@@ -80,7 +80,7 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
           return (
             <div
               key={classItem.id}
-              className={`relative p-5 rounded-[2rem] border transition-all duration-300 group hover:shadow-xl hover:shadow-indigo-100/30 hover:-translate-y-1 ${themeClass}`}
+              className={`relative p-5 rounded-[2rem] border transition-all duration-300 group hover:shadow-xl hover:shadow-indigo-100/30 hover:-translate-y-1 ${themeClass} min-w-0 flex-1`}
             >
               {isOngoing && (
                 <div className="absolute -top-2 -right-2 bg-indigo-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10 animate-pulse">
@@ -91,7 +91,10 @@ export default function UpcomingClasses({ classes }: UpcomingClassesProps) {
               <div className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <h4 className="font-black text-gray-900 text-base tracking-tight leading-tight group-hover:text-indigo-600 transition-colors uppercase">
+                    <h4 
+                      className="font-black text-gray-900 text-base tracking-tight leading-tight group-hover:text-indigo-600 transition-colors uppercase line-clamp-2"
+                      title={classItem.classTitle}
+                    >
                       {classItem.classTitle}
                     </h4>
                     <div className="flex flex-wrap items-center gap-2 mt-2">

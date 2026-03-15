@@ -134,7 +134,7 @@ export default function StudentManagement() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 via-white to-indigo-50/30">
+      <div className="flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-indigo-50/30">
         <div className="text-center">
           <div className="h-16 w-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
           <p className="text-gray-600 font-black text-sm tracking-wider">
@@ -146,10 +146,9 @@ export default function StudentManagement() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans">
-      <main className="p-4 md:p-6 lg:p-8 space-y-8">
-        {/* Page Header Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+    <div className="space-y-8">
+      {/* Page Header Card */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-6">
             <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
               <Users size={40} />
@@ -441,7 +440,6 @@ export default function StudentManagement() {
             </div>
           )}
         </div>
-      </main>
 
       <RegisterStudentModal
         isOpen={isRegisterModalOpen}

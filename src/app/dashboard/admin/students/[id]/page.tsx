@@ -1246,8 +1246,7 @@ export default function StudentDetail() {
   ];
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
-      <main className="p-4 md:p-6 lg:p-8 space-y-8 pb-20">
+    <div className="space-y-8 pb-20">
         {/* Header with Breadcrumbs & Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <AdminBreadcrumbs
@@ -1907,7 +1906,7 @@ export default function StudentDetail() {
           )}
           {/* End of tab content */}
         </div>
-      </main>
+
 
       {student && (
         <EnrollCourseModal

@@ -167,8 +167,7 @@ export default function PaymentManagement() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen lg:ml-64 font-sans">
-      <main className="p-4 md:p-6 lg:p-8 space-y-8">
+    <div className="space-y-8">
         {/* Page Header Card */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-6">
@@ -401,8 +400,7 @@ export default function PaymentManagement() {
               </p>
             </div>
           )}
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
