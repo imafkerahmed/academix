@@ -116,23 +116,29 @@ export default function StudentDashboard() {
   const [enrollments, setEnrollments] = useState<EnrollmentRecord[]>([]);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const hasInitialized = React.useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
 
 
-  const fetchCalendarEvents = React.useCallback(async () => {
+  const fetchCalendarEvents = React.useCallback(async (providedEnrollments?: EnrollmentRecord[]) => {
     try {
       setIsCalendarLoading(true);
       const currentUser = pb.authStore.model;
       if (!currentUser) return;
 
       // 1. Fetch enrollments
-      const token = pb.authStore.token;
-      const resp = await fetch("/api/student/enrollments", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok) throw new Error("Failed to fetch enrollments");
-      const { enrollments: enrollmentRecords } = await resp.json();
+      let enrollmentRecords = providedEnrollments || enrollments;
+      if (!enrollmentRecords || enrollmentRecords.length === 0) {
+        const token = pb.authStore.token;
+        const resp = await fetch("/api/student/enrollments", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!resp.ok) throw new Error("Failed to fetch enrollments");
+        const data = await resp.json();
+        enrollmentRecords = data.enrollments;
+        setEnrollments(enrollmentRecords!);
+      }
 
       const intakeIds = enrollmentRecords.map((e: { course_intake: string }) => e.course_intake);
       if (intakeIds.length === 0) {
@@ -186,7 +192,7 @@ export default function StudentDashboard() {
         const course = cs?.expand?.course_intake?.expand?.course;
         
         // Find enrollment for this course_intake to build the link
-        const enrollment = enrollments.find((e: EnrollmentRecord) => e.course_intake === cs?.course_intake);
+        const enrollment = enrollmentRecords.find((e: EnrollmentRecord) => e.course_intake === cs?.course_intake);
         const link = enrollment ? `/dashboard/student/courses/${enrollment.id}/subjects/${subject?.id}` : "";
 
         const subjectName = subject?.name || (Array.isArray(subject) ? subject[0]?.name : subject?.name);
@@ -219,7 +225,7 @@ export default function StudentDashboard() {
         const course = cs?.expand?.course_intake?.expand?.course;
         
         // Find enrollment for this course_intake to build the link
-        const enrollment = enrollments.find((e: EnrollmentRecord) => e.course_intake === cs?.course_intake);
+        const enrollment = enrollmentRecords.find((e: EnrollmentRecord) => e.course_intake === cs?.course_intake);
         const link = enrollment ? `/dashboard/student/courses/${enrollment.id}/subjects/${subject?.id}?tab=assignments` : "";
 
         const dueDate = a.deadline || a.due_date || a.created;
@@ -246,28 +252,23 @@ export default function StudentDashboard() {
     } finally {
       setIsCalendarLoading(false);
     }
-  }, [enrollments]);
+  }, []);
 
   const fetchStudentData = React.useCallback(async (studentId: string) => {
     try {
-      // Fetch enrollments via API endpoint
+      // Fetch enrollments via API endpoint for central state
       const token = pb.authStore.token;
       const response = await fetch("/api/student/enrollments", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) {
-        throw { status: response.status, message: response.statusText };
+      if (response.ok) {
+        const data = await response.json();
+        setEnrollments(data.enrollments);
+        // Also trigger calendar fetch with these enrollments to be efficient
+        fetchCalendarEvents(data.enrollments);
       }
 
-      const data = await response.json();
-      const enrollmentRecords = data.enrollments;
-
-      setEnrollments(enrollmentRecords);
-
-      // courseList removal since it was unused
       console.log("Fetching data for student:", studentId);
     } catch (error: unknown) {
       console.error("Error fetching student data:", error);
@@ -280,16 +281,17 @@ export default function StudentDashboard() {
         router.push("/login");
         return;
       }
-      // For other errors, use empty data
-      setEnrollments([]);
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [fetchCalendarEvents]);
 
   // Check account status on initial load
   useEffect(() => {
     const checkAccountStatus = async () => {
+      if (hasInitialized.current) return;
+      hasInitialized.current = true;
+
       const currentUser = pb.authStore.model;
       if (!currentUser || currentUser.role !== "student") {
         router.push("/login");
@@ -318,11 +320,10 @@ export default function StudentDashboard() {
 
       setUser(latestUser as unknown as StudentUser);
       fetchStudentData(latestUser.id);
-      fetchCalendarEvents();
     };
 
     checkAccountStatus();
-  }, [router, fetchStudentData, fetchCalendarEvents]);
+  }, [router, fetchStudentData]);
 
   // statsData was unused, removed.
 
@@ -437,7 +438,7 @@ export default function StudentDashboard() {
             <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter mb-6">
               Upcoming <span className="text-indigo-600">Schedules</span>
             </h3>
-            <Section5Schedules />
+            <Section5Schedules enrollments={enrollments} />
           </div>
         </div>
       </div>

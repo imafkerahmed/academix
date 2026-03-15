@@ -42,41 +42,43 @@ interface ScheduleItem {
   duration: number;
 }
 
-export default function Section5Schedules() {
+interface EnrollmentRecord {
+  id: string;
+  course_intake: string;
+  status: string;
+}
+
+interface Section5SchedulesProps {
+  enrollments?: EnrollmentRecord[];
+}
+
+export default function Section5Schedules({ enrollments }: Section5SchedulesProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [upcoming, setUpcoming] = useState<ScheduleItem[]>([]);
   const today = new Date().toISOString().slice(0, 10);
 
-  useEffect(() => {
-    fetchSchedules();
-
-    // Real-time subscription: re-fetch when any class changes
-    pb.collection("classes").subscribe("*", () => {
-      fetchSchedules();
-    });
-
-    return () => {
-      pb.collection("classes").unsubscribe("*");
-    };
-  }, []);
-
-  const fetchSchedules = async () => {
+  const fetchSchedules = React.useCallback(async (providedEnrollments?: EnrollmentRecord[]) => {
     try {
       setLoading(true);
       const user = pb.authStore.model;
       if (!user) return;
 
-      // 1. Fetch enrollments
-      const token = pb.authStore.token;
-      const resp = await fetch("/api/student/enrollments", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok) throw new Error("Failed to fetch enrollments");
-      const { enrollments } = await resp.json();
+      // 1. Fetch enrollments (if not provided)
+      let enrollmentRecords = providedEnrollments || enrollments;
+      
+      if (!enrollmentRecords) {
+        const token = pb.authStore.token;
+        const resp = await fetch("/api/student/enrollments", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!resp.ok) throw new Error("Failed to fetch enrollments");
+        const data = await resp.json();
+        enrollmentRecords = data.enrollments;
+      }
 
-      const intakeIds = enrollments.map((e: { course_intake: string }) => e.course_intake);
+      const intakeIds = enrollmentRecords!.map((e: { course_intake: string }) => e.course_intake);
       if (intakeIds.length === 0) {
         setUpcoming([]);
         setLoading(false);
@@ -206,7 +208,20 @@ export default function Section5Schedules() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [enrollments]);
+
+  useEffect(() => {
+    fetchSchedules();
+
+    // Real-time subscription: re-fetch when any class changes
+    pb.collection("classes").subscribe("*", () => {
+      fetchSchedules();
+    });
+
+    return () => {
+      pb.collection("classes").unsubscribe("*");
+    };
+  }, [fetchSchedules]);
 
   // Prevent background scrolling when modal is open
   useEffect(() => {
