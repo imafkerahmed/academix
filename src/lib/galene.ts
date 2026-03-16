@@ -98,13 +98,27 @@ export class GaleneClient {
   }
 
   private getWsUrl(): string {
-    const url = process.env.NEXT_PUBLIC_GALENE_URL || "http://localhost:8443";
-    console.log("[Galene] Using base URL from env:", url);
+    let url = process.env.NEXT_PUBLIC_GALENE_URL || "http://localhost:8443";
+    
+    // Auto-detection logic for production/custom domains
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname;
+      // If we are on a production domain but the baked-in URL is localhost, 
+      // we need to dynamically target the classroom subdomain.
+      if (hostname.endsWith(".codix.site") && url.includes("localhost")) {
+        url = `https://academix-classroom.codix.site`;
+        console.log("[Galene] Production domain detected, overriding localhost with:", url);
+      }
+    }
+
+    console.log("[Galene] Base URL:", url);
+
     const base = url.replace(/^http(s)?:\/\//, (match) => {
       return match.startsWith("https") ? "wss://" : "ws://";
     });
+    
     const wsUrl = `${base.endsWith("/") ? base : base + "/" }ws`;
-    console.log("[Galene] Derived WebSocket URL:", wsUrl);
+    console.log("[Galene] WebSocket URL:", wsUrl);
     return wsUrl;
   }
 
