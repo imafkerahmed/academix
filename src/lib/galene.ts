@@ -98,8 +98,12 @@ export class GaleneClient {
   }
 
   private getWsUrl(): string {
-    const base = GALENE_URL.replace(/^http/, "ws");
-    return `${base}/ws`;
+    const base = GALENE_URL.replace(/^http(s)?:\/\//, (match) => {
+      return match.startsWith("https") ? "wss://" : "ws://";
+    });
+    const wsUrl = `${base.endsWith("/") ? base : base + "/" }ws`;
+    console.log("[Galene] Derived WebSocket URL:", wsUrl);
+    return wsUrl;
   }
 
   on(event: string, callback: GaleneEventCallback): void {

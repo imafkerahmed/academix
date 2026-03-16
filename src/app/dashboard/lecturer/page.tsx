@@ -20,9 +20,6 @@ import UpcomingClasses, {
 } from "@/components/lecturer/UpcomingClasses";
 import AllSchedulesModal from "@/components/lecturer/AllSchedulesModal";
 import {
-  type Intake,
-  type Course,
-  type Subject,
   type User,
 } from "@/lib/pocketbase";
 import StatsCarousel from "@/components/admin/StatsCarousel";
@@ -31,128 +28,7 @@ import StatsCarousel from "@/components/admin/StatsCarousel";
 // Mock user type deleted - unused
 
 // UI specific types extending PB types
-interface UIIntake extends Intake {
-  name: string;
-  courses: UICourse[];
-}
-
-interface UICourse extends Course {
-  subjects: UISubject[];
-}
-
-interface UISubject extends Subject {
-  assigned: boolean;
-}
-
-// Mock data deleted - using PB data directly or refined types
-
-const mockIntakes: UIIntake[] = [
-  {
-    id: "intake-1",
-    code: "INT-2024-01",
-    name: "January 2024 Intake",
-    start_date: "2024-01-15",
-    end_date: "2024-06-30",
-    created: new Date().toISOString(),
-    updated: new Date().toISOString(),
-    intakeStatus: "ongoing",
-    courses: [
-      {
-        id: "course-1",
-        name: "Computer Science Fundamentals",
-        code: "CS101",
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
-            subjects: [
-              {
-                id: "subject-1",
-                name: "Programming Basics",
-                code: "CS101-A",
-                assigned: true,
-                description: "Basic programming",
-                created: new Date().toISOString(),
-                updated: new Date().toISOString(),
-              },
-              {
-                id: "subject-2",
-                name: "Data Structures",
-                code: "CS101-B",
-                assigned: true,
-                description: "Data structs",
-                created: new Date().toISOString(),
-                updated: new Date().toISOString(),
-              },
-              {
-                id: "subject-3",
-                name: "Algorithms",
-                code: "CS101-C",
-                assigned: false,
-                description: "Algorithms",
-                created: new Date().toISOString(),
-                updated: new Date().toISOString(),
-              },
-            ],
-          },
-          {
-            id: "course-2",
-            name: "Web Development",
-            code: "WEB201",
-            created: new Date().toISOString(),
-            updated: new Date().toISOString(),
-            subjects: [
-              {
-                id: "subject-4",
-                name: "Frontend Development",
-                code: "WEB201-A",
-                assigned: true,
-                description: "Frontend",
-                created: new Date().toISOString(),
-                updated: new Date().toISOString(),
-              },
-              {
-                id: "subject-5",
-                name: "Backend Development",
-                code: "WEB201-B",
-                assigned: false,
-                description: "Backend",
-                created: new Date().toISOString(),
-                updated: new Date().toISOString(),
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: "intake-2",
-        code: "INT-2024-02",
-        name: "March 2024 Intake",
-        start_date: "2024-03-01",
-        end_date: "2024-08-31",
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
-        intakeStatus: "ongoing",
-        courses: [
-          {
-            id: "course-3",
-            name: "Mathematics",
-            code: "MATH101",
-            created: new Date().toISOString(),
-            updated: new Date().toISOString(),
-            subjects: [
-              {
-                id: "subject-6",
-                name: "Calculus I",
-                code: "MATH101-A",
-                assigned: true,
-                description: "Calculus",
-                created: new Date().toISOString(),
-                updated: new Date().toISOString(),
-              },
-            ],
-          },
-        ],
-      },
-    ];
+// Mock data removed
 
 // Data fetching for real classes
 const fetchUpcomingClasses = async (
@@ -178,80 +54,45 @@ const fetchUpcomingClasses = async (
         }
         return true;
       })
-      .map((record: { 
-        id: string; 
-        title: string; 
-        start_time: string; 
-        duration: number; 
-        status: string;
-        expand?: {
-          lecturer?: { name: string };
-          course_subject?: unknown;
-        }
-      }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((record: any) => {
         const csExpand = record.expand?.course_subject;
-        const subjectsArr = Array.isArray(csExpand)
-          ? csExpand
-          : [csExpand].filter(Boolean);
-        const isMerged = subjectsArr.length > 1;
+        const subjects = Array.isArray(csExpand) ? csExpand : [csExpand].filter(Boolean);
+        
+        const subjectNames = subjects
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((cs: any) => {
+            const subjectData = cs?.expand?.subject;
+            if (Array.isArray(subjectData)) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              return subjectData.map((s: any) => s.name).join(", ");
+            }
+            return subjectData?.name;
+          })
+          .filter(Boolean)
+          .join(", ");
+
+        const courseNames = subjects
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((cs: any) => cs?.expand?.course_intake?.expand?.course?.name)
+          .filter(Boolean)
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .join(", ");
+
+        const intakeNames = subjects
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((cs: any) => cs?.expand?.course_intake?.expand?.intake?.code)
+          .filter(Boolean)
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .join(", ");
+
+        const isMerged = subjects.length > 1;
 
         return {
           id: record.id,
-          intakeName:
-            subjectsArr.length > 0
-              ? Array.from(
-                  new Set(
-                    subjectsArr.map(
-                      (cs: {
-                        expand?: {
-                          course_intake?: {
-                            expand?: { intake?: { code: string } };
-                          };
-                        };
-                      }) => cs.expand?.course_intake?.expand?.intake?.code,
-                    ),
-                  ),
-                )
-                  .filter(Boolean)
-                  .join(", ") || "N/A"
-              : "N/A",
-          courseName:
-            subjectsArr.length > 0
-              ? Array.from(
-                  new Set(
-                    subjectsArr.map(
-                      (cs: {
-                        expand?: {
-                          course_intake?: {
-                            expand?: { course?: { name: string } };
-                          };
-                        };
-                      }) => cs.expand?.course_intake?.expand?.course?.name,
-                    ),
-                  ),
-                )
-                  .filter(Boolean)
-                  .join(" & ") || "N/A"
-              : "N/A",
-          subjectName:
-            subjectsArr.length > 0
-              ? Array.from(
-                  new Set(
-                    subjectsArr.map(
-                      (cs: {
-                        expand?: {
-                          subject?: { name: string } | { name: string }[];
-                        }
-                      }) => {
-                        const s = cs.expand?.subject;
-                        return Array.isArray(s) ? s[0]?.name : s?.name;
-                      }
-                    ),
-                  ),
-                )
-                  .filter(Boolean)
-                  .join(" & ") || "N/A"
-              : "N/A",
+          intakeName: intakeNames || "N/A",
+          courseName: courseNames || "N/A",
+          subjectName: subjectNames || "N/A",
           classTitle: record.title,
           startTime: new Date(record.start_time).toLocaleString("en-US", {
             month: "short",
@@ -264,14 +105,15 @@ const fetchUpcomingClasses = async (
           status: record.status as "scheduled" | "in_progress" | "completed" | "cancelled",
           lecturerName: record.expand?.lecturer?.name || "Lecturer",
           isMerged,
-        };
+        } as UpcomingClass & { rawStartTime: string };
       });
 
     const now = Date.now();
     const activeUpcoming: UpcomingClass[] = [];
     const ended: UpcomingClass[] = [];
 
-    mappedRecords.forEach((item: UpcomingClass & { rawStartTime: string }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mappedRecords.forEach((item: any) => {
       const scheduledEnd =
         new Date(item.rawStartTime).getTime() + item.duration * 60000;
       if (now >= scheduledEnd) {
@@ -340,6 +182,36 @@ export default function LecturerDashboard() {
     Promise.resolve().then(() => setUser(currentUser));
   }, [router]);
 
+  const [subjectsCount, setSubjectsCount] = useState(0);
+  const [coursesCount, setCoursesCount] = useState(0);
+  const [intakesCount, setIntakesCount] = useState(0);
+
+  const loadStats = async (lecturerId: string) => {
+    try {
+      const res = await fetch(`/api/lecturer/intakes?lecturerId=${lecturerId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const intakes = data.records || [];
+        setIntakesCount(intakes.length);
+        
+        let courses = 0;
+        let subjects = 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        intakes.forEach((intake: any) => {
+          courses += intake.courses.length;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          intake.courses.forEach((course: any) => {
+            subjects += course.subjects.length;
+          });
+        });
+        setCoursesCount(courses);
+        setSubjectsCount(subjects);
+      }
+    } catch (error) {
+      console.error("Error loading lecturer stats:", error);
+    }
+  };
+
   const [upcomingClasses, setUpcomingClasses] = useState<UpcomingClass[]>([]);
 
   const loadClasses = async (lecturerId: string) => {
@@ -349,7 +221,12 @@ export default function LecturerDashboard() {
 
   useEffect(() => {
     if (user?.id) {
-      Promise.resolve().then(() => loadClasses(user.id));
+      const init = async () => {
+        await loadStats(user.id);
+        await loadClasses(user.id);
+      };
+      init();
+      // ... existing subscription code
 
       // Listen for real-time updates
       const subscribeToClasses = async () => {
@@ -420,23 +297,9 @@ export default function LecturerDashboard() {
   }
 
   const stats = {
-    totalIntakes: mockIntakes.length,
-    totalCourses: mockIntakes.reduce(
-      (sum, intake) => sum + intake.courses.length,
-      0,
-    ),
-    totalSubjects: mockIntakes.reduce(
-      (sum, intake) =>
-        sum +
-        intake.courses.reduce(
-          (courseSum: number, course: UICourse) =>
-            courseSum +
-            (course.subjects || []).filter((s: UISubject) => s.assigned)
-              .length,
-          0,
-        ),
-      0,
-    ),
+    totalIntakes: intakesCount,
+    totalCourses: coursesCount,
+    totalSubjects: subjectsCount,
     upcomingClasses: upcomingClasses.length,
     assignmentsToMark: 0,
   };

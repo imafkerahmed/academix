@@ -34,8 +34,8 @@ export default function IntakeCourseManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [intakes, setIntakes] = useState<Intake[]>([]);
-  const courses: unknown[] = [];
-  const courseIntakes: unknown[] = [];
+  const [coursesCount, setCoursesCount] = useState(0);
+  const [enrollmentsCount, setEnrollmentsCount] = useState(0);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -45,24 +45,28 @@ export default function IntakeCourseManagement() {
     end_date: "",
   });
 
-  const fetchIntakes = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const records = await pb.collection("intakes").getFullList<Intake>({
-        sort: "-created",
-      });
-      setIntakes(records);
+      const [intakeRecords, courseRecords, enrollmentRecords] = await Promise.all([
+        pb.collection("intakes").getFullList<Intake>({ sort: "-created" }),
+        pb.collection("courses").getList(1, 1),
+        pb.collection("enrollments").getList(1, 1),
+      ]);
+      setIntakes(intakeRecords);
+      setCoursesCount(courseRecords.totalItems);
+      setEnrollmentsCount(enrollmentRecords.totalItems);
     } catch (error) {
-      console.error("Error fetching intakes:", error);
-      toast.error("Failed to load intakes");
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void fetchIntakes();
-  }, [fetchIntakes]);
+    void fetchData();
+  }, [fetchData]);
 
   // Filter intakes by tab and search
   const filteredIntakes = intakes
@@ -116,7 +120,7 @@ export default function IntakeCourseManagement() {
       });
 
       // Refresh the list
-      void fetchIntakes();
+      void fetchData();
     } catch (error: unknown) {
       console.error("Error creating intake:", error);
       const err = error as { message?: string };
@@ -165,21 +169,21 @@ export default function IntakeCourseManagement() {
               },
               {
                 title: "Active Courses",
-                value: courses.length,
+                value: coursesCount,
                 icon: BookOpen,
                 bgColor: "bg-green-50",
                 iconColor: "text-green-600",
               },
               {
-                title: "Active Enrollments",
-                value: courseIntakes.length,
+                title: "Total Enrollments",
+                value: enrollmentsCount,
                 icon: Layers,
                 bgColor: "bg-purple-50",
                 iconColor: "text-purple-600",
               },
               {
-                title: "System Uptime",
-                value: "99.9%",
+                title: "Academic Period",
+                value: new Date().getFullYear(),
                 icon: Layers,
                 bgColor: "bg-indigo-50",
                 iconColor: "text-indigo-600",

@@ -3,86 +3,51 @@
 import React from "react";
 import { GraduationCap, TrendingUp } from "lucide-react";
 import IntakesTree, { type Intake } from "@/components/lecturer/IntakesTree";
-
-const mockIntakes: Intake[] = [
-  {
-    id: "intake-1",
-    code: "INT-2024-01",
-    name: "January 2024 Intake",
-    startDate: "2024-01-15",
-    endDate: "2024-06-30",
-    courses: [
-      {
-        id: "course-1",
-        name: "Computer Science Fundamentals",
-        code: "CS101",
-        subjects: [
-          {
-            id: "subject-1",
-            name: "Programming Basics",
-            code: "CS101-A",
-            assigned: true,
-          },
-          {
-            id: "subject-2",
-            name: "Data Structures",
-            code: "CS101-B",
-            assigned: true,
-          },
-          {
-            id: "subject-3",
-            name: "Algorithms",
-            code: "CS101-C",
-            assigned: false,
-          },
-        ],
-      },
-      {
-        id: "course-2",
-        name: "Web Development",
-        code: "WEB201",
-        subjects: [
-          {
-            id: "subject-4",
-            name: "Frontend Development",
-            code: "WEB201-A",
-            assigned: true,
-          },
-          {
-            id: "subject-5",
-            name: "Backend Development",
-            code: "WEB201-B",
-            assigned: false,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "intake-2",
-    code: "INT-2024-02",
-    name: "March 2024 Intake",
-    startDate: "2024-03-01",
-    endDate: "2024-08-31",
-    courses: [
-      {
-        id: "course-3",
-        name: "Mathematics",
-        code: "MATH101",
-        subjects: [
-          {
-            id: "subject-6",
-            name: "Calculus I",
-            code: "MATH101-A",
-            assigned: true,
-          },
-        ],
-      },
-    ],
-  },
-];
+import pb from "@/lib/pocketbase";
 
 export default function IntakesPage() {
+  const [intakes, setIntakes] = React.useState<Intake[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const fetchIntakes = async () => {
+      try {
+        const user = pb.authStore.model;
+        if (!user?.id) return;
+
+        const res = await fetch(`/api/lecturer/intakes?lecturerId=${user.id}`);
+        if (!res.ok) throw new Error("Failed to fetch intakes");
+        
+        const data = await res.json();
+        setIntakes(data.records || []);
+      } catch (err) {
+        console.error("Error loading intakes:", err);
+        setError("Failed to load your assigned subjects. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIntakes();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center bg-red-50 rounded-[2rem] border border-red-100 mt-8">
+        <p className="text-red-600 font-bold">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Page Header Card */}
@@ -102,7 +67,7 @@ export default function IntakesPage() {
           </div>
         </div>
       </div>
-      <IntakesTree intakes={mockIntakes} />
+      <IntakesTree intakes={intakes} />
     </>
   );
 }

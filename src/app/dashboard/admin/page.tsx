@@ -14,95 +14,12 @@ import {
   Video,
   Calendar as CalendarIcon,
   Lock,
+  type LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import StatsCarousel from "@/components/admin/StatsCarousel";
 import pb from "@/lib/pocketbase";
-
-// Mock data for today's classes
-const todaysClasses = [
-  {
-    id: 21,
-    title: "Zoom Math Class",
-    topic: "Algebra: Quadratic Equations",
-    type: "Online Class",
-    date: "2026-02-07",
-    startTime: "10:00",
-    endTime: "11:00",
-    platform: "Zoom",
-    joinUrl: "https://zoom.us/j/1234567890",
-    intakeName: "2026 Intake A",
-    courseName: "Math 101",
-    duration: 60,
-    status: "scheduled",
-  },
-  {
-    id: 22,
-    title: "Physical Chemistry Lab",
-    topic: "Organic Compounds",
-    type: "Physical Class",
-    date: "2026-02-07",
-    startTime: "13:00",
-    endTime: "14:30",
-    platform: "Lab 2",
-    joinUrl: "",
-    intakeName: "2025 Intake B",
-    courseName: "Chem 201",
-    duration: 90,
-    status: "scheduled",
-  },
-  {
-    id: 23,
-    title: "Zoom English Lecture",
-    topic: "Shakespearean Sonnets",
-    type: "Online Class",
-    date: "2026-02-07",
-    startTime: "15:00",
-    endTime: "16:00",
-    platform: "Zoom",
-    joinUrl: "https://zoom.us/j/9876543210",
-    intakeName: "2026 Intake C",
-    courseName: "Eng 102",
-    duration: 60,
-    status: "ongoing",
-  },
-];
-
-const statsData = [
-  {
-    title: "Active Students",
-    value: 1234,
-    icon: Users,
-    bgColor: "bg-blue-50",
-    iconColor: "text-blue-600",
-    trend: { value: "2.5%", isPositive: true },
-  },
-  {
-    title: "Active Intakes",
-    value: 4,
-    icon: GraduationCap,
-    bgColor: "bg-green-50",
-    iconColor: "text-green-600",
-    trend: { value: "1.2%", isPositive: true },
-  },
-  {
-    title: "Pending Payments",
-    value: 12,
-    icon: DollarSign,
-    bgColor: "bg-orange-50",
-    iconColor: "text-orange-600",
-    trend: { value: "0.8%", isPositive: false },
-  },
-  {
-    title: "Total Courses",
-    value: 27,
-    icon: BookOpen,
-    bgColor: "bg-purple-50",
-    iconColor: "text-purple-600",
-    trend: { value: "1.7%", isPositive: true },
-  },
-];
 
 interface CalendarEvent {
   id: string;
@@ -120,10 +37,35 @@ interface CalendarEvent {
   duration?: number;
 }
 
+interface DashboardStat {
+  title: string;
+  value: string | number;
+  icon: LucideIcon;
+  bgColor: string;
+  iconColor: string;
+}
+
+interface TodaysClass {
+  id: string;
+  title: string;
+  courseName: string;
+  intakeName: string;
+  platform: string;
+  startTime: string;
+  endTime: string;
+  joinUrl: string;
+  status: string;
+  duration: number;
+  rawStartTime: string;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isAllSchedulesOpen, setIsAllSchedulesOpen] = React.useState(false);
+  const [stats, setStats] = useState<DashboardStat[]>([]);
+  const [todaysClasses, setTodaysClasses] = useState<TodaysClass[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const currentUser = pb.authStore.model;
@@ -132,13 +74,104 @@ export default function AdminDashboard() {
       return;
     }
 
-    // Check if account is disabled
     if (currentUser.accountStatus === "disabled") {
       return;
     }
 
-    fetchCalendarEvents();
+    const init = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchCalendarEvents(),
+        fetchDashboardStats(),
+        fetchTodaysClasses()
+      ]);
+      setLoading(false);
+    };
+    init();
   }, [router]);
+
+  const fetchDashboardStats = async () => {
+    try {
+      const [students, intakes, payments, courses] = await Promise.all([
+        pb.collection("users").getList(1, 1, { filter: 'role = "student" && accountStatus = "active"' }),
+        pb.collection("intakes").getList(1, 1, { filter: 'intakeStatus = "ongoing"' }),
+        pb.collection("payments").getList(1, 1, { filter: "verified = false" }),
+        pb.collection("courses").getList(1, 1),
+      ]);
+
+      setStats([
+        {
+          title: "Active Students",
+          value: students.totalItems,
+          icon: Users,
+          bgColor: "bg-blue-50",
+          iconColor: "text-blue-600",
+        },
+        {
+          title: "Active Intakes",
+          value: intakes.totalItems,
+          icon: GraduationCap,
+          bgColor: "bg-green-50",
+          iconColor: "text-green-600",
+        },
+        {
+          title: "Pending Sync",
+          value: payments.totalItems,
+          icon: DollarSign,
+          bgColor: "bg-orange-50",
+          iconColor: "text-orange-600",
+        },
+        {
+          title: "Total Courses",
+          value: courses.totalItems,
+          icon: BookOpen,
+          bgColor: "bg-purple-50",
+          iconColor: "text-purple-600",
+        },
+      ]);
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+    }
+  };
+
+  const fetchTodaysClasses = async () => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const records = await pb.collection("classes").getFullList({
+        filter: `start_time >= "${today.toISOString()}" && start_time < "${tomorrow.toISOString()}"`,
+        expand: "course_subject.subject,course_subject.course_intake.course",
+        sort: "start_time",
+      });
+
+      setTodaysClasses(records.map(record => {
+        const cs = record.expand?.course_subject;
+        const subject = cs?.expand?.subject;
+        const intake = cs?.expand?.course_intake?.expand?.intake;
+        const course = cs?.expand?.course_intake?.expand?.course;
+        const subjectName = Array.isArray(subject) ? subject[0]?.name : subject?.name;
+
+        return {
+          id: record.id,
+          title: subjectName || record.title,
+          courseName: course?.name || "Multiple Courses",
+          intakeName: intake?.name || "Multiple Intakes",
+          platform: record.type || "Online",
+          startTime: new Date(record.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+          endTime: new Date(new Date(record.start_time).getTime() + record.duration * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+          joinUrl: record.zoom_link,
+          status: record.status,
+          duration: record.duration,
+          rawStartTime: record.start_time,
+        };
+      }));
+    } catch (error) {
+      console.error("Error fetching today's classes:", error);
+    }
+  };
 
   const fetchCalendarEvents = async () => {
     try {
@@ -250,7 +283,7 @@ export default function AdminDashboard() {
     intakeName: c.intakeName ?? "",
     courseName: c.courseName ?? "",
     classTitle: c.title,
-    startTime: c.date + "T" + (c.startTime || "00:00") + ":00Z",
+    startTime: c.rawStartTime || (new Date().toISOString()),
     duration: c.duration ?? 60,
     status: (c.status as "scheduled" | "ongoing" | "completed") ?? "scheduled",
     zoomJoinUrl: c.joinUrl ?? "",
@@ -277,7 +310,11 @@ export default function AdminDashboard() {
 
           {/* Stats Section with Premium Styling */}
           <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <StatsCarousel stats={statsData} />
+            {loading ? (
+              <div className="h-32 bg-gray-50 rounded-3xl animate-pulse" />
+            ) : (
+              <StatsCarousel stats={stats} />
+            )}
           </div>
 
           {/* Main Grid: 2 Column Desktop */}
@@ -324,53 +361,65 @@ export default function AdminDashboard() {
                 {/* Only the new list view is rendered */}
                 <div className="flex-1 max-h-[420px] overflow-y-auto pr-1">
                   <div className="flex flex-col gap-5">
-                    {todaysClasses.map((cls) => (
-                      <div
-                        key={cls.id}
-                        className="bg-white border border-gray-100 rounded-2xl p-6 flex flex-col gap-3 shadow-sm hover:shadow-lg transition-all duration-300"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 mt-1 ${cls.status === "ongoing" ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}
-                          >
-                            <Video size={22} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors tracking-tight line-clamp-2"
-                                title={cls.title}
-                              >
-                                {cls.title}
-                              </span>
-                              {cls.status === "ongoing" && (
-                                <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full animate-pulse">
-                                  LIVE
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500 font-semibold mt-1 truncate">
-                              {cls.courseName} &bull; {cls.platform}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
-                          <span className="text-xs text-gray-400 font-bold">
-                            {cls.startTime} - {cls.endTime}
-                          </span>
-                          {cls.joinUrl && (
-                            <a
-                              href={cls.joinUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm text-center"
-                            >
-                              Spectate
-                            </a>
-                          )}
-                        </div>
+                    {loading ? (
+                      <div className="space-y-4">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className="h-24 bg-gray-50 rounded-2xl animate-pulse" />
+                        ))}
                       </div>
-                    ))}
+                    ) : todaysClasses.length === 0 ? (
+                      <div className="text-center py-12">
+                        <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">No classes scheduled for today</p>
+                      </div>
+                    ) : (
+                      todaysClasses.map((cls) => (
+                        <div
+                          key={cls.id}
+                          className="bg-white border border-gray-100 rounded-2xl p-6 flex flex-col gap-3 shadow-sm hover:shadow-lg transition-all duration-300"
+                        >
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 mt-1 ${cls.status === "ongoing" || cls.status === "in_progress" ? "bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}
+                            >
+                              <Video size={22} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors tracking-tight line-clamp-2"
+                                  title={cls.title}
+                                >
+                                  {cls.title}
+                                </span>
+                                {(cls.status === "ongoing" || cls.status === "in_progress") && (
+                                  <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full animate-pulse">
+                                    LIVE
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500 font-semibold mt-1 truncate">
+                                {cls.courseName} &bull; {cls.platform}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
+                            <span className="text-xs text-gray-400 font-bold">
+                              {cls.startTime} - {cls.endTime}
+                            </span>
+                            {cls.joinUrl && (
+                              <a
+                                href={cls.joinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm text-center"
+                              >
+                                Spectate
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
