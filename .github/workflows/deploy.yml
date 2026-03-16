@@ -52,8 +52,14 @@ jobs:
     runs-on: self-hosted
     needs: build
     steps:
-      - name: Pull and Restart Services
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Sync Configuration and Restart
         run: |
+          # Copy the latest docker-compose.yml to your data folder
+          cp docker-compose.yml '/DATA/Web Projects/Academix/docker-compose.yml'
+          
           cd '/DATA/Web Projects/Academix'
           docker compose pull
           docker compose up -d
