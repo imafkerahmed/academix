@@ -59,23 +59,17 @@ jobs:
           sudo chmod +x /usr/local/bin/cloudflared
 
       - name: Execute Remote SSH Commands
-        env:
-          TUNNEL_CLIENT_ID: ${{ secrets.CF_CLIENT_ID }}
-          TUNNEL_CLIENT_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
-        run: |
-          mkdir -p ~/.ssh
-          cat <<EOF > ~/.ssh/id_rsa
-          ${{ secrets.SSH_PRIVATE_KEY }}
-          EOF
-          chmod 600 ~/.ssh/id_rsa
-          
-          # Use environment variables for Cloudflare credentials
-          # This is the most reliable way to avoid shell escaping issues
-          ssh -v -o StrictHostKeyChecking=no \
-              -o "ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname %h" \
-              -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-            cd '/DATA/Web Projects/Academix'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_command: |
+            /usr/local/bin/cloudflared access ssh --hostname %h \
+            --service-token-id ${{ secrets.CF_CLIENT_ID }} \
+            --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}
+          script: |
+            cd "/DATA/Web Projects/Academix"
             sudo docker compose pull
             sudo docker compose up -d
             sudo docker image prune -f
-          "
