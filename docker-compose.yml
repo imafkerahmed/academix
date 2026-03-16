@@ -2,7 +2,7 @@ services:
   app:
     image: afkerahmed/academix-app:latest
     build: .
-    container_name: academix-app
+    container_name: academix-frontend
     ports:
       - "3000:3000"
     volumes:
@@ -17,7 +17,7 @@ services:
   galene:
     image: afkerahmed/academix-galene:latest
     build: ./services/galene
-    container_name: academix-galene
+    container_name: academix-video
     ports:
       - "8443:8443"
       - "10000-10020:10000-10020/udp"
