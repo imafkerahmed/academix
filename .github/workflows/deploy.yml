@@ -62,5 +62,5 @@ jobs:
           
           cd '/DATA/Web Projects/Academix'
           docker compose pull
-          docker compose up -d
+          docker compose up -d --no-build
           docker image prune -f
