@@ -14,12 +14,15 @@ export async function GET(request: Request) {
     }
 
     const adminPb = await getAdminClient();
+    console.log(`[Lecturer Subjects API] Fetching for lecturer: ${lecturerId}`);
 
     // Fetch all course_subjects assigned to this lecturer
     const records = await adminPb.collection("course_subjects").getFullList({
       filter: `lecturer = "${lecturerId}"`,
       expand: "subject,course_intake.course,course_intake.intake",
     });
+
+    console.log(`[Lecturer Subjects API] Found ${records.length} records`);
 
     return NextResponse.json({ records });
   } catch (error: unknown) {

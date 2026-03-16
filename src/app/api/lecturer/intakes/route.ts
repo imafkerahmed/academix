@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     }
 
     const adminPb = await getAdminClient();
+    console.log(`[Lecturer API] Fetching course_subjects for lecturer: ${lecturerId}`);
 
     // Fetch all course_subjects for this lecturer with full expanded info
     const csRecords = await adminPb.collection("course_subjects").getFullList({
@@ -21,18 +22,26 @@ export async function GET(request: Request) {
       expand: "subject,course_intake.course,course_intake.intake",
     });
 
+    console.log(`[Lecturer API] Found ${csRecords.length} course_subjects`);
+
     // Structure the data for IntakesTree
     const intakesMap = new Map();
 
     for (const cs of csRecords) {
       const ci = cs.expand?.course_intake;
-      if (!ci) continue;
+      if (!ci) {
+        console.warn(`[Lecturer API] Missing expansion for course_intake on course_subject ${cs.id}`);
+        continue;
+      }
       
       const intake = ci.expand?.intake;
       const course = ci.expand?.course;
       const subjects = cs.expand?.subject;
 
-      if (!intake || !course || !subjects) continue;
+      if (!intake || !course || !subjects) {
+        console.warn(`[Lecturer API] Missing expansion on course_intake ${ci.id}: intake=${!!intake}, course=${!!course}, subjects=${!!subjects}`);
+        continue;
+      }
 
       if (!intakesMap.has(intake.id)) {
         intakesMap.set(intake.id, {

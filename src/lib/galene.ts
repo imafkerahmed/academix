@@ -98,7 +98,9 @@ export class GaleneClient {
   }
 
   private getWsUrl(): string {
-    const base = GALENE_URL.replace(/^http(s)?:\/\//, (match) => {
+    const url = process.env.NEXT_PUBLIC_GALENE_URL || "http://localhost:8443";
+    console.log("[Galene] Using base URL from env:", url);
+    const base = url.replace(/^http(s)?:\/\//, (match) => {
       return match.startsWith("https") ? "wss://" : "ws://";
     });
     const wsUrl = `${base.endsWith("/") ? base : base + "/" }ws`;

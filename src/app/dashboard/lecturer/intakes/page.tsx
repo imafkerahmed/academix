@@ -17,13 +17,14 @@ export default function IntakesPage() {
         if (!user?.id) return;
 
         const res = await fetch(`/api/lecturer/intakes?lecturerId=${user.id}`);
-        if (!res.ok) throw new Error("Failed to fetch intakes");
-        
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to fetch intakes");
+        
         setIntakes(data.records || []);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Error loading intakes:", err);
-        setError("Failed to load your assigned subjects. Please try again later.");
+        const errorMessage = err instanceof Error ? err.message : "Failed to load your assigned subjects. Please try again later.";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

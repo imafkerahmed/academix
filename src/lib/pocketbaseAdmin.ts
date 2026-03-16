@@ -19,11 +19,23 @@ export async function getAdminClient() {
   }
 
   const client = new PocketBase(url);
+  client.autoCancellation(false);
 
-  // PocketBase v0.23+ uses _superusers collection instead of client.admins
-  await client
-    .collection("_superusers")
-    .authWithPassword(adminEmail, adminPassword);
+  try {
+    // Try PocketBase v0.23+ superusers first
+    await client
+      .collection("_superusers")
+      .authWithPassword(adminEmail, adminPassword);
+  } catch (err) {
+    console.warn("[PocketBase Admin] _superusers auth failed, trying legacy admins:", err);
+    try {
+      // Fallback to legacy admins
+      await client.admins.authWithPassword(adminEmail, adminPassword);
+    } catch (legacyErr) {
+      console.error("[PocketBase Admin] Both auth methods failed.", legacyErr);
+      throw legacyErr;
+    }
+  }
 
   adminClient = client;
   return client;
