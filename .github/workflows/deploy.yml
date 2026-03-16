@@ -68,9 +68,9 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           
           # SSH using cloudflared as a ProxyCommand
-          # Note: appleboy/ssh-action is skipped because it ignores the proxy_command input.
+          # We use both env vars and explicit flags to ensure cloudflared catches the token
           ssh -v -o StrictHostKeyChecking=no \
-              -o "ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname %h" \
+              -o "ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}" \
               -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             cd '/DATA/Web Projects/Academix'
             sudo docker compose pull
