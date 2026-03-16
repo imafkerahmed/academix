@@ -59,6 +59,9 @@ jobs:
           sudo chmod +x /usr/local/bin/cloudflared
 
       - name: Execute Remote SSH Commands
+        env:
+          TUNNEL_CLIENT_ID: ${{ secrets.CF_CLIENT_ID }}
+          TUNNEL_CLIENT_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
           mkdir -p ~/.ssh
           cat <<EOF > ~/.ssh/id_rsa
@@ -66,16 +69,11 @@ jobs:
           EOF
           chmod 600 ~/.ssh/id_rsa
           
-          # Create SSH config for clean proxying
-          cat <<EOF > ~/.ssh/config
-          Host ${{ secrets.SERVER_IP }}
-            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h --port %p --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}
-            StrictHostKeyChecking no
-            IdentityFile ~/.ssh/id_rsa
-          EOF
-          
-          # SSH into the server using the config
-          ssh -v ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+          # Use environment variables for Cloudflare credentials
+          # This is the most reliable way to avoid shell escaping issues
+          ssh -v -o StrictHostKeyChecking=no \
+              -o "ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname %h" \
+              -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             cd '/DATA/Web Projects/Academix'
             sudo docker compose pull
             sudo docker compose up -d
