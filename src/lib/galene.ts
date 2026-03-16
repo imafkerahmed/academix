@@ -105,9 +105,9 @@ export class GaleneClient {
       const hostname = window.location.hostname;
       // If we are on a production domain but the baked-in URL is localhost, 
       // we need to dynamically target the classroom subdomain.
-      if (hostname.endsWith(".codix.site") && url.includes("localhost")) {
+      if (hostname.endsWith(".codix.site") && !url.includes("academix-classroom.codix.site")) {
         url = `https://academix-classroom.codix.site`;
-        console.log("[Galene] Production domain detected, overriding localhost with:", url);
+        console.log("[Galene] Production domain detected, overriding URL with:", url);
       }
     }
 
