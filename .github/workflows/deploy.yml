@@ -55,6 +55,6 @@ jobs:
       - name: Pull and Restart Services
         run: |
           cd '/DATA/Web Projects/Academix'
-          sudo docker compose pull
-          sudo docker compose up -d
-          sudo docker image prune -f
+          docker compose pull
+          docker compose up -d
+          docker image prune -f
