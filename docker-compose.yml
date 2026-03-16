@@ -18,6 +18,7 @@ services:
     image: afkerahmed/academix-galene:latest
     build: ./services/galene
     container_name: academix-video
+    command: ["/galene/galene", "-http", "0.0.0.0:8443", "-domain", "academix-classroom.codix.site"]
     ports:
       - "8443:8443"
       - "10000-10020:10000-10020/udp"
