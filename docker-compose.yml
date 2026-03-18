@@ -6,31 +6,10 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - galene_groups:/app/services/galene/groups
+      - /DATA/Web Projects/Academix/services/galene/groups:/app/services/galene/groups
     environment:
       - NEXT_PUBLIC_POCKETBASE_URL=https://academixdb.codix.site
-      - NEXT_PUBLIC_GALENE_URL=http://galene:8443
-    depends_on:
-      - galene
+      - GALENE_GROUPS_PATH=/app/services/galene/groups
+      - INTERNAL_SECRET=${INTERNAL_SECRET}
     restart: unless-stopped
 
-  galene:
-    image: afkerahmed/academix-galene:latest
-    build: ./services/galene
-    container_name: academix-video
-    command: ["/galene/galene", "-http", "0.0.0.0:8443", "-insecure", "-groups", "/galene/groups", "-data", "/galene/data", "-udp-range", "10000-10020"]
-    ports:
-      - "8443:8443"
-      - "10000-10020:10000-10020/udp"
-    volumes:
-      - galene_groups:/galene/groups
-      - ./services/galene/data:/galene/data
-    environment:
-      - GALENE_INSECURE=1
-      - GALENE_ALLOWED_ORIGINS=http://localhost:3000,https://academix.codix.site,http://app:3000
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-volumes:
-  galene_groups:

@@ -43,17 +43,41 @@ export async function POST(request: Request) {
       );
     }
 
-    // Define the path to the Galene groups directory
-    // Galene docker-compose mounts ./services/galene/groups to /var/lib/galene/groups
-    const groupsDir = path.join(process.cwd(), "services", "galene", "groups");
+    const remoteUrl = process.env.GALENE_REMOTE_MANAGEMENT_URL;
+    const internalSecret = process.env.INTERNAL_SECRET;
+
+    // --- Local -> Production Bridge ---
+    if (remoteUrl) {
+      console.log(`[Galene API] Forwarding POST request to ${remoteUrl}`);
+      const response = await fetch(remoteUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": internalSecret || "",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    // --- Production Security Check ---
+    const incomingSecret = request.headers.get("x-internal-secret");
+    if (internalSecret && incomingSecret !== internalSecret) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // --- Production -> File System ---
+    const groupsDir =
+      process.env.GALENE_GROUPS_PATH ||
+      path.join(process.cwd(), "services", "galene", "groups");
     const filePath = path.join(groupsDir, `${classId}.json`);
 
-    // Create the directory if it doesn't exist
     if (!fs.existsSync(groupsDir)) {
       fs.mkdirSync(groupsDir, { recursive: true });
     }
 
-    // Generate and write the config file
     const config = generateGroupConfig(
       passwordHost,
       passwordAttendee,
@@ -88,7 +112,33 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const groupsDir = path.join(process.cwd(), "services", "galene", "groups");
+    const remoteUrl = process.env.GALENE_REMOTE_MANAGEMENT_URL;
+    const internalSecret = process.env.INTERNAL_SECRET;
+
+    // --- Local -> Production Bridge ---
+    if (remoteUrl) {
+      console.log(`[Galene API] Forwarding DELETE request to ${remoteUrl}`);
+      const response = await fetch(`${remoteUrl}?classId=${classId}`, {
+        method: "DELETE",
+        headers: {
+          "x-internal-secret": internalSecret || "",
+        },
+      });
+
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    // --- Production Security Check ---
+    const incomingSecret = request.headers.get("x-internal-secret");
+    if (internalSecret && incomingSecret !== internalSecret) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // --- Production -> File System ---
+    const groupsDir =
+      process.env.GALENE_GROUPS_PATH ||
+      path.join(process.cwd(), "services", "galene", "groups");
     const filePath = path.join(groupsDir, `${classId}.json`);
 
     if (fs.existsSync(filePath)) {

@@ -51,12 +51,8 @@ yarn-error.log*
 next-env.d.ts
 
 # --- Infrastructure & Services ---
-# Allow the services folder itself so Dockerfiles can be tracked
-!services/
-
-# But ignore the sensitive data and binaries inside them
-services/pocketbase/pb_data/
-services/pocketbase/pocketbase
+# Services are now handled separately on the server.
+services/
 
 
 # We want the docker-compose.yml in Git to manage deployment
