@@ -395,9 +395,13 @@ export default function VirtualClassroom() {
 
     try {
       if (hostMode && classData.status !== "in_progress") {
+        const token = pb.authStore.token;
         await fetch("/api/classroom/start-class", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
           body: JSON.stringify({ classId }),
         });
       }

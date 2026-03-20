@@ -113,11 +113,16 @@ export class GaleneClient {
 
     console.log("[Galene] Base URL:", url);
 
+    // If it's already a WebSocket URL, just ensure the /ws path
+    if (url.startsWith("ws://") || url.startsWith("wss://")) {
+      return url.endsWith("/ws") ? url : `${url.replace(/\/$/, "")}/ws`;
+    }
+
     const base = url.replace(/^http(s)?:\/\//, (match) => {
       return match.startsWith("https") ? "wss://" : "ws://";
     });
     
-    const wsUrl = `${base.endsWith("/") ? base : base + "/" }ws`;
+    const wsUrl = base.endsWith("/ws") ? base : `${base.replace(/\/$/, "")}/ws`;
     console.log("[Galene] WebSocket URL:", wsUrl);
     return wsUrl;
   }
@@ -171,12 +176,26 @@ export class GaleneClient {
     this.password = password;
     this.connectionId = newRandomId();
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         const wsUrl = this.getWsUrl();
+        const httpUrl = wsUrl.replace("wss://", "https://").replace("ws://", "http://").replace("/ws", "");
+
+        console.log("[Galene] Testing reachability to:", httpUrl);
+        
+        // Quick reachability test to see if the server is even there
+        try {
+          const ping = await fetch(httpUrl, { method: "HEAD", mode: "no-cors" });
+          console.log("[Galene] Server reachability check result (no-cors HEAD):", ping.type);
+        } catch (e) {
+          console.warn("[Galene] Server reachability check failed (pre-connection):", e);
+        }
+
+        console.log("[Galene] Attempting WebSocket connection to:", wsUrl);
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
+          console.log("[Galene] WebSocket connection successfully OPENED to:", wsUrl);
           // Send handshake with protocol version 2 and our connection ID
           this.send({
             type: "handshake",
@@ -188,6 +207,7 @@ export class GaleneClient {
         this.ws.onmessage = (event) => {
           try {
             const msg = JSON.parse(event.data);
+            console.log("[Galene] Received message:", msg.type, msg);
             this.handleMessage(msg, resolve, reject);
           } catch (e) {
             console.error("[Galene] Failed to parse message:", e);
@@ -197,7 +217,13 @@ export class GaleneClient {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.ws.onerror = (error: any) => {
           const wsMsg =
-            error?.message || "Check if Galene server is running at " + wsUrl;
+            error?.message || 
+            `Failed to connect to Galene at ${wsUrl}. \n` +
+            `Troubleshooting:\n` +
+            `1. Ensure the server is running and accessible at ${this.getWsUrl().replace("wss://", "https://").replace("ws://", "http://").replace("/ws", "")}\n` +
+            `2. Check if GALENE_ALLOWED_ORIGINS on your server includes ${typeof window !== "undefined" ? window.location.origin : "your app origin"}\n` +
+            `3. Ensure your reverse proxy (Cloudflare) allows WebSocket connections.`;
+          
           console.error("[Galene] WebSocket error:", error, wsMsg);
           this.emit("error", new Error(wsMsg));
           reject(new Error(wsMsg));

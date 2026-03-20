@@ -49,81 +49,37 @@ export async function POST(request: Request) {
 
     // Ensure Galene group configuration exists
     if (classRecord.galene_group) {
-      const groupsDir = path.join(
-        process.cwd(),
-        "services",
-        "galene",
-        "groups",
-      );
-      const filePath = path.join(groupsDir, `${classRecord.galene_group}.json`);
+      const hostPassword = process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123";
+      const studentPassword = process.env.NEXT_PUBLIC_GALENE_STUDENT_PASSWORD || "student123";
+      const duration = classRecord.duration || 60;
 
-      interface GaleneConfig {
-        users: {
-          [key: string]: {
-            password: string;
-            permissions: string[];
-          };
-        };
-        "wildcard-user"?: {
-          password: string;
-          permissions: string[];
-        };
-        autolock: boolean;
-        "max-history-age": number;
-      }
-
-      // If configuration missing or needs patching
-      let shouldCreate = !fs.existsSync(filePath);
-      let config: GaleneConfig | null = null;
-
-      if (!shouldCreate) {
-        try {
-          config = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-          if (config && config.users?.lecturer && !config.users?.admin) {
-            config.users.admin = { ...config.users.lecturer };
-            shouldCreate = true; // Trigger write for patch
-          }
-        } catch (err) {
-          console.error("Failed to read galene group config:", err);
-          shouldCreate = true;
-        }
-      } else {
-        // Create new config
-        config = {
-          users: {
-            lecturer: {
-              password:
-                process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123",
-              permissions: ["op", "present", "message", "record"],
-            },
-            admin: {
-              password:
-                process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123",
-              permissions: ["op", "present", "message", "record"],
-            },
+      // Call our internal Galene management API
+      // This automatically handles local-to-production bridging and correct filesystem paths
+      const internalUrl = `${new URL(request.url).origin}/api/galene/group`;
+      
+      try {
+        const galeneRes = await fetch(internalUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-internal-secret": process.env.INTERNAL_SECRET || "",
           },
-          "wildcard-user": {
-            password:
-              process.env.NEXT_PUBLIC_GALENE_STUDENT_PASSWORD || "student123",
-            permissions: ["present", "message"],
-          },
-          autolock: false,
-          "max-history-age": (classRecord.duration || 60) * 60 + 3600,
-        };
-      }
+          body: JSON.stringify({
+            classId: classRecord.galene_group,
+            passwordHost: hostPassword,
+            passwordAttendee: studentPassword,
+            duration: duration,
+          }),
+        });
 
-      if (shouldCreate && config) {
-        try {
-          if (!fs.existsSync(groupsDir)) {
-            fs.mkdirSync(groupsDir, { recursive: true });
-          }
-          fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
-          console.log(
-            `[Classroom] Created/Patched Galene group config for ${classRecord.galene_group}`,
-          );
-        } catch (err) {
-          console.error("Failed to write galene group config:", err);
+        if (!galeneRes.ok) {
+          const errorData = await galeneRes.json();
+          console.error("[Classroom] Failed to ensure Galene group via bridge:", errorData);
+        } else {
+          console.log(`[Classroom] Galene group ${classRecord.galene_group} checked/created via bridge.`);
         }
+      } catch (err) {
+        console.error("[Classroom] Network error calling Galene bridge:", err);
       }
     }
 
