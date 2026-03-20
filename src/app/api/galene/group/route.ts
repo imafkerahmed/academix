@@ -59,12 +59,14 @@ export async function POST(request: Request) {
       });
 
       const data = await response.json();
+      console.log(`[Galene API] Forwarding result: ${response.status}`, data);
       return NextResponse.json(data, { status: response.status });
     }
 
     // --- Production Security Check ---
     const incomingSecret = request.headers.get("x-internal-secret");
     if (internalSecret && incomingSecret !== internalSecret) {
+      console.warn("[Galene API] Unauthorized bridge request - secret mismatch");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -73,6 +75,8 @@ export async function POST(request: Request) {
       process.env.GALENE_GROUPS_PATH ||
       path.join(process.cwd(), "services", "galene", "groups");
     const filePath = path.join(groupsDir, `${classId}.json`);
+
+    console.log(`[Galene API] Writing group config to: ${filePath}`);
 
     if (!fs.existsSync(groupsDir)) {
       fs.mkdirSync(groupsDir, { recursive: true });
@@ -84,6 +88,8 @@ export async function POST(request: Request) {
       duration,
     );
     fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
+
+    console.log(`[Galene API] Success: ${classId} created.`);
 
     return NextResponse.json({
       success: true,

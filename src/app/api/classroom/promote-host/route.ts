@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const decoded = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
     const userRole = decoded.role;
 
-    if (userRole !== "lecturer" && userRole !== "admin") {
+    if (userRole !== "lecturer" && userRole !== "admin" && userRole !== "superuser") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -3,6 +3,24 @@ import PocketBase from "pocketbase";
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    const tokenParts = token.split(".");
+    if (tokenParts.length !== 3) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    const decoded = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
+    const userRole = decoded.role;
+
+    if (userRole !== "lecturer" && userRole !== "admin" && userRole !== "superuser") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { classId } = await request.json();
 
     if (!classId) {

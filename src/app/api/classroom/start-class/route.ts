@@ -19,7 +19,8 @@ export async function POST(request: Request) {
     const decoded = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
     const userRole = decoded.role;
 
-    if (userRole !== "lecturer" && userRole !== "admin") {
+    if (userRole !== "lecturer" && userRole !== "admin" && userRole !== "superuser") {
+      console.warn(`[Classroom] Access denied for role: ${userRole}`);
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -56,6 +57,11 @@ export async function POST(request: Request) {
       // Call our internal Galene management API
       // This automatically handles local-to-production bridging and correct filesystem paths
       const internalUrl = `${new URL(request.url).origin}/api/galene/group`;
+      
+      console.log(`[Classroom] Ensuring Galene group via bridge: ${internalUrl}`, {
+        classId: classRecord.galene_group,
+        remoteUrl: process.env.GALENE_REMOTE_MANAGEMENT_URL
+      });
       
       try {
         const galeneRes = await fetch(internalUrl, {
