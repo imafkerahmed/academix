@@ -44,7 +44,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import pb from "@/lib/pocketbase";
 import { RecordModel } from "pocketbase";
 
-// --- Types ---
 interface Intake {
   id: string;
   code: string;
@@ -148,7 +147,6 @@ function formatDate(date: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// --- Course Details Page ---
 export default function CourseDetailsPage() {
   const params = useParams();
   const intakeId = typeof params?.intakeId === "string" ? params.intakeId : "";
@@ -605,7 +603,6 @@ export default function CourseDetailsPage() {
         )}
       </div>
 
-      {/* --- MODALS --- */}
 
       {/* Edit Course Modal */}
       <ModernModal

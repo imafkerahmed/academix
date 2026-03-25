@@ -16,7 +16,6 @@ export async function POST(request: Request) {
 
     const decoded = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
     // Log the payload to debug roles during local development
-    console.log("[Classroom] Token Payload:", decoded);
 
     const userRole = (decoded.role || "").toLowerCase();
     const { classId } = await request.json();

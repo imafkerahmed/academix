@@ -100,9 +100,9 @@ function ConnectionMonitor() {
   const room = useRoomContext();
   
   useEffect(() => {
-    const onReconnecting = () => console.warn("[LiveKit] Reconnecting to signaling...");
-    const onReconnected = () => console.log("[LiveKit] Reconnected successfully");
-    const onSignalConnected = () => console.log("[LiveKit] Signal Connected");
+    const onReconnecting = () => {};
+    const onReconnected = () => {};
+    const onSignalConnected = () => {};
     
     room.on(RoomEvent.Reconnecting, onReconnecting);
     room.on(RoomEvent.Reconnected, onReconnected);

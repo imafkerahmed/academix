@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/pagination";
 import { ModernModal } from "@/components/ui/modern-modal";
 
-// --- Types ---
 interface Intake {
   id: string;
   code: string;
@@ -59,7 +58,6 @@ interface CourseTemplate {
   course_description?: string;
 }
 
-// --- Utility Functions ---
 function calculateStatus(start_date: string, end_date: string) {
   const today = new Date();
   const start = new Date(start_date);
@@ -100,7 +98,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// --- Intake Details Page ---
 export default function IntakeDetailsPage() {
   const params = useParams();
   const intakeId = typeof params?.intakeId === "string" ? params.intakeId : "";

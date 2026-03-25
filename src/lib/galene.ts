@@ -107,11 +107,11 @@ export class GaleneClient {
       // we need to dynamically target the classroom subdomain.
       if (hostname.endsWith(".codix.site") && !url.includes("academix-classroom.codix.site")) {
         url = `https://academix-classroom.codix.site`;
-        console.log("[Galene] Production domain detected, overriding URL with:", url);
+
       }
     }
 
-    console.log("[Galene] Base URL:", url);
+
 
     // If it's already a WebSocket URL, just ensure the /ws path
     if (url.startsWith("ws://") || url.startsWith("wss://")) {
@@ -123,7 +123,7 @@ export class GaleneClient {
     });
     
     const wsUrl = base.endsWith("/ws") ? base : `${base.replace(/\/$/, "")}/ws`;
-    console.log("[Galene] WebSocket URL:", wsUrl);
+
     return wsUrl;
   }
 
@@ -181,21 +181,21 @@ export class GaleneClient {
         const wsUrl = this.getWsUrl();
         const httpUrl = wsUrl.replace("wss://", "https://").replace("ws://", "http://").replace("/ws", "");
 
-        console.log("[Galene] Testing reachability to:", httpUrl);
+
         
         // Quick reachability test to see if the server is even there
         try {
           const ping = await fetch(httpUrl, { method: "HEAD", mode: "no-cors" });
-          console.log("[Galene] Server reachability check result (no-cors HEAD):", ping.type);
+
         } catch (e) {
           console.warn("[Galene] Server reachability check failed (pre-connection):", e);
         }
 
-        console.log("[Galene] Attempting WebSocket connection to:", wsUrl);
+
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
-          console.log("[Galene] WebSocket connection successfully OPENED to:", wsUrl);
+
           // Send handshake with protocol version 2 and our connection ID
           this.send({
             type: "handshake",
@@ -207,7 +207,7 @@ export class GaleneClient {
         this.ws.onmessage = (event) => {
           try {
             const msg = JSON.parse(event.data);
-            console.log("[Galene] Received message:", msg.type, msg);
+
             this.handleMessage(msg, resolve, reject);
           } catch (e) {
             console.error("[Galene] Failed to parse message:", e);

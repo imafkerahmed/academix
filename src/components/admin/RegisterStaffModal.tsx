@@ -78,7 +78,6 @@ export function RegisterStaffModal({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    // Stage 1: Role & Identity
     role: defaultRole as "admin" | "lecturer",
     name: "",
     nameinitials: "",
@@ -86,7 +85,6 @@ export function RegisterStaffModal({
     dateOfBirth: "",
     IdentificationDocument: "",
 
-    // Stage 2: Contact
     email: "",
     mobile: "",
     whatsapp: "",
@@ -94,7 +92,6 @@ export function RegisterStaffModal({
     city: "",
     countryCode: "+94",
 
-    // Stage 3: Account & Role Details
     userId: "",
     password: "",
     branch: "Colombo",
@@ -181,7 +178,6 @@ export function RegisterStaffModal({
     }
   }, [isOpen, defaultRole, editUser]);
 
-  // Re-generate userId when role changes (only in create mode)
   useEffect(() => {
     if (isOpen && !isEditMode) {
       generateNextUserId(formData.role);
@@ -433,7 +429,6 @@ export function RegisterStaffModal({
       avatarColor={rc.color}
     >
       <div className="space-y-6">
-        {/* Progress */}
         <div className="flex items-center gap-2 mb-2">
           {stages.map((s, i) => (
             <div key={i} className="flex-1 flex flex-col items-center gap-2">
@@ -453,10 +448,8 @@ export function RegisterStaffModal({
           ))}
         </div>
 
-        {/* STAGE 1: Role & Identity */}
         {stage === 1 && (
           <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-            {/* Role Selector */}
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
                 Account Role *
@@ -490,7 +483,6 @@ export function RegisterStaffModal({
               </div>
             </div>
 
-            {/* Avatar */}
             <div className="flex items-center gap-5">
               <div className="relative group">
                 <div
@@ -538,7 +530,6 @@ export function RegisterStaffModal({
               </label>
             </div>
 
-            {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
@@ -635,7 +626,6 @@ export function RegisterStaffModal({
           </div>
         )}
 
-        {/* STAGE 2: Contact */}
         {stage === 2 && (
           <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
@@ -747,10 +737,8 @@ export function RegisterStaffModal({
           </div>
         )}
 
-        {/* STAGE 3: Account & Role Details */}
         {stage === 3 && (
           <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-            {/* User ID */}
             <div className="p-5 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50">
               <div className="flex items-center justify-between">
                 <div>

@@ -61,12 +61,10 @@ export function EnrollExistingStudentModal({
   const [loading, setLoading] = useState(false);
   const [fetchingStudents, setFetchingStudents] = useState(false);
 
-  // Students
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-  // Course fee details
   const [courseFee, setCourseFee] = useState(0);
   const [registrationFee, setRegistrationFee] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -74,7 +72,6 @@ export function EnrollExistingStudentModal({
   const [intakeCode, setIntakeCode] = useState("");
   const [courseCode, setCourseCode] = useState("");
 
-  // Payment options
   const [paymentOption, setPaymentOption] = useState<
     "full_payment" | "upfront_installments" | "installments_only"
   >("full_payment");
@@ -209,7 +206,6 @@ export function EnrollExistingStudentModal({
     }
   }, [courseIntakeId]);
 
-  // Fetch students and course details when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchPendingStudents();
@@ -218,7 +214,6 @@ export function EnrollExistingStudentModal({
     }
   }, [isOpen, fetchPendingStudents, fetchCourseDetails, resetModal]);
 
-  // Recalculate fees when payment options change
   useEffect(() => {
     if (stage === 2 && courseFee > 0) {
       const calc = calculateEnrollmentFees(
@@ -413,9 +408,7 @@ export function EnrollExistingStudentModal({
     >
       <div className="space-y-6">
         {stage === 1 ? (
-          // Stage 1: Select Student
           <>
-            {/* Search Bar */}
             <div className="relative">
               <Search
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
@@ -430,7 +423,6 @@ export function EnrollExistingStudentModal({
               />
             </div>
 
-            {/* Students List */}
             <div className="space-y-3 max-h-[500px] overflow-y-auto">
               {fetchingStudents ? (
                 <div className="flex items-center justify-center py-20">
@@ -493,9 +485,7 @@ export function EnrollExistingStudentModal({
             </div>
           </>
         ) : (
-          // Stage 2: Payment Options
           <div className="space-y-5">
-            {/* Selected Student Info - compact */}
             <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl">
               <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center text-white font-black text-base flex-shrink-0">
                 {selectedStudent?.name.charAt(0).toUpperCase()}
@@ -510,7 +500,6 @@ export function EnrollExistingStudentModal({
               </div>
             </div>
 
-            {/* Payment Structure - compact stacked */}
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
                 Payment Structure
@@ -577,7 +566,6 @@ export function EnrollExistingStudentModal({
               </div>
             </div>
 
-            {/* Custom Upfront Amount — shown only for upfront_installments */}
             {paymentOption === "upfront_installments" && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-200">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
@@ -615,7 +603,6 @@ export function EnrollExistingStudentModal({
               </div>
             )}
 
-            {/* Registration Fee Toggle */}
             <div className="flex items-center justify-between p-5 bg-white rounded-2xl border-2 border-gray-100 shadow-sm">
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-black text-gray-700 uppercase tracking-wide">
@@ -647,7 +634,6 @@ export function EnrollExistingStudentModal({
               </button>
             </div>
 
-            {/* Discount Section */}
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-xs font-black text-gray-700 uppercase tracking-widest">
                 <DollarSign size={14} className="text-green-600" />
@@ -682,7 +668,6 @@ export function EnrollExistingStudentModal({
               </div>
             </div>
 
-            {/* Fee Breakdown */}
             {feeCalculation && (
               <div className="p-6 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-2xl border-2 border-green-100">
                 <div className="text-xs font-black text-green-700 uppercase tracking-widest mb-4">
@@ -767,7 +752,6 @@ export function EnrollExistingStudentModal({
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex gap-3 pt-4">
               <button
                 onClick={() => setStage(1)}

@@ -59,18 +59,15 @@ export function EnrollCourseModal({
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
 
-  // Data arrays
   const [intakes, setIntakes] = useState<Intake[]>([]);
   const [courseIntakes, setCourseIntakes] = useState<CourseIntakeFee[]>([]);
 
-  // Selected State
   const [selectedIntakeId, setSelectedIntakeId] = useState("");
   const [selectedCourseIntakeId, setSelectedCourseIntakeId] = useState("");
   const [paymentOption, setPaymentOption] = useState<
     "full_payment" | "installments_only" | "upfront_installments"
   >("full_payment");
 
-  // Payment configuration
   const [includeRegistrationFee, setIncludeRegistrationFee] = useState(true);
   const [discountType, setDiscountType] = useState<
     "percentage" | "flat" | null
@@ -80,7 +77,6 @@ export function EnrollCourseModal({
   const [feeCalculation, setFeeCalculation] =
     useState<EnrollmentFeeCalculation | null>(null);
 
-  // Fetch intakes on open
   useEffect(() => {
     if (isOpen) {
       fetchIntakes();
@@ -95,7 +91,6 @@ export function EnrollCourseModal({
     }
   }, [isOpen]);
 
-  // Fetch specific courses when intake changes
   useEffect(() => {
     if (selectedIntakeId) {
       fetchCoursesForIntake(selectedIntakeId);
@@ -104,7 +99,6 @@ export function EnrollCourseModal({
     }
   }, [selectedIntakeId]);
 
-  // Recalculate fees when payment options change
   useEffect(() => {
     if (selectedCourseIntakeId) {
       const selectedCourse = courseIntakes.find(
@@ -208,7 +202,6 @@ export function EnrollCourseModal({
         selectedCourse.expand?.course_intake?.expand?.course?.code || "COURSE",
       );
 
-      // Use the already selected fee record
       const courseIntakeFeeId = selectedCourse.id;
       const courseIntakeId = selectedCourse.course_intake;
 
@@ -244,7 +237,6 @@ export function EnrollCourseModal({
           : "",
       });
 
-      // Auto-create payment and installment records (non-blocking)
       try {
         // Registration fee — always a separate record
         if (
@@ -351,7 +343,6 @@ export function EnrollCourseModal({
       subtitle="Add a new academic pathway to this student's profile."
     >
       <div className="space-y-6">
-        {/* Step 1: Intake */}
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">
             <Calendar size={12} className="text-indigo-400" />
@@ -374,7 +365,6 @@ export function EnrollCourseModal({
           </select>
         </div>
 
-        {/* Step 2: Course Selection */}
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">
             <BookOpen size={12} className="text-indigo-400" />
@@ -445,12 +435,11 @@ export function EnrollCourseModal({
           </div>
         </div>
 
-        {/* Step 3: Payment Type */}
         {selectedCourseIntakeId && (
           <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">
               <CreditCard size={12} className="text-indigo-400" />
-              3. Payment Structure
+              Payment Structure
             </label>
             <div className="grid grid-cols-3 gap-3">
               {[
@@ -588,11 +577,10 @@ export function EnrollCourseModal({
                 );
               })()}
 
-            {/* Step 4: Discount (New) */}
             <div className="space-y-3 pt-2">
               <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">
                 <DollarSign size={12} className="text-green-500" />
-                4. Discount Options (Optional)
+                Discount Options
               </label>
               <div className="grid grid-cols-3 gap-3">
                 <select
@@ -697,7 +685,6 @@ export function EnrollCourseModal({
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="flex gap-4 pt-6 mt-6 border-t border-gray-100">
           <button
             onClick={onClose}

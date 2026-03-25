@@ -19,7 +19,6 @@ export async function POST(request: Request) {
     
     // Diagnostic logging for local dev
     if (process.env.NODE_ENV === "development") {
-      console.log("[Classroom] Promote-Host Payload:", decoded);
     }
 
     const isAuthorized = 

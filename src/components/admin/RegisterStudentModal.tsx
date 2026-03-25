@@ -81,14 +81,12 @@ export function RegisterStudentModal({
     useState<EnrollmentFeeCalculation | null>(null);
 
   const [formData, setFormData] = useState({
-    // Stage 1: Identity
     name: enrollOnly?.name || "",
     nameinitials: "",
     gender: "male",
     dateOfBirth: "",
     IdentificationDocument: "",
 
-    // Stage 2: Contact
     email: enrollOnly?.email || "",
     mobile: "",
     whatsapp: "",
@@ -96,19 +94,16 @@ export function RegisterStudentModal({
     city: "",
     countryCode: "+94",
 
-    // Stage 3: Account & Site
     userId: "",
     password: "",
     branch: "Colombo",
 
-    // Guardian Details (required)
     guardianName: "",
     guardianRelationship: "",
     guardianContact: "",
 
-    // Stage 4: Enrollment
     intakeId: "",
-    courseIntakeFeeId: "", // This maps to course_intake_fees
+    courseIntakeFeeId: "",
     paymentOption: "full_payment" as
       | "full_payment"
       | "upfront_installments"
@@ -140,7 +135,6 @@ export function RegisterStudentModal({
     }
   }, [isOpen, enrollOnly]);
 
-  // Preselect course when courseIntakes load
   useEffect(() => {
     if (enrollOnly?.preselectedCourseIntakeId && courseIntakes.length > 0) {
       const matchingFee = courseIntakes.find(
@@ -155,7 +149,6 @@ export function RegisterStudentModal({
     }
   }, [enrollOnly?.preselectedCourseIntakeId, courseIntakes]);
 
-  // Recalculate fees when payment options change
   useEffect(() => {
     if (formData.courseIntakeFeeId && enrollNow) {
       const selectedFee = courseIntakes.find(
@@ -340,7 +333,6 @@ export function RegisterStudentModal({
       let studentId = enrollOnly?.id;
 
       if (!enrollOnly) {
-        // Step 1: Create User with all schema fields using FormData for Avatar
         const data = new FormData();
         data.append("userId", formData.userId);
         data.append("name", formData.name);
@@ -373,7 +365,6 @@ export function RegisterStudentModal({
         studentId = newUser.id;
       }
 
-      // Step 2: Create Enrollment with complete data
       if (enrollNow && formData.courseIntakeFeeId) {
         const selectedFee = courseIntakes.find(
           (f) => f.id === formData.courseIntakeFeeId,
@@ -572,7 +563,6 @@ export function RegisterStudentModal({
           </div>
         )}
 
-        {/* ── Stage 1: Identity ── */}
         {stage === 1 && (
           <div className="space-y-5 animate-in fade-in duration-300">
             <div className="grid grid-cols-2 gap-4">
@@ -774,7 +764,6 @@ export function RegisterStudentModal({
           </div>
         )}
 
-        {/* ── Stage 2: Contact ── */}
         {stage === 2 && (
           <div className="space-y-5 animate-in fade-in duration-300">
             <div>

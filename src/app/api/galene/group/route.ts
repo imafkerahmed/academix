@@ -46,9 +46,7 @@ export async function POST(request: Request) {
     const remoteUrl = process.env.GALENE_REMOTE_MANAGEMENT_URL;
     const internalSecret = process.env.INTERNAL_SECRET;
 
-    // --- Local -> Production Bridge ---
     if (remoteUrl) {
-      console.log(`[Galene API] Forwarding POST request to: ${remoteUrl}`);
       try {
         const response = await fetch(remoteUrl, {
           method: "POST",
@@ -64,7 +62,6 @@ export async function POST(request: Request) {
           statusText: response.statusText 
         }));
         
-        console.log(`[Galene API] Forwarding result: ${response.status}`, data);
         return NextResponse.json(data, { status: response.status });
       } catch (err: unknown) {
         console.error("[Galene API] Forwarding failed with network error:", err);
@@ -75,20 +72,15 @@ export async function POST(request: Request) {
       }
     }
 
-    // --- Production Security Check ---
     const incomingSecret = request.headers.get("x-internal-secret");
     if (internalSecret && incomingSecret !== internalSecret) {
-      console.warn("[Galene API] Unauthorized bridge request - secret mismatch");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // --- Production -> File System ---
     const groupsDir =
       process.env.GALENE_GROUPS_PATH ||
       path.join(process.cwd(), "services", "galene", "groups");
     const filePath = path.join(groupsDir, `${classId}.json`);
-
-    console.log(`[Galene API] Writing group config to: ${filePath}`);
 
     if (!fs.existsSync(groupsDir)) {
       fs.mkdirSync(groupsDir, { recursive: true });
@@ -100,8 +92,6 @@ export async function POST(request: Request) {
       duration,
     );
     fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
-
-    console.log(`[Galene API] Success: ${classId} created.`);
 
     return NextResponse.json({
       success: true,
@@ -133,9 +123,7 @@ export async function PATCH(request: Request) {
     const remoteUrl = process.env.GALENE_REMOTE_MANAGEMENT_URL;
     const internalSecret = process.env.INTERNAL_SECRET;
 
-    // --- Local -> Production Bridge ---
     if (remoteUrl) {
-      console.log(`[Galene API] Forwarding PATCH request to: ${remoteUrl}`);
       try {
         const response = await fetch(remoteUrl, {
           method: "PATCH",
@@ -160,13 +148,11 @@ export async function PATCH(request: Request) {
       }
     }
 
-    // --- Production Security Check ---
     const incomingSecret = request.headers.get("x-internal-secret");
     if (internalSecret && incomingSecret !== internalSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // --- Production -> File System ---
     const groupsDir =
       process.env.GALENE_GROUPS_PATH ||
       path.join(process.cwd(), "services", "galene", "groups");
@@ -223,9 +209,7 @@ export async function DELETE(request: Request) {
     const remoteUrl = process.env.GALENE_REMOTE_MANAGEMENT_URL;
     const internalSecret = process.env.INTERNAL_SECRET;
 
-    // --- Local -> Production Bridge ---
     if (remoteUrl) {
-      console.log(`[Galene API] Forwarding DELETE request to ${remoteUrl}`);
       try {
         const response = await fetch(`${remoteUrl}?classId=${classId}`, {
           method: "DELETE",
@@ -248,13 +232,11 @@ export async function DELETE(request: Request) {
       }
     }
 
-    // --- Production Security Check ---
     const incomingSecret = request.headers.get("x-internal-secret");
     if (internalSecret && incomingSecret !== internalSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // --- Production -> File System ---
     const groupsDir =
       process.env.GALENE_GROUPS_PATH ||
       path.join(process.cwd(), "services", "galene", "groups");
