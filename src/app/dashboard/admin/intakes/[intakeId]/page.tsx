@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import AdminActionBar from "@/components/admin/AdminActionBar";
+import { DashboardActionBar } from "@/components/dashboard/shared/DashboardActionBar";
 import { DashboardBreadcrumbs } from "@/components/dashboard/shared/DashboardBreadcrumbs";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
@@ -512,7 +512,7 @@ export default function IntakeDetailsPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="w-full md:max-w-xl">
-            <AdminActionBar
+            <DashboardActionBar
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               searchPlaceholder="Search courses by name or code..."

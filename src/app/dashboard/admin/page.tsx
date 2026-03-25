@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import StatsCarousel from "@/components/admin/StatsCarousel";
+import { StatsCarousel } from "@/components/dashboard/shared/stats/StatsCarousel";
 import pb from "@/lib/pocketbase";
 
 interface CalendarEvent {

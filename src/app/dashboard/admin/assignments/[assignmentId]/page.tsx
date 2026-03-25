@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import pb from "@/lib/pocketbase";
-import AdminActionBar from "@/components/admin/AdminActionBar";
+
 import {
   CheckCircle,
   Clock,
@@ -14,7 +14,8 @@ import {
   Hash,
   FileText,
 } from "lucide-react";
-import StatsCarousel from "@/components/admin/StatsCarousel";
+import { StatsCarousel } from "@/components/dashboard/shared/stats/StatsCarousel";
+import { DashboardActionBar } from "@/components/dashboard/shared/DashboardActionBar";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
@@ -321,7 +322,7 @@ export default function AssignmentDetails() {
         {/* Filters & Table */}
         <div className="space-y-6">
           <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-4">
-            <AdminActionBar
+            <DashboardActionBar
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               searchPlaceholder="Search student name..."

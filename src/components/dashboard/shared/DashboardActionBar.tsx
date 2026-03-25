@@ -3,7 +3,7 @@
 import React from "react";
 import { Search } from "lucide-react";
 
-interface AdminActionBarProps {
+interface DashboardActionBarProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
@@ -15,13 +15,13 @@ interface AdminActionBarProps {
   }>;
 }
 
-export default function AdminActionBar({
+export function DashboardActionBar({
   searchQuery,
   onSearchChange,
   searchPlaceholder = "Search...",
   children,
   action,
-}: AdminActionBarProps) {
+}: DashboardActionBarProps) {
   return (
     <div className="w-full">
       <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center w-full mb-6">

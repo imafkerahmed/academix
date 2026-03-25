@@ -977,7 +977,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     intakeId: string | null,
   ) => {
     // Persistence disabled as per user request
-    console.log("Persistence disabled for intake:", intakeId);
+
   };
 
   const toggleCourse = (courseId: string) => {

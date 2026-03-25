@@ -277,9 +277,7 @@ export default function StudentPayment({
     files: File[];
     remarks: string;
   }) => {
-    console.log("Submitting receipt for:", data.selectedInvoice);
     await new Promise((r) => setTimeout(r, 1500));
-    // TODO: Integrate with PocketBase payments API
     setShowPayModal(false);
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);

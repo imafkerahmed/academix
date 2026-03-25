@@ -3,8 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import pb from "@/lib/pocketbase";
-import StatsCarousel from "@/components/admin/StatsCarousel";
-import AdminActionBar from "@/components/admin/AdminActionBar";
+import { StatsCarousel } from "@/components/dashboard/shared/stats/StatsCarousel";
+import { DashboardActionBar } from "@/components/dashboard/shared/DashboardActionBar";
 import {
   Video,
   Calendar,
@@ -358,7 +358,8 @@ export default function ClassManagement() {
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
 
-    // const now = Date.now(); // Impure
+
+
     const scheduledEnd =
       new Date(classItem.start_time).getTime() + classItem.duration * 60000;
     const isWithinTimeWindow = now < scheduledEnd;
@@ -687,7 +688,7 @@ export default function ClassManagement() {
 
         {/* Filter Bar */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <AdminActionBar
+          <DashboardActionBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             searchPlaceholder="Search sessions by title..."

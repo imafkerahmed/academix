@@ -41,12 +41,18 @@ export function BaseDashboardLayout({
 
   return (
     <div className="flex min-h-screen">
-      {/* Inject Sidebar Component */}
-      {!hideSidebar && React.isValidElement(sidebarComponent) 
-        ? React.cloneElement(sidebarComponent as React.ReactElement<any>, { 
-            isSidebarOpen, 
-            setIsSidebarOpen 
-          }) 
+      {/* Sidebar */}
+      {!hideSidebar && React.isValidElement(sidebarComponent)
+        ? React.cloneElement(
+            sidebarComponent as React.ReactElement<{
+              isSidebarOpen: boolean;
+              setIsSidebarOpen: (open: boolean) => void;
+            }>,
+            {
+              isSidebarOpen,
+              setIsSidebarOpen,
+            },
+          )
         : null}
 
       <SessionWarningModal

@@ -165,7 +165,7 @@ export default function AcademicStructurePage() {
 
       if (updates.length > 0) {
         await Promise.all(updates);
-        console.log(`Auto-updated ${updateCount} course-intake statuses`);
+
         // Refresh data after updates
         const updatedCourseIntakes = await pb
           .collection("course_intakes")

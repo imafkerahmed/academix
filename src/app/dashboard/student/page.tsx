@@ -274,7 +274,7 @@ export default function StudentDashboard() {
         throw new Error("Failed to fetch student data");
       }
 
-      console.log("Fetching data for student:", studentId);
+
     } catch (error: unknown) {
       console.error("Error fetching student data:", error);
       // Handle permission errors by redirecting to login

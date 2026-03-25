@@ -22,7 +22,7 @@ import { AllSchedulesModal } from "@/components/dashboard/shared";
 import {
   type User,
 } from "@/lib/pocketbase";
-import StatsCarousel from "@/components/admin/StatsCarousel";
+import { StatsCarousel } from "@/components/dashboard/shared/stats/StatsCarousel";
 
 // Mock user type
 // Mock user type deleted - unused
@@ -232,7 +232,7 @@ export default function LecturerDashboard() {
       const subscribeToClasses = async () => {
         try {
           await pb.collection("classes").subscribe("*", (e) => {
-            console.log("Class update received:", e.action, e.record);
+
             loadClasses(user.id);
           });
         } catch (error) {

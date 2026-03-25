@@ -16,8 +16,8 @@ import {
   Layers,
   BookOpen,
 } from "lucide-react";
-import StatsCarousel from "@/components/admin/StatsCarousel";
-import AdminActionBar from "@/components/admin/AdminActionBar";
+import { StatsCarousel } from "@/components/dashboard/shared/stats/StatsCarousel";
+import { DashboardActionBar } from "@/components/dashboard/shared/DashboardActionBar";
 import { Badge } from "@/components/ui/badge";
 import { RegisterStudentModal } from "@/components/admin/RegisterStudentModal";
 import { DashboardLoader } from "@/components/dashboard/shared/DashboardLoader";
@@ -208,7 +208,7 @@ export default function StudentManagement() {
 
         {/* Filter & Search Bar */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <AdminActionBar
+          <DashboardActionBar
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
             searchPlaceholder="Search by name, email or reg ID..."

@@ -11,8 +11,8 @@ import {
   Search,
   ArrowRight,
 } from "lucide-react";
-import StatsCarousel from "@/components/admin/StatsCarousel";
-import AdminActionBar from "@/components/admin/AdminActionBar";
+import { StatsCarousel } from "@/components/dashboard/shared/stats/StatsCarousel";
+import { DashboardActionBar } from "@/components/dashboard/shared/DashboardActionBar";
 import { useRouter } from "next/navigation";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
@@ -195,7 +195,7 @@ export default function IntakeCourseManagement() {
 
         {/* Filter Bar */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <AdminActionBar
+          <DashboardActionBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             searchPlaceholder="Search intakes by code..."

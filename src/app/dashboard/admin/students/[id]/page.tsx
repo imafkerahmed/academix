@@ -91,7 +91,7 @@ function ResetPasswordControl({
       });
 
       const data = await res.json();
-      console.log("Password reset response status:", res.status, "Data:", data);
+
 
       if (!res.ok) {
         const errorMsg =
@@ -108,7 +108,7 @@ function ResetPasswordControl({
       setPassword("");
       setPasswordConfirm("");
     } catch (error: unknown) {
-      console.error("Password reset error:", error);
+
       const err = error as { message?: string };
       const message = err?.message || "Failed to reset password.";
       setFeedback(message);
@@ -1109,39 +1109,34 @@ export default function StudentDetail() {
       });
       const studentData = record;
 
-      // Fetch Assignments
       try {
         const enrollments = studentData.expand?.enrollments_via_student || [];
         const intakeIds = enrollments.map((e) => e.course_intake);
-        
+
         if (intakeIds.length > 0) {
-          // 1. Get all subjects for these intakes
           const subjects = await pb.collection("course_subjects").getFullList<CourseSubject>({
             filter: intakeIds.map((id: string) => `course_intake = "${id}"`).join(" || "),
             expand: "subject"
           });
-          
+
           const subjectIds = subjects.map(s => s.id);
-          
+
           if (subjectIds.length > 0) {
-            // 2. Get assignments for these subjects
             const assignmentsRecords = await pb.collection("assignments").getFullList<Assignment>({
               filter: subjectIds.map((id: string) => `course_subject = "${id}"`).join(" || "),
               expand: "course_subject.subject",
               sort: "-due_date"
             });
-            
-            // 3. Get student's submissions
+
             const studentSubmissions = await pb.collection("assignment_submissions").getFullList<StudentAssignmentSubmission>({
               filter: `student = "${studentId}"`
             });
-            
-            // Map them together
+
             const mappedAssignments: StudentAssignment[] = assignmentsRecords.map(a => ({
               ...a,
               submission: studentSubmissions.find(s => s.assignment === a.id)
             }));
-            
+
             setStudentAssignments(mappedAssignments);
           }
         }
