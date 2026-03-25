@@ -34,6 +34,7 @@ interface RaisePaymentModalProps {
     remarks: string;
   }) => Promise<void>;
   theme: { bg: string; text: string; border: string };
+  paymentInstructions?: string;
 }
 
 const formatCurrency = (amount: number, currency: string) =>
@@ -47,6 +48,7 @@ export function RaisePaymentModal({
   paymentOptions,
   onSubmit,
   theme,
+  paymentInstructions = "",
 }: RaisePaymentModalProps) {
   const [modalStep, setModalStep] = useState(1);
   const [files, setFiles] = useState<File[]>([]);
@@ -271,6 +273,17 @@ export function RaisePaymentModal({
                               {formatCurrency(selectedInvoice.amount, selectedInvoice.currency)}
                             </p>
                           </div>
+                        </div>
+                      )}
+
+                      {paymentInstructions && (
+                        <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 mb-6 mt-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">
+                              Bank Details / Payment Instructions
+                            </p>
+                            <pre className="text-sm font-bold text-gray-700 whitespace-pre-wrap font-sans">
+                              {paymentInstructions}
+                            </pre>
                         </div>
                       )}
 

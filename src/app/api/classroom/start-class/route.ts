@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import PocketBase from "pocketbase";
-import fs from "fs";
-import path from "path";
 
 export async function POST(request: Request) {
   try {
@@ -17,13 +15,10 @@ export async function POST(request: Request) {
     }
 
     const decoded = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
-    const userRole = decoded.role;
+    // Log the payload to debug roles during local development
+    console.log("[Classroom] Token Payload:", decoded);
 
-    if (userRole !== "lecturer" && userRole !== "admin" && userRole !== "superuser") {
-      console.warn(`[Classroom] Access denied for role: ${userRole}`);
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
+    const userRole = (decoded.role || "").toLowerCase();
     const { classId } = await request.json();
 
     if (!classId) {
@@ -32,14 +27,30 @@ export async function POST(request: Request) {
 
     const pb = new PocketBase(process.env.NEXT_PUBLIC_POCKETBASE_URL);
 
-    // Auth as superuser to bypass rules for updating status
+    // Auth as superuser to bypass rules for fetching and updating
     await pb.admins.authWithPassword(
       process.env.POCKETBASE_ADMIN_EMAIL || "afkerahmad@gmail.com",
       process.env.POCKETBASE_ADMIN_PASSWORD || "Afker1234",
     );
 
-    // Get the class to ensure it exists
+    // Get the class to ensure it exists and to check ownership
     const classRecord = await pb.collection("classes").getOne(classId);
+
+    // Check authorization: Admin/Superuser OR the assigned Lecturer for this class
+    const isAdminAccount = 
+      ["admin", "superuser"].includes(userRole) || 
+      decoded.type === "admin";
+    
+    const isAssignedLecturer = classRecord.lecturer === decoded.id;
+
+    if (!isAdminAccount && !isAssignedLecturer) {
+      console.warn(`[Classroom] Unauthorized start attempt for class ${classId}`, { 
+        userId: decoded.id,
+        userRole: userRole,
+        assignedLecturer: classRecord.lecturer
+      });
+      return NextResponse.json({ error: "Forbidden: You are not authorized to start this class" }, { status: 403 });
+    }
 
     // Update the status to in_progress
     if (classRecord.status !== "in_progress") {

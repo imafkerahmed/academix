@@ -42,6 +42,8 @@ interface StudentPaymentProps {
     name: string;
     registration_number?: string;
   }[];
+  globalCurrency?: string;
+  paymentInstructions?: string;
 }
 
 export default function StudentPayment({
@@ -49,6 +51,8 @@ export default function StudentPayment({
   installments = [],
   payments = [],
   enrolledCourses = [],
+  globalCurrency = "USD",
+  paymentInstructions = "",
 }: StudentPaymentProps) {
   // Find registration and upfront payments for the course
   // registrationPayments and upfrontPayments should be filtered from the mapped paymentFeed below
@@ -136,13 +140,13 @@ export default function StudentPayment({
       date: i.due_date,
       description: i.remarks || "Installment Due",
       amount: i.amount,
-      currency: "USD",
+      currency: globalCurrency,
       status: i.status === "paid" ? "Paid" : "Pending",
       course,
       payment_type: i.payment_type || "installment", // Ensure payment_type exists
       reference_Id: undefined as string | undefined,
     }));
-  }, [installments, enrolledCourses, course]);
+  }, [installments, enrolledCourses, course, globalCurrency]);
 
   // Map payments to feed items
   const paymentFeed = useMemo(() => {
@@ -154,13 +158,13 @@ export default function StudentPayment({
       date: p.date_paid || p.created || "",
       description: p.remarks || "Payment",
       amount: p.amount,
-      currency: "USD",
+      currency: globalCurrency,
       status: p.verified ? "Paid" : "Pending",
       course,
       payment_type: p.payment_type,
       reference_Id: p.reference_Id,
     }));
-  }, [payments, enrolledCourses, course]);
+  }, [payments, enrolledCourses, course, globalCurrency]);
 
   // derive combined history from installments and payments feeds
   const history = useMemo(
@@ -229,12 +233,12 @@ export default function StudentPayment({
         id: "full",
         label: "Full Balance",
         amount: totalBalance,
-        currency: "USD",
+        currency: globalCurrency,
         status: "Pending",
         reference_Id: undefined as string | undefined,
       },
     ];
-  }, [pendingThisMonth, totalBalance, paymentFeed]);
+  }, [pendingThisMonth, totalBalance, paymentFeed, globalCurrency]);
   // Find registration and upfront payments using payment_type field
   // Show registration and upfront payments for the selected course, regardless of status
   const registrationPayments = paymentFeed.filter(
@@ -418,6 +422,7 @@ export default function StudentPayment({
         paymentOptions={paymentOptions}
         onSubmit={handleSubmitReceipt}
         theme={getTheme(activeCourse)}
+        paymentInstructions={paymentInstructions}
       />
 
       {/* Success Notification */}

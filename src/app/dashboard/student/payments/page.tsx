@@ -54,9 +54,11 @@ export default function StudentPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [isAccountDisabled, setIsAccountDisabled] = useState(false);
+  const [globalCurrency, setGlobalCurrency] = useState("USD");
+  const [paymentInstructions, setPaymentInstructions] = useState("");
 
   // compute totals for selected course
-  const formatCurrency = (amount: number, currency = "USD") =>
+  const formatCurrency = (amount: number, currency: string) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
       amount,
     );
@@ -192,6 +194,17 @@ export default function StudentPaymentsPage() {
       if (!latestUser?.id) {
         router.push("/login");
         return;
+      }
+
+      // Fetch global settings
+      try {
+        const settings = await pb.collection("institution_settings").getFullList();
+        if (settings.length > 0) {
+          setGlobalCurrency(settings[0].currency || "USD");
+          setPaymentInstructions(settings[0].payment_instructions || "");
+        }
+      } catch (err) {
+        console.error("Failed to fetch institution settings:", err);
       }
 
       fetchEnrollments(latestUser.id);
@@ -380,7 +393,7 @@ export default function StudentPaymentsPage() {
                     Total Paid
                   </h3>
                   <p className="text-3xl font-black text-gray-900">
-                    {formatCurrency(totalPaid, "USD")}
+                    {formatCurrency(totalPaid, globalCurrency)}
                   </p>
                 </div>
 
@@ -394,7 +407,7 @@ export default function StudentPaymentsPage() {
                     Total Balance
                   </h3>
                   <p className="text-3xl font-black text-gray-900">
-                    {formatCurrency(totalBalance, "USD")}
+                    {formatCurrency(totalBalance, globalCurrency)}
                   </p>
                 </div>
 
@@ -408,7 +421,7 @@ export default function StudentPaymentsPage() {
                     Due This Month
                   </h3>
                   <p className="text-3xl font-black text-gray-900">
-                    {formatCurrency(totalDueThisMonth, "USD")}
+                    {formatCurrency(totalDueThisMonth, globalCurrency)}
                   </p>
                 </div>
               </div>
@@ -434,6 +447,8 @@ export default function StudentPaymentsPage() {
                   installments={installments}
                   payments={payments}
                   enrolledCourses={enrolledCourses}
+                  globalCurrency={globalCurrency}
+                  paymentInstructions={paymentInstructions}
                 />
               </div>
             </motion.div>

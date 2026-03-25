@@ -28,15 +28,27 @@ export async function GET(request: Request) {
     });
 
     let deletedCount = 0;
-    const groupsDir = path.join(process.cwd(), "services", "galene", "groups");
+    const internalUrl = `${new URL(request.url).origin}/api/galene/group`;
 
     for (const record of records) {
       if (record.galene_group) {
-        const filePath = path.join(groupsDir, `${record.galene_group}.json`);
+        console.log(`[Cleanup] Deleting Galene group via bridge: ${record.galene_group}`);
+        try {
+          const deleteRes = await fetch(`${internalUrl}?classId=${record.galene_group}`, {
+            method: "DELETE",
+            headers: {
+              "x-internal-secret": process.env.INTERNAL_SECRET || "",
+            },
+          });
 
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-          deletedCount++;
+          if (deleteRes.ok) {
+            deletedCount++;
+          } else {
+            const errData = await deleteRes.json().catch(() => ({}));
+            console.error(`[Cleanup] Failed to delete group ${record.galene_group}:`, errData);
+          }
+        } catch (err) {
+          console.error(`[Cleanup] Network error deleting group ${record.galene_group}:`, err);
         }
       }
     }

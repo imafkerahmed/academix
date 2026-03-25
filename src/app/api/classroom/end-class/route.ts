@@ -15,9 +15,13 @@ export async function POST(request: Request) {
     }
 
     const decoded = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
-    const userRole = decoded.role;
+    const userRole = (decoded.role || "").toLowerCase();
+    
+    const isAuthorized = 
+      ["lecturer", "admin", "superuser", "host"].includes(userRole) || 
+      decoded.type === "admin";
 
-    if (userRole !== "lecturer" && userRole !== "admin" && userRole !== "superuser") {
+    if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

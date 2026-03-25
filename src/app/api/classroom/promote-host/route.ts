@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import PocketBase from "pocketbase";
-import fs from "fs";
-import path from "path";
 
 export async function POST(request: Request) {
   try {
@@ -17,9 +15,18 @@ export async function POST(request: Request) {
     }
 
     const decoded = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
-    const userRole = decoded.role;
+    const userRole = (decoded.role || "").toLowerCase();
+    
+    // Diagnostic logging for local dev
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Classroom] Promote-Host Payload:", decoded);
+    }
 
-    if (userRole !== "lecturer" && userRole !== "admin" && userRole !== "superuser") {
+    const isAuthorized = 
+      ["lecturer", "admin", "superuser", "host"].includes(userRole) || 
+      decoded.type === "admin";
+
+    if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -49,47 +56,48 @@ export async function POST(request: Request) {
       );
     }
 
-    const groupsDir = path.join(process.cwd(), "services", "galene", "groups");
-    const filePath = path.join(groupsDir, `${classRecord.galene_group}.json`);
+    // Call our internal Galene management API
+    // This automatically handles local-to-production bridging
+    const internalUrl = `${new URL(request.url).origin}/api/galene/group`;
+    
+    console.log(`[Classroom] Updating user status via bridge: ${internalUrl}`, {
+      classId: classRecord.galene_group,
+      username,
+      demote: !!demote
+    });
 
-    if (!fs.existsSync(filePath)) {
-      return NextResponse.json(
-        { error: "Galene configuration file not found" },
-        { status: 404 },
-      );
-    }
+    try {
+      const bridgeRes = await fetch(internalUrl, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": process.env.INTERNAL_SECRET || "",
+        },
+        body: JSON.stringify({
+          classId: classRecord.galene_group,
+          username,
+          demote: !!demote,
+        }),
+      });
 
-    // Read and parse current configuration
-    const config = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-
-    // Extract wildcard password (which students use)
-    const attendeePassword = config["wildcard-user"]?.password;
-
-    if (!attendeePassword) {
-      return NextResponse.json(
-        { error: "Cannot determine attendee password" },
-        { status: 500 },
-      );
-    }
-
-    // Initialize users object if undefined
-    if (!config.users) config.users = {};
-
-    // Inject the specific username as an OP with the attendee password.
-    if (demote) {
-      if (config.users[username]) {
-        delete config.users[username];
-        fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
+      if (!bridgeRes.ok) {
+        const errorData = await bridgeRes.json().catch(() => ({ error: bridgeRes.statusText }));
+        console.error("[Classroom] Failed to update user status via bridge:", errorData);
+        return NextResponse.json(
+          { error: errorData.error || "Failed to update Galene group" },
+          { status: bridgeRes.status }
+        );
       }
-    } else {
-      config.users[username] = {
-        password: attendeePassword,
-        permissions: ["op", "present", "message", "record"],
-      };
-      fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
-    }
 
-    return NextResponse.json({ success: true });
+      console.log(`[Classroom] User ${username} ${demote ? 'demoted' : 'promoted'} via bridge.`);
+      return NextResponse.json({ success: true });
+    } catch (err) {
+      console.error("[Classroom] Network error calling Galene bridge:", err);
+      return NextResponse.json(
+        { error: "Bridge connection failed" },
+        { status: 502 }
+      );
+    }
   } catch (error: unknown) {
     const err = error as { message?: string };
     console.error("Error promoting user:", err);
