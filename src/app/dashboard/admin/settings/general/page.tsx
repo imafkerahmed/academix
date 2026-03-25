@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
 import { Loader2, Layout, Save } from "lucide-react";
+import AdminLoader from "@/components/admin/AdminLoader";
 
 export default function GeneralSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -58,14 +59,6 @@ export default function GeneralSettingsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -84,7 +77,7 @@ export default function GeneralSettingsPage() {
         </div>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || loading}
           className="px-6 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-1 transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed hidden md:flex"
         >
           {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
@@ -92,53 +85,59 @@ export default function GeneralSettingsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm space-y-8">
-        <div className="space-y-3">
-          <label className="text-xs font-black uppercase tracking-widest text-gray-500 ml-1">
-            Institution Name
-          </label>
-          <input
-            type="text"
-            className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900"
-            placeholder="e.g. Oxford University"
-            value={institutionName}
-            onChange={(e) => setInstitutionName(e.target.value)}
-          />
+      {loading ? (
+        <div className="bg-white rounded-[2.5rem] p-12 border border-gray-100 shadow-sm flex items-center justify-center">
+          <AdminLoader inline={true} message="Loading General Settings..." />
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      ) : (
+        <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm space-y-8">
           <div className="space-y-3">
             <label className="text-xs font-black uppercase tracking-widest text-gray-500 ml-1">
-              Support Email
-            </label>
-            <input
-              type="email"
-              className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900"
-              placeholder="support@example.com"
-              value={supportEmail}
-              onChange={(e) => setSupportEmail(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-500 ml-1">
-              System Timezone
+              Institution Name
             </label>
             <input
               type="text"
               className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900"
-              placeholder="e.g. UTC, Asia/Colombo"
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
+              placeholder="e.g. Oxford University"
+              value={institutionName}
+              onChange={(e) => setInstitutionName(e.target.value)}
             />
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-500 ml-1">
+                Support Email
+              </label>
+              <input
+                type="email"
+                className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900"
+                placeholder="support@example.com"
+                value={supportEmail}
+                onChange={(e) => setSupportEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-500 ml-1">
+                System Timezone
+              </label>
+              <input
+                type="text"
+                className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900"
+                placeholder="e.g. UTC, Asia/Colombo"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Mobile Save Button */}
       <button
         onClick={handleSave}
-        disabled={saving}
+        disabled={saving || loading}
         className="w-full px-6 py-5 rounded-2xl bg-indigo-600 text-white font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed md:hidden"
       >
         {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}

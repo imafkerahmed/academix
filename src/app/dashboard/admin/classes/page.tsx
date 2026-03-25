@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import AdminLoader from "@/components/admin/AdminLoader";
 import {
   Dialog,
   DialogContent,
@@ -374,19 +375,6 @@ export default function ClassManagement() {
     return matchesSearch && matchesFilter;
   });
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
-            Syncing Class Schedules...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8">
       {/* Page Header Card */}
@@ -727,7 +715,13 @@ export default function ClassManagement() {
 
         {/* Classes Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-          {filteredClasses.map((classItem) => (
+          {loading ? (
+            <div className="col-span-full py-20 flex justify-center">
+              <AdminLoader inline={true} message="Syncing Class Schedules..." />
+            </div>
+          ) : (
+            <>
+              {filteredClasses.map((classItem) => (
             <div
               key={classItem.id}
               className={cn(
@@ -848,9 +842,11 @@ export default function ClassManagement() {
               </div>
             </div>
           ))}
+            </>
+          )}
         </div>
 
-        {filteredClasses.length === 0 && (
+        {!loading && filteredClasses.length === 0 && (
           <div className="text-center py-24 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm">
             <div className="w-20 h-20 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-200 mx-auto mb-6">
               <Video size={40} />
@@ -859,7 +855,7 @@ export default function ClassManagement() {
             <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">Try clearing your filters or search terms</p>
           </div>
         )}
-    </div>
+      </div>
   );
 }
 

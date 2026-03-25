@@ -16,6 +16,7 @@ import AdminActionBar from "@/components/admin/AdminActionBar";
 import { useRouter } from "next/navigation";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
+import AdminLoader from "@/components/admin/AdminLoader";
 
 interface Intake {
   id: string;
@@ -242,13 +243,8 @@ export default function IntakeCourseManagement() {
               <tbody className="divide-y divide-gray-50/50">
                 {loading ? (
                   <tr>
-                    <td colSpan={3} className="text-center py-20">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-                          Loading intakes...
-                        </p>
-                      </div>
+                    <td colSpan={3} className="py-20">
+                      <AdminLoader inline={true} message="Loading intakes..." />
                     </td>
                   </tr>
                 ) : filteredIntakes.length === 0 ? (

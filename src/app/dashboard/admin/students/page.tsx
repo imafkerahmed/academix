@@ -20,6 +20,7 @@ import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import { Badge } from "@/components/ui/badge";
 import { RegisterStudentModal } from "@/components/admin/RegisterStudentModal";
+import AdminLoader from "@/components/admin/AdminLoader";
 
 interface Student {
   id: string;
@@ -131,19 +132,6 @@ export default function StudentManagement() {
   };
 
   const filteredStudents = students;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-indigo-50/30">
-        <div className="text-center">
-          <div className="h-16 w-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <p className="text-gray-600 font-black text-sm tracking-wider">
-            Loading Student Directory...
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
@@ -279,7 +267,13 @@ export default function StudentManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50/50">
-                {filteredStudents.map((student) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="py-20">
+                      <AdminLoader inline={true} message="Loading Student Directory..." />
+                    </td>
+                  </tr>
+                ) : filteredStudents.map((student) => (
                   <tr
                     key={student.id}
                     className="group/row hover:bg-indigo-50/30 transition-all duration-300"
@@ -376,12 +370,26 @@ export default function StudentManagement() {
                     </td>
                   </tr>
                 ))}
+                {!loading && filteredStudents.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-center py-24 bg-gray-50/30">
+                      <div className="w-20 h-20 bg-gray-100 rounded-[2rem] flex items-center justify-center text-gray-300 mx-auto mb-6">
+                        <Search size={40} />
+                      </div>
+                      <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                        No results found
+                      </h3>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
+                        Adjust your filters or try a different search term
+                      </p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
+          {totalPages > 1 && !loading && (
             <div className="px-10 py-6 border-t border-gray-50 flex items-center justify-between bg-white">
               <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 Showing Page{" "}
@@ -423,20 +431,6 @@ export default function StudentManagement() {
                   Next
                 </button>
               </div>
-            </div>
-          )}
-
-          {students.length === 0 && !loading && (
-            <div className="text-center py-24 bg-gray-50/30">
-              <div className="w-20 h-20 bg-gray-100 rounded-[2rem] flex items-center justify-center text-gray-300 mx-auto mb-6">
-                <Search size={40} />
-              </div>
-              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">
-                No results found
-              </h3>
-              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
-                Adjust your filters or try a different search term
-              </p>
             </div>
           )}
         </div>

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import AdminLoader from "@/components/admin/AdminLoader";
 import {
   Dialog,
   DialogContent,
@@ -308,20 +309,6 @@ export default function AssignmentManagement() {
     if (filter === "marked") return status === "completed";
     return true;
   });
-
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
-            Compiling Submissions...
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
@@ -805,7 +792,12 @@ export default function AssignmentManagement() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+        {loading ? (
+          <div className="col-span-full py-12">
+            <AdminLoader inline={true} message="Compiling Submissions..." />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-6 duration-1000">
           {filteredAssignments.map((assignment) => {
             const status = getAssignmentStatus(assignment.id);
             const submissionCount = submissions.filter(s => s.assignment === assignment.id).length;
@@ -926,12 +918,10 @@ export default function AssignmentManagement() {
               <h3 className="text-sm font-black text-gray-900 uppercase tracking-tighter">
                 No assignments found
               </h3>
-              <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">
-                Try adjusting your filters or search query
-              </p>
             </div>
-          )}
+            )}
         </div>
+      )}
     </div>
   );
 }

@@ -65,7 +65,9 @@ export default function AdminDashboard() {
   const [isAllSchedulesOpen, setIsAllSchedulesOpen] = React.useState(false);
   const [stats, setStats] = useState<DashboardStat[]>([]);
   const [todaysClasses, setTodaysClasses] = useState<TodaysClass[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [classesLoading, setClassesLoading] = useState(true);
+  const [calendarLoading, setCalendarLoading] = useState(true);
 
   useEffect(() => {
     const currentUser = pb.authStore.model;
@@ -79,19 +81,17 @@ export default function AdminDashboard() {
     }
 
     const init = async () => {
-      setLoading(true);
-      await Promise.all([
-        fetchCalendarEvents(),
-        fetchDashboardStats(),
-        fetchTodaysClasses()
-      ]);
-      setLoading(false);
+      // Fetch each section independently to improve perceived load speed
+      void fetchDashboardStats();
+      void fetchTodaysClasses();
+      void fetchCalendarEvents();
     };
     init();
   }, [router]);
 
   const fetchDashboardStats = async () => {
     try {
+      setStatsLoading(true);
       const [students, intakes, payments, courses] = await Promise.all([
         pb.collection("users").getList(1, 1, { filter: 'role = "student" && accountStatus = "active"' }),
         pb.collection("intakes").getList(1, 1, { filter: 'intakeStatus = "ongoing"' }),
@@ -131,11 +131,14 @@ export default function AdminDashboard() {
       ]);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
   const fetchTodaysClasses = async () => {
     try {
+      setClassesLoading(true);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
@@ -170,11 +173,14 @@ export default function AdminDashboard() {
       }));
     } catch (error) {
       console.error("Error fetching today's classes:", error);
+    } finally {
+      setClassesLoading(false);
     }
   };
 
   const fetchCalendarEvents = async () => {
     try {
+      setCalendarLoading(true);
       // 1. Fetch all Classes
       const classes = await pb.collection("classes").getFullList({
         filter: 'status != "cancelled"',
@@ -242,6 +248,7 @@ export default function AdminDashboard() {
 
       setCalendarEvents([...classEvents, ...assignmentEvents]);
     } finally {
+      setCalendarLoading(false);
     }
   };
   // Show disabled account message if account is disabled
@@ -290,8 +297,8 @@ export default function AdminDashboard() {
   }));
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+    <div className="flex flex-col gap-6">
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
         <div className="flex items-center gap-6">
           <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-100 ring-8 ring-indigo-50">
             <Layout size={40} />
@@ -309,8 +316,8 @@ export default function AdminDashboard() {
       </div>
 
           {/* Stats Section with Premium Styling */}
-          <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {loading ? (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {statsLoading ? (
               <div className="h-32 bg-gray-50 rounded-3xl animate-pulse" />
             ) : (
               <StatsCarousel stats={stats} />
@@ -330,7 +337,13 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex items-start justify-center">
                   <div className="w-full">
-                    <Calendar events={calendarEvents} />
+                    {calendarLoading ? (
+                      <div className="h-[400px] flex items-center justify-center">
+                        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                      </div>
+                    ) : (
+                      <Calendar events={calendarEvents} />
+                    )}
                   </div>
                 </div>
               </div>
@@ -361,7 +374,7 @@ export default function AdminDashboard() {
                 {/* Only the new list view is rendered */}
                 <div className="flex-1 max-h-[420px] overflow-y-auto pr-1">
                   <div className="flex flex-col gap-5">
-                    {loading ? (
+                    {classesLoading ? (
                       <div className="space-y-4">
                         {[1, 2, 3].map(i => (
                           <div key={i} className="h-24 bg-gray-50 rounded-2xl animate-pulse" />

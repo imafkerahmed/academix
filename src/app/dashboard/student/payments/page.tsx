@@ -262,7 +262,7 @@ export default function StudentPaymentsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
           className="space-y-8"
         >
           <div className="min-h-[60vh] flex flex-col items-center justify-center">
@@ -322,13 +322,13 @@ export default function StudentPaymentsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
           className="space-y-8"
         >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8"
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 w-full">
@@ -379,7 +379,7 @@ export default function StudentPaymentsPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
+              transition={{ delay: 0.2, duration: 0.3 }}
               className="lg:col-span-12 space-y-8"
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

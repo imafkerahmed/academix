@@ -26,6 +26,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
+import AdminLoader from "@/components/admin/AdminLoader";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -908,18 +909,7 @@ export default function AcademicStructurePage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="bg-gray-50 min-h-screen lg:ml-64 flex items-center justify-center">
-        <div className="text-center">
-          <div className="h-16 w-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
-            Loading Academic Structure...
-          </p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="space-y-8">
@@ -1136,7 +1126,13 @@ export default function AcademicStructurePage() {
 
           {/* Content Area */}
           <div className="flex-1 min-w-0 space-y-6">
-            {/* Section Header with Actions */}
+            {loading ? (
+              <div className="bg-white rounded-[2.5rem] p-12 border border-gray-100 shadow-sm flex items-center justify-center">
+                <AdminLoader inline={true} message="Syncing Academic Records..." />
+              </div>
+            ) : (
+              <>
+                {/* Section Header with Actions */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               <div className="flex items-center justify-between gap-4">
                 {/* Search */}
@@ -3458,8 +3454,10 @@ export default function AcademicStructurePage() {
                 </div>
               </form>
             </ModernModal>
-          </div>
-        </div>
+          </>
+        )}
+      </div>
     </div>
+</div>
   );
 }

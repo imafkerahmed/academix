@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import AdminLoader from "@/components/admin/AdminLoader";
 
 interface PaymentBase {
   id: string;
@@ -153,19 +154,6 @@ export default function PaymentManagement() {
     return true;
   });
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 font-black text-xs uppercase tracking-widest">
-            Auditing Transactions...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8">
         {/* Page Header Card */}
@@ -285,7 +273,13 @@ export default function PaymentManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50/50">
-                {filteredPayments.map((payment) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="py-20">
+                      <AdminLoader inline={true} message="Auditing Transactions..." />
+                    </td>
+                  </tr>
+                ) : filteredPayments.map((payment) => (
                   <tr
                     key={payment.id}
                     className="group/row hover:bg-indigo-50/30 transition-all duration-300"

@@ -32,7 +32,7 @@ export default function StatsCarousel({ stats, children }: StatsCarouselProps) {
   }, [stats.length]);
 
   return (
-    <div className="mb-4">
+    <div className="">
       {/* Mobile/Tablet Carousel (< lg) */}
       <div className="lg:hidden">
         <div className="relative overflow-hidden rounded-[2rem] shadow-sm bg-white/50 border border-indigo-50/50">
