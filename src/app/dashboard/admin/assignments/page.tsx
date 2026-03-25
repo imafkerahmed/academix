@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import AdminLoader from "@/components/admin/AdminLoader";
+import { DashboardLoader } from "@/components/dashboard/shared/DashboardLoader";
 import {
   Dialog,
   DialogContent,
@@ -794,7 +794,7 @@ export default function AssignmentManagement() {
 
         {loading ? (
           <div className="col-span-full py-12">
-            <AdminLoader inline={true} message="Compiling Submissions..." />
+            <DashboardLoader inline={true} message="Compiling Submissions..." />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-6 duration-1000">

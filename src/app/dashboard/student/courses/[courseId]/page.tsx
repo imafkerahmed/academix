@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RouteLink } from "@/components/ui/route-link";
-import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
+import { DashboardBreadcrumbs } from "@/components/dashboard/shared/DashboardBreadcrumbs";
 import pb from "@/lib/pocketbase";
 import { Loader2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
@@ -381,7 +381,9 @@ export default function CoursePage() {
 
   return (
     <div className="space-y-8">
-      <StudentBreadcrumbs
+      <DashboardBreadcrumbs
+        homeHref="/dashboard/student"
+        homeLabel="Dashboard"
         items={[
           { label: "Courses", href: "/dashboard/student/courses" },
           { label: course.name },

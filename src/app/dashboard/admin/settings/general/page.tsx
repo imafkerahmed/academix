@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
 import { Loader2, Layout, Save } from "lucide-react";
-import AdminLoader from "@/components/admin/AdminLoader";
+import { DashboardLoader } from "@/components/dashboard/shared/DashboardLoader";
 
 export default function GeneralSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -87,7 +87,7 @@ export default function GeneralSettingsPage() {
 
       {loading ? (
         <div className="bg-white rounded-[2.5rem] p-12 border border-gray-100 shadow-sm flex items-center justify-center">
-          <AdminLoader inline={true} message="Loading General Settings..." />
+          <DashboardLoader inline={true} message="Loading General Settings..." />
         </div>
       ) : (
         <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm space-y-8">

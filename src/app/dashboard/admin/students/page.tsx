@@ -20,7 +20,7 @@ import StatsCarousel from "@/components/admin/StatsCarousel";
 import AdminActionBar from "@/components/admin/AdminActionBar";
 import { Badge } from "@/components/ui/badge";
 import { RegisterStudentModal } from "@/components/admin/RegisterStudentModal";
-import AdminLoader from "@/components/admin/AdminLoader";
+import { DashboardLoader } from "@/components/dashboard/shared/DashboardLoader";
 
 interface Student {
   id: string;
@@ -270,7 +270,7 @@ export default function StudentManagement() {
                 {loading ? (
                   <tr>
                     <td colSpan={5} className="py-20">
-                      <AdminLoader inline={true} message="Loading Student Directory..." />
+                      <DashboardLoader inline={true} message="Loading Student Directory..." />
                     </td>
                   </tr>
                 ) : filteredStudents.map((student) => (

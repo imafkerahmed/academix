@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import AdminLoader from "@/components/admin/AdminLoader";
+import { DashboardLoader } from "@/components/dashboard/shared/DashboardLoader";
 import {
   Dialog,
   DialogContent,
@@ -717,7 +717,7 @@ export default function ClassManagement() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
           {loading ? (
             <div className="col-span-full py-20 flex justify-center">
-              <AdminLoader inline={true} message="Syncing Class Schedules..." />
+              <DashboardLoader inline={true} message="Syncing Class Schedules..." />
             </div>
           ) : (
             <>

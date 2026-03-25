@@ -15,10 +15,10 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import pb from "@/lib/pocketbase";
-import UpcomingClasses, {
+import { UpcomingClasses,
   type UpcomingClass,
-} from "@/components/lecturer/UpcomingClasses";
-import AllSchedulesModal from "@/components/lecturer/AllSchedulesModal";
+} from "@/components/dashboard/shared";
+import { AllSchedulesModal } from "@/components/dashboard/shared";
 import {
   type User,
 } from "@/lib/pocketbase";

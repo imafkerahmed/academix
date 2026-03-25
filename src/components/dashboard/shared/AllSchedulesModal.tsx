@@ -2,25 +2,25 @@
 
 import React, { useState, useEffect } from "react";
 import { X, Clock } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { UpcomingClass } from "./UpcomingClasses";
-import pb from "@/lib/pocketbase";
 
 interface AllSchedulesModalProps {
   isOpen: boolean;
   onClose: () => void;
   classes: UpcomingClass[];
+  onQuickJoin?: (id: string, url?: string, status?: string) => void;
+  role?: "admin" | "lecturer";
 }
 
-export default function AllSchedulesModal({
+export function AllSchedulesModal({
   isOpen,
   onClose,
   classes,
+  onQuickJoin,
+  role = "admin",
 }: AllSchedulesModalProps) {
-  const router = useRouter();
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState<string>("");
-
+  const [selectedFilter, setSelectedFilter] = useState<string>("");
   const [nowTimestamp, setNowTimestamp] = useState<number>(0);
 
   useEffect(() => {
@@ -31,8 +31,8 @@ export default function AllSchedulesModal({
     }
   }, [isOpen]);
 
-  const monthOptions = React.useMemo(() => {
-    const monthMap = new Map<string, string>();
+  const filterOptions = React.useMemo(() => {
+    const filterMap = new Map<string, string>();
 
     classes.forEach((classItem) => {
       const date = new Date(classItem.rawStartTime || classItem.startTime);
@@ -40,24 +40,27 @@ export default function AllSchedulesModal({
 
       const year = date.getFullYear();
       const monthIndex = date.getMonth();
-      const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-      const monthLabel = date.toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric",
-      });
+      // Use YYYY-MM for lecturer view (more spread out classes), YYYY-MM-DD for Admin
+      const filterKey = role === "lecturer" 
+        ? `${year}-${String(monthIndex + 1).padStart(2, "0")}`
+        : date.toISOString().slice(0, 10);
+        
+      const filterLabel = role === "lecturer"
+        ? date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+        : date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 
-      if (!monthMap.has(monthKey)) {
-        monthMap.set(monthKey, monthLabel);
+      if (!filterMap.has(filterKey)) {
+        filterMap.set(filterKey, filterLabel);
       }
     });
 
-    return Array.from(monthMap.entries())
+    return Array.from(filterMap.entries())
       .map(([value, label]) => ({ value, label }))
       .sort((a, b) => (a.value < b.value ? -1 : 1));
-  }, [classes]);
+  }, [classes, role]);
 
   const filteredClasses = React.useMemo(() => {
-    if (!selectedMonth) return classes;
+    if (!selectedFilter) return classes;
 
     return classes.filter((classItem) => {
       const date = new Date(classItem.rawStartTime || classItem.startTime);
@@ -65,36 +68,38 @@ export default function AllSchedulesModal({
 
       const year = date.getFullYear();
       const monthIndex = date.getMonth();
-      const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+      const filterKey = role === "lecturer"
+        ? `${year}-${String(monthIndex + 1).padStart(2, "0")}`
+        : date.toISOString().slice(0, 10);
 
-      return monthKey === selectedMonth;
+      return filterKey === selectedFilter;
     });
-  }, [classes, selectedMonth]);
+  }, [classes, selectedFilter, role]);
 
-  // When the modal opens, default the filter to the current month
+  // When modal opens, default to current month/day
   useEffect(() => {
     if (!isOpen || classes.length === 0) return;
 
     const now = new Date();
-    const year = now.getFullYear();
-    const monthIndex = now.getMonth();
-    const currentMonthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+    const currentKey = role === "lecturer"
+      ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+      : now.toISOString().slice(0, 10);
 
-    const hasCurrentMonthClasses = classes.some((classItem) => {
+    const hasCurrentClasses = classes.some((classItem) => {
       const date = new Date(classItem.rawStartTime || classItem.startTime);
       if (Number.isNaN(date.getTime())) return false;
-      const itemYear = date.getFullYear();
-      const itemMonthIndex = date.getMonth();
-      const itemKey = `${itemYear}-${String(itemMonthIndex + 1).padStart(2, "0")}`;
-      return itemKey === currentMonthKey;
+      const itemKey = role === "lecturer"
+        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+        : date.toISOString().slice(0, 10);
+      return itemKey === currentKey;
     });
 
-    const targetMonth = hasCurrentMonthClasses ? currentMonthKey : "";
+    const targetFilter = hasCurrentClasses ? currentKey : "";
     
     setTimeout(() => {
-      setSelectedMonth(targetMonth);
+      setSelectedFilter(targetFilter);
     }, 0);
-  }, [isOpen, classes]);
+  }, [isOpen, classes, role]);
 
   // Body scroll lock
   useEffect(() => {
@@ -110,7 +115,6 @@ export default function AllSchedulesModal({
 
   useEffect(() => {
     if (isOpen) {
-      // Trigger animation after mount
       const timer = setTimeout(() => setIsAnimating(true), 10);
       return () => clearTimeout(timer);
     } else {
@@ -121,13 +125,14 @@ export default function AllSchedulesModal({
 
   const handleClose = () => {
     setIsAnimating(false);
-    setTimeout(onClose, 300); // Wait for animation to complete
+    setTimeout(onClose, 300);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "scheduled":
         return "bg-blue-100 text-blue-700 border-blue-200";
+      case "in_progress":
       case "ongoing":
         return "bg-green-100 text-green-700 border-green-200";
       case "completed":
@@ -143,20 +148,6 @@ export default function AllSchedulesModal({
     return date.toLocaleDateString("en-US", { weekday: "short" });
   };
 
-  const handleQuickJoin = async (id: string, status: string) => {
-    if (status === "completed") {
-      try {
-        await pb.collection("classes").update(id, {
-          status: "scheduled",
-        });
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (error) {
-        /* silent */
-      }
-    }
-    router.push(`/dashboard/classroom/${id}?role=host`);
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -166,7 +157,6 @@ export default function AllSchedulesModal({
       }`}
       onClick={handleClose}
     >
-      {/* Modal */}
       <div
         className={`relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden mx-4 transition-transform transition-opacity duration-300 ${
           isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
@@ -177,24 +167,22 @@ export default function AllSchedulesModal({
         <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white relative z-10">
           <div>
             <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">
-              Upcoming <span className="text-indigo-600">Classes</span>
+              Schedule <span className="text-indigo-600">Overview</span>
             </h2>
             <div className="flex items-center gap-4 mt-2">
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                All your upcoming activities
+                All upcoming classes
               </p>
-              {monthOptions.length > 0 && (
+              {filterOptions.length > 0 && (
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-1 rounded-full bg-gray-300" />
                   <select
-                    value={selectedMonth}
-                    onChange={(event) => {
-                      setSelectedMonth(event.target.value);
-                    }}
+                    value={selectedFilter}
+                    onChange={(event) => setSelectedFilter(event.target.value)}
                     className="border-none bg-transparent text-[10px] font-black uppercase tracking-widest text-indigo-600 focus:outline-none cursor-pointer hover:text-indigo-700 transition-colors"
                   >
-                    <option value="">All months</option>
-                    {monthOptions.map((option) => (
+                    <option value="">All {role === "lecturer" ? "months" : "days"}</option>
+                    {filterOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -212,7 +200,7 @@ export default function AllSchedulesModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-gray-50/30 no-scrollbar">
+        <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-gray-50/30 custom-scrollbar">
           {filteredClasses.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border border-dashed border-gray-200 opacity-50">
               <Clock className="text-gray-300 mb-4" size={48} />
@@ -223,23 +211,19 @@ export default function AllSchedulesModal({
           ) : (
             <div className="space-y-4">
               {filteredClasses.map((classItem) => {
-                const isOngoing = classItem.status === "in_progress";
+                const isOngoing = classItem.status === "in_progress" || classItem.status === "ongoing";
                 const isCompleted = classItem.status === "completed";
-                const startTimeStr =
-                  classItem.rawStartTime || classItem.startTime;
-                const scheduledEnd =
-                  new Date(startTimeStr).getTime() + classItem.duration * 60000;
+                const startTimeStr = classItem.rawStartTime || classItem.startTime;
+                const scheduledEnd = new Date(startTimeStr).getTime() + classItem.duration * 60000;
                 const isWithinTimeWindow = nowTimestamp < scheduledEnd;
                 const isReallyEnded = isCompleted && !isWithinTimeWindow;
 
                 return (
                   <div
                     key={classItem.id}
-                    className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col gap-6 transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-1 group w-full relative overflow-hidden min-w-0"
+                    className="bg-white rounded-[2.5rem] p-6 lg:p-8 border border-gray-100 flex flex-col gap-6 transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-1 group w-full relative overflow-hidden min-w-0"
                   >
-                    <div
-                      className={`absolute top-0 right-0 w-32 h-32 opacity-[0.03] transition-transform duration-700 group-hover:scale-150 rounded-full -mr-16 -mt-16 bg-indigo-600`}
-                    />
+                    <div className={`absolute top-0 right-0 w-32 h-32 opacity-[0.03] transition-transform duration-700 group-hover:scale-150 rounded-full -mr-16 -mt-16 bg-indigo-600`} />
 
                     {isOngoing && (
                       <div className="absolute top-6 right-8 bg-indigo-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg z-10 animate-pulse">
@@ -260,26 +244,22 @@ export default function AllSchedulesModal({
                             let badgeLabel = classItem.status.toUpperCase();
                             let badgeColor = getStatusColor(classItem.status);
 
-                            if (
-                              classItem.status === "completed" &&
-                              !isReallyEnded
-                            ) {
+                            if (classItem.status === "completed" && !isReallyEnded) {
                               badgeLabel = "ENDED EARLY";
-                              badgeColor =
-                                "border-amber-100 bg-amber-50 text-amber-700";
+                              badgeColor = "border-amber-100 bg-amber-50 text-amber-700";
                             }
 
                             return (
-                              <span
-                                className={`text-[10px] px-3 py-1 rounded-xl border font-black uppercase tracking-widest ${badgeColor}`}
-                              >
+                              <span className={`text-[10px] px-3 py-1 rounded-xl border font-black uppercase tracking-widest ${badgeColor}`}>
                                 {badgeLabel}
                               </span>
                             );
                           })()}
-                          <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-xl uppercase tracking-widest">
-                            {classItem.subjectName || "SUBJECT"}
-                          </span>
+                          {classItem.subjectName && (
+                            <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-xl uppercase tracking-widest">
+                              {classItem.subjectName}
+                            </span>
+                          )}
                           <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-xl uppercase tracking-widest">
                             {classItem.intakeName}
                           </span>
@@ -295,18 +275,20 @@ export default function AllSchedulesModal({
                             Class Ended
                           </span>
                         ) : (
-                          <button
-                            onClick={() =>
-                              handleQuickJoin(classItem.id, classItem.status)
-                            }
-                            className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl transition-all hover:scale-105 active:scale-95 ${
-                              isCompleted
-                                ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100"
-                                : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
-                            }`}
-                          >
-                            {isCompleted ? "Rejoin Session" : "Join Class"}
-                          </button>
+                          (!classItem.zoomJoinUrl && role === "admin") ? null : (
+                            <button
+                                onClick={() => {
+                                  if (onQuickJoin) onQuickJoin(classItem.id, classItem.zoomJoinUrl, classItem.status);
+                                }}
+                                className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-[0.1em] shadow-xl transition-all hover:scale-105 active:scale-95 ${
+                                  isCompleted
+                                    ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100"
+                                    : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+                                }`}
+                              >
+                                {isCompleted && role === "lecturer" ? "Rejoin Session" : "Join Class"}
+                              </button>
+                          )
                         )}
                       </div>
                     </div>
@@ -314,15 +296,10 @@ export default function AllSchedulesModal({
                     <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 relative z-10 pt-4 border-t border-gray-50">
                       <span className="flex items-center gap-2 whitespace-nowrap">
                         <Clock size={14} className="text-gray-300" />{" "}
-                        {getWeekdayLabel(
-                          classItem.rawStartTime || classItem.startTime,
-                        )}{" "}
+                        {getWeekdayLabel(classItem.rawStartTime || classItem.startTime)}{" "}
                         • {classItem.startTime} -{" "}
                         {new Date(
-                          new Date(
-                            classItem.rawStartTime || classItem.startTime,
-                          ).getTime() +
-                            classItem.duration * 60000,
+                          new Date(classItem.rawStartTime || classItem.startTime).getTime() + classItem.duration * 60000
                         ).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",

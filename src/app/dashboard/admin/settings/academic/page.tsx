@@ -25,8 +25,8 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
-import AdminLoader from "@/components/admin/AdminLoader";
+import { DashboardBreadcrumbs } from "@/components/dashboard/shared/DashboardBreadcrumbs";
+import { DashboardLoader } from "@/components/dashboard/shared/DashboardLoader";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -915,7 +915,9 @@ export default function AcademicStructurePage() {
     <div className="space-y-8">
         {/* Compact Header */}
         <div className="mb-6">
-          <AdminBreadcrumbs
+          <DashboardBreadcrumbs
+            homeHref="/dashboard/admin"
+            homeLabel="Dashboard"
             items={[
               { label: "Settings", href: "/dashboard/admin/settings" },
               { label: "Academic Structure" },
@@ -1128,7 +1130,7 @@ export default function AcademicStructurePage() {
           <div className="flex-1 min-w-0 space-y-6">
             {loading ? (
               <div className="bg-white rounded-[2.5rem] p-12 border border-gray-100 shadow-sm flex items-center justify-center">
-                <AdminLoader inline={true} message="Syncing Academic Records..." />
+                <DashboardLoader inline={true} message="Syncing Academic Records..." />
               </div>
             ) : (
               <>

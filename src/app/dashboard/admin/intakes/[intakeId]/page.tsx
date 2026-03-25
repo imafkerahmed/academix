@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import AdminActionBar from "@/components/admin/AdminActionBar";
-import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
+import { DashboardBreadcrumbs } from "@/components/dashboard/shared/DashboardBreadcrumbs";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
 import {
@@ -395,7 +395,9 @@ export default function IntakeDetailsPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans">
-      <AdminBreadcrumbs
+      <DashboardBreadcrumbs
+        homeHref="/dashboard/admin"
+        homeLabel="Dashboard"
         items={[
           { label: "Intakes", href: "/dashboard/admin/intakes" },
           { label: intake.code },

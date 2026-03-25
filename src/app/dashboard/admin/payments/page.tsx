@@ -21,7 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import AdminLoader from "@/components/admin/AdminLoader";
+import { DashboardLoader } from "@/components/dashboard/shared/DashboardLoader";
 
 interface PaymentBase {
   id: string;
@@ -276,7 +276,7 @@ export default function PaymentManagement() {
                 {loading ? (
                   <tr>
                     <td colSpan={6} className="py-20">
-                      <AdminLoader inline={true} message="Auditing Transactions..." />
+                      <DashboardLoader inline={true} message="Auditing Transactions..." />
                     </td>
                   </tr>
                 ) : filteredPayments.map((payment) => (

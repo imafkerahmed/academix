@@ -2,15 +2,15 @@
 
 import React from "react";
 
-interface AdminLoaderProps {
+interface DashboardLoaderProps {
   message?: string;
   inline?: boolean;
 }
 
-export default function AdminLoader({ 
+export function DashboardLoader({ 
   message = "Loading data...",
   inline = false 
-}: AdminLoaderProps) {
+}: DashboardLoaderProps) {
   return (
     <div className={`flex-1 flex flex-col items-center justify-center ${inline ? 'py-12' : 'min-h-[60vh]'} animate-in fade-in duration-500`}>
       <div className="flex flex-col items-center gap-4">

@@ -12,7 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
+import { DashboardBreadcrumbs } from "@/components/dashboard/shared/DashboardBreadcrumbs";
 import { RegisterStaffModal } from "@/components/admin/RegisterStaffModal";
 import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import { toast } from "sonner";
@@ -104,7 +104,9 @@ export default function UserManagementPage() {
   return (
     <div className="space-y-8">
         {/* Breadcrumbs */}
-        <AdminBreadcrumbs
+        <DashboardBreadcrumbs
+          homeHref="/dashboard/admin"
+          homeLabel="Dashboard"
           items={[
             { label: "Settings", href: "/dashboard/admin/settings" },
             { label: "User Management" },

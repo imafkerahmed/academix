@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import StudentBreadcrumbs from "@/components/student/StudentBreadcrumbs";
+import { DashboardBreadcrumbs } from "@/components/dashboard/shared/DashboardBreadcrumbs";
 import { Loader2, Download } from "lucide-react";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
@@ -712,7 +712,9 @@ export default function SubjectPage() {
 
   return (
     <div className="space-y-8">
-      <StudentBreadcrumbs
+      <DashboardBreadcrumbs
+        homeHref="/dashboard/student"
+        homeLabel="Dashboard"
         items={[
           { label: "Courses", href: "/dashboard/student/courses" },
           {

@@ -2,7 +2,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 
-import AllSchedulesModal from "@/components/admin/AllSchedulesModal";
+import { AllSchedulesModal } from "@/components/dashboard/shared";
 import Calendar from "@/components/Calendar";
 import {
   Users,

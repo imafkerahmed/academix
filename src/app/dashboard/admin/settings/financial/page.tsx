@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import pb from "@/lib/pocketbase";
 import { toast } from "sonner";
 import { Loader2, DollarSign, Save, ChevronDown } from "lucide-react";
-import AdminLoader from "@/components/admin/AdminLoader";
+import { DashboardLoader } from "@/components/dashboard/shared/DashboardLoader";
 
 const CURRENCIES = [
   { code: "USD", symbol: "$", label: "US Dollar" },
@@ -100,7 +100,7 @@ export default function FinancialSettingsPage() {
 
       {loading ? (
         <div className="bg-white rounded-[2.5rem] p-12 border border-gray-100 shadow-sm flex items-center justify-center">
-          <AdminLoader inline={true} message="Loading Financial Protocol..." />
+          <DashboardLoader inline={true} message="Loading Financial Protocol..." />
         </div>
       ) : (
         <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm space-y-8">

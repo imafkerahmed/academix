@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import pb, { isSuperuserOnlyError } from "@/lib/pocketbase";
 import { RecordModel } from "pocketbase";
-import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
+import { DashboardBreadcrumbs } from "@/components/dashboard/shared/DashboardBreadcrumbs";
 import {
   User,
   BookOpen,
@@ -1249,10 +1249,12 @@ export default function StudentDetail() {
     <div className="space-y-8 pb-20">
         {/* Header with Breadcrumbs & Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <AdminBreadcrumbs
+          <DashboardBreadcrumbs
+            homeHref="/dashboard/admin"
+            homeLabel="Dashboard"
             items={[{ label: "Students", href: "/dashboard/admin/students" }]}
           />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 md:ml-auto">
             {activeTab === "payments" && <RecordPaymentControl />}
 
             {activeTab === "academic" && (

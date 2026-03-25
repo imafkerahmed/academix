@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ModernModal } from "@/components/ui/modern-modal";
-import AdminBreadcrumbs from "@/components/admin/AdminBreadcrumbs";
+import { DashboardBreadcrumbs } from "@/components/dashboard/shared/DashboardBreadcrumbs";
 import { EnrollExistingStudentModal } from "@/components/admin/EnrollExistingStudentModal";
 import {
   Accordion,
@@ -468,7 +468,9 @@ export default function CourseDetailsPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8 font-sans">
-      <AdminBreadcrumbs
+      <DashboardBreadcrumbs
+        homeHref="/dashboard/admin"
+        homeLabel="Dashboard"
         items={[
           { label: "Intakes", href: "/dashboard/admin/intakes" },
           {
