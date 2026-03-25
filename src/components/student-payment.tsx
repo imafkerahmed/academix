@@ -272,11 +272,13 @@ export default function StudentPayment({
     filteredFeed = verifiedPayments.slice(0, 3);
   }
 
-  const handleSubmitReceipt = async (data: {
-    selectedInvoice: unknown;
-    files: File[];
-    remarks: string;
-  }) => {
+  const handleSubmitReceipt = async (
+    _data: { // eslint-disable-line @typescript-eslint/no-unused-vars
+      selectedInvoice: unknown;
+      files: File[];
+      remarks: string;
+    }
+  ) => {
     await new Promise((r) => setTimeout(r, 1500));
     setShowPayModal(false);
     setShowSuccess(true);

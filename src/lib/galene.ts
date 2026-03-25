@@ -185,7 +185,7 @@ export class GaleneClient {
         
         // Quick reachability test to see if the server is even there
         try {
-          const ping = await fetch(httpUrl, { method: "HEAD", mode: "no-cors" });
+          await fetch(httpUrl, { method: "HEAD", mode: "no-cors" });
 
         } catch (e) {
           console.warn("[Galene] Server reachability check failed (pre-connection):", e);

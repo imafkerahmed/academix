@@ -231,7 +231,7 @@ export default function LecturerDashboard() {
       // Listen for real-time updates
       const subscribeToClasses = async () => {
         try {
-          await pb.collection("classes").subscribe("*", (e) => {
+          await pb.collection("classes").subscribe("*", () => {
 
             loadClasses(user.id);
           });

@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { SessionWarningModal } from "@/components/SessionWarningModal";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
-import { logout } from "@/lib/pocketbase";
 import { cn } from "@/lib/utils";
 
 interface BaseDashboardLayoutProps {
@@ -21,7 +20,6 @@ export function BaseDashboardLayout({
   userRoleInitial,
   hideSidebarPaths,
 }: BaseDashboardLayoutProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -32,10 +30,6 @@ export function BaseDashboardLayout({
       enabled: true,
     });
 
-  const onLogout = () => {
-    logout();
-    router.replace("/login");
-  };
 
   const hideSidebar = hideSidebarPaths ? hideSidebarPaths(pathname || "") : false;
 

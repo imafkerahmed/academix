@@ -146,7 +146,6 @@ export default function AcademicStructurePage() {
   const updateExpiredCourseIntakes = useCallback(async (courseIntakesData: CourseIntake[]) => {
     try {
       const updates: Promise<unknown>[] = [];
-      let updateCount = 0;
 
       for (const ci of courseIntakesData) {
         const calculatedStatus = calculateCourseIntakeStatus(
@@ -159,7 +158,6 @@ export default function AcademicStructurePage() {
               course_status: calculatedStatus,
             }),
           );
-          updateCount++;
         }
       }
 

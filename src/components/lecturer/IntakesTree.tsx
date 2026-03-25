@@ -974,7 +974,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
 
 
   const persistSelection = (
-    intakeId: string | null,
+    _intakeId: string | null, // eslint-disable-line @typescript-eslint/no-unused-vars
   ) => {
     // Persistence disabled as per user request
 

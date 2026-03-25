@@ -255,7 +255,7 @@ export default function StudentDashboard() {
     }
   }, [enrollments]);
 
-  const fetchStudentData = React.useCallback(async (studentId: string) => {
+  const fetchStudentData = React.useCallback(async () => {
     try {
       setLoading(true);
       // Fetch enrollments via API endpoint for central state
@@ -323,7 +323,7 @@ export default function StudentDashboard() {
       }
 
       setUser(latestUser as unknown as StudentUser);
-      fetchStudentData(latestUser.id);
+      fetchStudentData();
     };
 
     checkAccountStatus();
