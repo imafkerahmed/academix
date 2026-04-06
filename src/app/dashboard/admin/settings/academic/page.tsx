@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Fragment } from "react";
 import pb from "@/lib/pocketbase";
+import { RecordModel } from "pocketbase";
 import type {
   Course,
   Subject,
@@ -64,6 +65,7 @@ export default function AcademicStructurePage() {
   const [courseTemplates, setCourseTemplates] = useState<CourseTemplate[]>([]);
   const [courseStatusFilter] =
     useState<string>("active");
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
 
   // Modal states for Courses
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -230,37 +232,49 @@ export default function AcademicStructurePage() {
       console.error("Error updating course statuses:", error);
     }
   }, []);
-
   const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
       const [
         coursesData,
         subjectsData,
+        intakesData,
         courseIntakesData,
         courseSubjectsData,
         feesData,
-        intakesData,
         templatesData,
+        settingsRes,
       ] = await Promise.all([
         pb.collection("courses").getFullList<Course>({ sort: "-created" }),
         pb.collection("subjects").getFullList<Subject>({ sort: "-created" }),
+        pb.collection("intakes").getFullList<Intake>({ sort: "-created" }),
         pb.collection("course_intakes").getFullList<CourseIntake>({
-          sort: "-created",
           expand: "course,intake",
+          sort: "-created",
         }),
         pb
           .collection("course_subjects")
-          .getFullList<CourseSubject>({ expand: "subject,course_intake" }),
+          .getFullList<CourseSubject>({ sort: "semester,created" }),
         pb.collection("course_intake_fees").getFullList<CourseIntakeFee>({
           expand: "course_intake.course,course_intake.intake",
+          sort: "-created",
         }),
-        pb.collection("intakes").getFullList<Intake>({ sort: "-created" }),
-        pb
-          .collection("course_templates")
-          .getFullList<CourseTemplate>({ sort: "-created" }),
+        pb.collection("course_templates").getFullList<CourseTemplate>({
+          sort: "-created",
+        }),
+        pb.collection("institution_settings").getFullList(),
       ]);
 
+      const settings = settingsRes as unknown as RecordModel[];
+      if (settings && settings.length > 0) {
+        const currencyCode = settings[0].currency || "INR";
+        const symbols: Record<string, string> = {
+          USD: "$", EUR: "€", GBP: "£", LKR: "Rs", 
+          AUD: "A$", CAD: "C$", INR: "₹", SGD: "S$", 
+          AED: "د.إ", ZAR: "R"
+        };
+        setCurrencySymbol(symbols[currencyCode] || "₹");
+      }
       setCourses(coursesData);
       setSubjects(subjectsData);
       setCourseIntakes(courseIntakesData);
@@ -1128,7 +1142,7 @@ export default function AcademicStructurePage() {
           <div className="flex-1 min-w-0 space-y-6">
             {loading ? (
               <div className="bg-white rounded-[2.5rem] p-12 border border-gray-100 shadow-sm flex items-center justify-center">
-                <DashboardLoader inline={true} message="Syncing Academic Records..." />
+                <DashboardLoader inline={true} message="Loading Academic Terms..." />
               </div>
             ) : (
               <>
@@ -1962,17 +1976,17 @@ export default function AcademicStructurePage() {
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <span className="font-black text-gray-700 text-sm">
-                                    LKR {fee.registration_fee.toLocaleString()}
+                                    {currencySymbol} {fee.registration_fee.toLocaleString()}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <span className="font-black text-gray-700 text-sm">
-                                    LKR {fee.course_fee.toLocaleString()}
+                                    {currencySymbol} {fee.course_fee.toLocaleString()}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <span className="font-black text-green-600 text-sm">
-                                    LKR {total.toLocaleString()}
+                                    {currencySymbol} {total.toLocaleString()}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 text-center">
@@ -3247,7 +3261,7 @@ export default function AcademicStructurePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                      Registration Fee (LKR)
+                      Registration Fee ({currencySymbol})
                     </label>
                     <input
                       type="number"
@@ -3267,7 +3281,7 @@ export default function AcademicStructurePage() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                      Course Fee (LKR)
+                      Course Fee ({currencySymbol})
                     </label>
                     <input
                       type="number"
@@ -3314,7 +3328,7 @@ export default function AcademicStructurePage() {
                       Total Fee:
                     </span>
                     <span className="text-2xl font-black text-green-600">
-                      LKR{" "}
+                      {currencySymbol}{" "}
                       {(
                         feeForm.registration_fee + feeForm.course_fee
                       ).toLocaleString()}

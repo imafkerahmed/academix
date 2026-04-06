@@ -159,6 +159,7 @@ export default function CourseDetailsPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [courseIntake, setCourseIntake] = useState<CourseIntake | null>(null);
   const [fees, setFees] = useState<Fee | null>(null);
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
   const [editLoading, setEditLoading] = useState(false);
   const [allLecturers, setAllLecturers] = useState<UserRecord[]>([]);
   const [availableSubjects, setAvailableSubjects] = useState<Subject[]>([]);
@@ -179,15 +180,27 @@ export default function CourseDetailsPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [intakeRecord, courseRecord, courseIntakesData] = await Promise.all(
+      const [intakeRecord, courseRecord, courseIntakesData, settingsData] = await Promise.all(
         [
           pb.collection("intakes").getOne(intakeId),
           pb.collection("courses").getOne(courseId),
           pb.collection("course_intakes").getFullList({
             filter: `intake="${intakeId}"&&course="${courseId}"`,
           }),
+          pb.collection("institution_settings").getFullList(),
         ],
       );
+
+      const settings = settingsData as unknown as RecordModel[];
+      if (settings && settings.length > 0) {
+        const currencyCode = settings[0].currency || "INR";
+        const symbols: Record<string, string> = {
+          USD: "$", EUR: "€", GBP: "£", LKR: "Rs", 
+          AUD: "A$", CAD: "C$", INR: "₹", SGD: "S$", 
+          AED: "د.إ", ZAR: "R"
+        };
+        setCurrencySymbol(symbols[currencyCode] || "₹");
+      }
 
       const courseIntakeRecord = courseIntakesData[0] ?? null;
       setIntake(intakeRecord as unknown as Intake);
@@ -532,7 +545,7 @@ export default function CourseDetailsPage() {
               COURSE FEE
             </span>
             <span className="text-xl font-bold text-gray-900">
-              LKR {(fees?.course_fee || 0).toLocaleString()}
+              {currencySymbol} {(fees?.course_fee || 0).toLocaleString()}
             </span>
           </div>
           <div className="flex flex-col bg-gray-50/50 border border-gray-100 rounded-3xl p-6 hover:bg-white transition-all group">
@@ -540,7 +553,7 @@ export default function CourseDetailsPage() {
               REGISTRATION FEE
             </span>
             <span className="text-xl font-bold text-gray-900">
-              LKR {(fees?.registration_fee || 0).toLocaleString()}
+              {currencySymbol} {(fees?.registration_fee || 0).toLocaleString()}
             </span>
           </div>
         </div>
@@ -781,7 +794,7 @@ export default function CourseDetailsPage() {
               </label>
               <div className="relative">
                 <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-gray-400">
-                  LKR
+                  {currencySymbol}
                 </span>
                 <input
                   type="number"
@@ -807,7 +820,7 @@ export default function CourseDetailsPage() {
               </label>
               <div className="relative">
                 <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-gray-400">
-                  LKR
+                  {currencySymbol}
                 </span>
                 <input
                   type="number"

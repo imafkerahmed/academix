@@ -79,6 +79,7 @@ export function RegisterStudentModal({
   const [validationError, setValidationError] = useState<string>("");
   const [feeCalculation, setFeeCalculation] =
     useState<EnrollmentFeeCalculation | null>(null);
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
 
   const [formData, setFormData] = useState({
     name: enrollOnly?.name || "",
@@ -132,6 +133,7 @@ export function RegisterStudentModal({
       setEnrollNow(true);
       setValidationError("");
       setFeeCalculation(null);
+      fetchCurrencySymbol();
     }
   }, [isOpen, enrollOnly]);
 
@@ -261,6 +263,23 @@ export function RegisterStudentModal({
       }
     } finally {
       setFetchingData(false);
+    }
+  };
+
+  const fetchCurrencySymbol = async () => {
+    try {
+      const settings = await pb.collection("institution_settings").getFullList();
+      if (settings && settings.length > 0) {
+        const currencyCode = settings[0].currency || "INR";
+        const symbols: Record<string, string> = {
+          USD: "$", EUR: "€", GBP: "£", LKR: "Rs", 
+          AUD: "A$", CAD: "C$", INR: "₹", SGD: "S$", 
+          AED: "د.إ", ZAR: "R"
+        };
+        setCurrencySymbol(symbols[currencyCode] || "₹");
+      }
+    } catch (err) {
+      console.error("Error fetching currency settings:", err);
     }
   };
 
@@ -413,7 +432,7 @@ export function RegisterStudentModal({
             enrollement_status: "enrolled",
             certificate_status: "pending",
             remarks: formData.discountType
-              ? `Enrolled with ${formData.discountType} discount of ${formData.discountValue}${formData.discountType === "percentage" ? "%" : " LKR"}`
+              ? `Enrolled with ${formData.discountType} discount of ${formData.discountValue}${formData.discountType === "percentage" ? "%" : " " + currencySymbol}`
               : "",
           });
 
@@ -1167,7 +1186,7 @@ export function RegisterStudentModal({
                     {formData.paymentOption === "upfront_installments" && (
                       <div className="animate-in fade-in slide-in-from-top-2 duration-200">
                         <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                          Upfront Amount (LKR){" "}
+                          Upfront Amount ({currencySymbol}){" "}
                           <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -1196,7 +1215,7 @@ export function RegisterStudentModal({
                           <p className="text-[10px] font-medium text-gray-400 mt-1.5 ml-1">
                             Balance:{" "}
                             <span className="font-bold text-gray-600">
-                              LKR{" "}
+                              {currencySymbol}{" "}
                               {Math.max(
                                 0,
                                 feeCalculation.fee_after_discount -
@@ -1226,7 +1245,7 @@ export function RegisterStudentModal({
                           Include Registration Fee
                         </span>
                         <span className="text-xs font-bold text-indigo-600">
-                          LKR{" "}
+                          {currencySymbol}{" "}
                           {courseIntakes
                             .find((f) => f.id === formData.courseIntakeFeeId)
                             ?.registration_fee?.toLocaleString() || "0"}
@@ -1304,7 +1323,7 @@ export function RegisterStudentModal({
                           }
                           disabled={!formData.discountType}
                           placeholder={
-                            formData.discountType === "percentage" ? "%" : "LKR"
+                            formData.discountType === "percentage" ? "%" : currencySymbol
                           }
                           className="col-span-2 px-4 py-3 bg-white border-2 border-indigo-100 rounded-xl text-sm font-bold text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
                         />
@@ -1327,7 +1346,7 @@ export function RegisterStudentModal({
                               Course Fee
                             </span>
                             <span className="font-black text-gray-900">
-                              LKR{" "}
+                              {currencySymbol}{" "}
                               {feeCalculation.total_course_fee.toLocaleString()}
                             </span>
                           </div>
@@ -1338,7 +1357,7 @@ export function RegisterStudentModal({
                                 Discount Applied
                               </span>
                               <span className="font-black text-green-600">
-                                - LKR{" "}
+                                - {currencySymbol}{" "}
                                 {feeCalculation.discount_amount.toLocaleString()}
                               </span>
                             </div>
@@ -1350,7 +1369,7 @@ export function RegisterStudentModal({
                                 Fee After Discount
                               </span>
                               <span className="font-black text-gray-900">
-                                LKR{" "}
+                                {currencySymbol}{" "}
                                 {feeCalculation.fee_after_discount.toLocaleString()}
                               </span>
                             </div>
@@ -1362,7 +1381,7 @@ export function RegisterStudentModal({
                                 Registration Fee
                               </span>
                               <span className="font-black text-gray-900">
-                                LKR{" "}
+                                {currencySymbol}{" "}
                                 {feeCalculation.registration_fee_amount.toLocaleString()}
                               </span>
                             </div>
@@ -1383,7 +1402,7 @@ export function RegisterStudentModal({
                                   : "Upfront Payment"}
                               </span>
                               <span className="font-black text-2xl text-indigo-600">
-                                LKR{" "}
+                                {currencySymbol}{" "}
                                 {formData.paymentOption === "full_payment"
                                   ? feeCalculation.upfront_payment.toLocaleString()
                                   : formData.customUpfrontAmount.toLocaleString()}
@@ -1400,7 +1419,7 @@ export function RegisterStudentModal({
                                 Installments
                               </span>
                               <span className="font-black text-lg text-gray-900">
-                                LKR{" "}
+                                {currencySymbol}{" "}
                                 {feeCalculation.installment_amount.toLocaleString()}{" "}
                                 <span className="text-xs font-bold text-gray-400">
                                   each
@@ -1408,7 +1427,7 @@ export function RegisterStudentModal({
                               </span>
                             </div>
                             <p className="text-[10px] font-medium text-gray-400 mt-1 uppercase tracking-widest">
-                              Total Installments: LKR{" "}
+                              Total Installments: {currencySymbol}{" "}
                               {(
                                 feeCalculation.installment_amount *
                                 feeCalculation.installment_count

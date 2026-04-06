@@ -83,6 +83,7 @@ export function EnrollExistingStudentModal({
   const [customUpfrontAmount, setCustomUpfrontAmount] = useState(0);
   const [feeCalculation, setFeeCalculation] =
     useState<EnrollmentFeeCalculation | null>(null);
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
 
   const resetModal = React.useCallback(() => {
     setStage(1);
@@ -210,6 +211,7 @@ export function EnrollExistingStudentModal({
     if (isOpen) {
       fetchPendingStudents();
       fetchCourseDetails();
+      fetchCurrencySymbol();
       resetModal();
     }
   }, [isOpen, fetchPendingStudents, fetchCourseDetails, resetModal]);
@@ -241,6 +243,23 @@ export function EnrollExistingStudentModal({
     discountValue,
     customUpfrontAmount,
   ]);
+
+  const fetchCurrencySymbol = async () => {
+    try {
+      const settings = await pb.collection("institution_settings").getFullList();
+      if (settings && settings.length > 0) {
+        const currencyCode = settings[0].currency || "INR";
+        const symbols: Record<string, string> = {
+          USD: "$", EUR: "€", GBP: "£", LKR: "Rs", 
+          AUD: "A$", CAD: "C$", INR: "₹", SGD: "S$", 
+          AED: "د.إ", ZAR: "R"
+        };
+        setCurrencySymbol(symbols[currencyCode] || "₹");
+      }
+    } catch (err) {
+      console.error("Error fetching currency settings:", err);
+    }
+  };
 
   async function handleEnroll() {
     if (!selectedStudent || !feeCalculation || !courseIntakeFeeId) return;
@@ -569,7 +588,7 @@ export function EnrollExistingStudentModal({
             {paymentOption === "upfront_installments" && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-200">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                  Upfront Amount (LKR) <span className="text-rose-500">*</span>
+                  Upfront Amount ({currencySymbol}) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -587,7 +606,7 @@ export function EnrollExistingStudentModal({
                   <p className="text-[10px] font-medium text-gray-400 mt-1.5 ml-1">
                     Balance:{" "}
                     <span className="font-bold text-gray-600">
-                      LKR{" "}
+                      {currencySymbol}{" "}
                       {Math.max(
                         0,
                         feeCalculation.fee_after_discount -
@@ -609,7 +628,7 @@ export function EnrollExistingStudentModal({
                   Include Registration Fee
                 </span>
                 <span className="text-xs font-bold text-green-600">
-                  LKR {registrationFee.toLocaleString()}
+                  {currencySymbol} {registrationFee.toLocaleString()}
                 </span>
                 <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">
                   One-time enrollment charge
@@ -653,7 +672,7 @@ export function EnrollExistingStudentModal({
                 >
                   <option value="">No Discount</option>
                   <option value="percentage">Percentage (%)</option>
-                  <option value="flat">Flat Amount (LKR)</option>
+                  <option value="flat">Flat Amount ({currencySymbol})</option>
                 </select>
                 <input
                   type="number"
@@ -679,7 +698,7 @@ export function EnrollExistingStudentModal({
                       Course Fee
                     </span>
                     <span className="font-bold text-gray-900">
-                      LKR {feeCalculation.total_course_fee.toLocaleString()}
+                      {currencySymbol} {feeCalculation.total_course_fee.toLocaleString()}
                     </span>
                   </div>
                   {feeCalculation.discount_amount > 0 && (
@@ -689,7 +708,7 @@ export function EnrollExistingStudentModal({
                           Discount Applied
                         </span>
                         <span className="font-bold text-green-600">
-                          - LKR{" "}
+                          - {currencySymbol}{" "}
                           {feeCalculation.discount_amount.toLocaleString()}
                         </span>
                       </div>
@@ -698,7 +717,7 @@ export function EnrollExistingStudentModal({
                           Fee After Discount
                         </span>
                         <span className="font-bold text-gray-900">
-                          LKR{" "}
+                          {currencySymbol}{" "}
                           {feeCalculation.fee_after_discount.toLocaleString()}
                         </span>
                       </div>
@@ -710,7 +729,7 @@ export function EnrollExistingStudentModal({
                         Registration Fee
                       </span>
                       <span className="font-bold text-gray-900">
-                        LKR{" "}
+                        {currencySymbol}{" "}
                         {feeCalculation.registration_fee_amount.toLocaleString()}
                       </span>
                     </div>
@@ -729,7 +748,7 @@ export function EnrollExistingStudentModal({
                             : "Upfront Payment"}
                         </span>
                         <span className="text-2xl font-black text-green-600">
-                          LKR
+                          {currencySymbol}
                           {paymentOption === "full_payment"
                             ? ` ${feeCalculation.upfront_payment.toLocaleString()}`
                             : ` ${customUpfrontAmount.toLocaleString()}`}
@@ -743,7 +762,7 @@ export function EnrollExistingStudentModal({
                         Monthly Installments
                       </span>
                       <span className="font-bold text-gray-900">
-                        {feeCalculation.installment_count} × LKR{" "}
+                        {feeCalculation.installment_count} × {currencySymbol}{" "}
                         {feeCalculation.installment_amount.toLocaleString()}
                       </span>
                     </div>

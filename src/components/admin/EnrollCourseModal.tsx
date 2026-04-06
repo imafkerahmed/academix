@@ -76,6 +76,7 @@ export function EnrollCourseModal({
   const [customUpfrontAmount, setCustomUpfrontAmount] = useState(0);
   const [feeCalculation, setFeeCalculation] =
     useState<EnrollmentFeeCalculation | null>(null);
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
 
   useEffect(() => {
     if (isOpen) {
@@ -88,8 +89,26 @@ export function EnrollCourseModal({
       setDiscountValue(0);
       setCustomUpfrontAmount(0);
       setFeeCalculation(null);
+      fetchCurrencySymbol();
     }
   }, [isOpen]);
+
+  const fetchCurrencySymbol = async () => {
+    try {
+      const settings = await pb.collection("institution_settings").getFullList();
+      if (settings && settings.length > 0) {
+        const currencyCode = settings[0].currency || "INR";
+        const symbols: Record<string, string> = {
+          USD: "$", EUR: "€", GBP: "£", LKR: "Rs", 
+          AUD: "A$", CAD: "C$", INR: "₹", SGD: "S$", 
+          AED: "د.إ", ZAR: "R"
+        };
+        setCurrencySymbol(symbols[currencyCode] || "₹");
+      }
+    } catch (err) {
+      console.error("Error fetching currency settings:", err);
+    }
+  };
 
   useEffect(() => {
     if (selectedIntakeId) {
@@ -233,7 +252,7 @@ export function EnrollCourseModal({
         enrollement_status: "enrolled",
         certificate_status: "pending",
         remarks: discountType
-          ? `Enrolled with ${discountType} discount of ${discountValue}${discountType === "percentage" ? "%" : " LKR"}`
+          ? `Enrolled with ${discountType} discount of ${discountValue}${discountType === "percentage" ? "%" : " " + currencySymbol}`
           : "",
       });
 
@@ -425,7 +444,7 @@ export function EnrollCourseModal({
                       <p
                         className={`text-xs font-black ${isSelected ? "text-indigo-600" : "text-gray-900"}`}
                       >
-                        LKR {c.course_fee.toLocaleString()}
+                        {currencySymbol} {c.course_fee.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -502,7 +521,7 @@ export function EnrollCourseModal({
               <div className="animate-in fade-in slide-in-from-top-2 duration-200 space-y-1">
                 <label className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">
                   <CreditCard size={10} className="text-indigo-400" />
-                  Upfront Amount (LKR) <span className="text-rose-500">*</span>
+                  Upfront Amount ({currencySymbol}) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -518,7 +537,7 @@ export function EnrollCourseModal({
                 />
                 {feeCalculation && customUpfrontAmount > 0 && (
                   <p className="text-[9px] font-medium text-gray-400 ml-1">
-                    Balance LKR{" "}
+                    Balance {currencySymbol}{" "}
                     {Math.max(
                       0,
                       feeCalculation.fee_after_discount - customUpfrontAmount,
@@ -551,7 +570,7 @@ export function EnrollCourseModal({
                         Registration Fee
                       </div>
                       <div className="text-[10px] font-bold text-indigo-600 mt-0.5">
-                        LKR {regFee.toLocaleString()}
+                        {currencySymbol} {regFee.toLocaleString()}
                       </div>
                     </div>
                     <button
@@ -626,7 +645,7 @@ export function EnrollCourseModal({
                       Course Fee
                     </span>
                     <span className="font-black text-gray-900">
-                      LKR {feeCalculation.total_course_fee.toLocaleString()}
+                      {currencySymbol} {feeCalculation.total_course_fee.toLocaleString()}
                     </span>
                   </div>
 
@@ -636,7 +655,7 @@ export function EnrollCourseModal({
                         Discount Applied
                       </span>
                       <span className="font-black text-emerald-500">
-                        - LKR {feeCalculation.discount_amount.toLocaleString()}
+                        - {currencySymbol} {feeCalculation.discount_amount.toLocaleString()}
                       </span>
                     </div>
                   )}
@@ -647,7 +666,7 @@ export function EnrollCourseModal({
                         Registration Fee
                       </span>
                       <span className="font-black text-gray-900">
-                        LKR {feeCalculation.registration_fee_amount.toLocaleString()}
+                        {currencySymbol} {feeCalculation.registration_fee_amount.toLocaleString()}
                       </span>
                     </div>
                   )}
@@ -663,7 +682,7 @@ export function EnrollCourseModal({
                               : "Upfront Payment"}
                         </p>
                         <p className="text-xl font-black text-indigo-600">
-                          LKR {feeCalculation.upfront_payment.toLocaleString()}
+                          {currencySymbol} {feeCalculation.upfront_payment.toLocaleString()}
                         </p>
                       </div>
                       {feeCalculation.installment_count > 0 && (
@@ -672,7 +691,7 @@ export function EnrollCourseModal({
                             {feeCalculation.installment_count}x Installments
                           </p>
                           <p className="text-xs font-black text-gray-900">
-                            LKR {feeCalculation.installment_amount.toLocaleString()}
+                            {currencySymbol} {feeCalculation.installment_amount.toLocaleString()}
                             <span className="text-[9px] text-gray-400 ml-1">/mo</span>
                           </p>
                         </div>

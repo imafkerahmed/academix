@@ -69,37 +69,42 @@ export default function PaymentManagement() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchData = async () => {
     try {
-      const paymentsPromise = pb
-        .collection("payments")
-        .getFullList<Payment>({
+      setLoading(true);
+      
+      const [paymentsData, installmentsData, settingsData] = await Promise.all([
+        pb.collection("payments").getFullList<Payment>({
           expand: "student,intake,course",
           sort: "-payment_date",
-        })
-        .catch(() => [] as Payment[]);
-
-      const installmentsPromise = pb
-        .collection("installments")
-        .getFullList<Installment>({
+        }).catch(() => [] as Payment[]),
+        pb.collection("installments").getFullList<Installment>({
           expand: "student",
           sort: "due_date",
-        })
-        .catch(() => [] as Installment[]);
-
-      const [paymentsData, installmentsData] = await Promise.all([
-        paymentsPromise,
-        installmentsPromise,
+        }).catch(() => [] as Installment[]),
+        pb.collection("institution_settings").getFullList().catch(() => []),
       ]);
+
+      if (settingsData && settingsData.length > 0) {
+        const currencyCode = settingsData[0].currency || "INR";
+        const symbols: Record<string, string> = {
+          USD: "$", EUR: "€", GBP: "£", LKR: "Rs", 
+          AUD: "A$", CAD: "C$", INR: "₹", SGD: "S$", 
+          AED: "د.إ", ZAR: "R"
+        };
+        setCurrencySymbol(symbols[currencyCode] || "₹");
+      }
 
       setPayments(paymentsData || []);
       setInstallments(installmentsData || []);
-      setLoading(false);
-    } catch {
+    } catch (error) {
+      console.error("Error fetching data:", error);
       setPayments([]);
       setInstallments([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -184,7 +189,7 @@ export default function PaymentManagement() {
             stats={[
               {
                 title: "Total Revenue",
-                value: `₹${stats.totalRevenue.toLocaleString()}`,
+                value: `${currencySymbol}${stats.totalRevenue.toLocaleString()}`,
                 icon: CreditCard,
                 bgColor: "bg-green-50",
                 iconColor: "text-green-600",
@@ -314,7 +319,7 @@ export default function PaymentManagement() {
                     <td className="px-10 py-6">
                       <div className="flex flex-col">
                         <span className="text-sm font-black text-gray-900">
-                          ₹{payment.amount?.toLocaleString()}
+                          {currencySymbol}{payment.amount?.toLocaleString()}
                         </span>
                         <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest flex items-center gap-1">
                           <Calendar size={10} className="text-indigo-400" />

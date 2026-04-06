@@ -862,7 +862,11 @@ function UpdateProfileControl({
   );
 }
 
-function RecordPaymentControl() {
+function RecordPaymentControl({
+  currencySymbol = "LKR",
+}: {
+  currencySymbol?: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const todayFormatted = new Date().toLocaleDateString("en-GB", {
     weekday: "long",
@@ -899,7 +903,7 @@ function RecordPaymentControl() {
                 Outstanding This Month
               </p>
               <p className="text-3xl font-black text-indigo-700">
-                LKR {outstandingAmount.toLocaleString()}
+                {currencySymbol} {outstandingAmount.toLocaleString()}
               </p>
             </div>
             <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-500 shadow-md">
@@ -1058,6 +1062,7 @@ export default function StudentDetail() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [studentAssignments, setStudentAssignments] = useState<StudentAssignment[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
   const [financeFilter, setFinanceFilter] = useState("all");
   const [internalNote, setInternalNote] = useState("");
   const [savingInternalNote, setSavingInternalNote] = useState(false);
@@ -1151,6 +1156,23 @@ export default function StudentDetail() {
           : "";
       setInternalNote(remoteNote || localNote);
       setPayments(paymentRecords);
+
+      // Fetch Global Currency Symbol
+      try {
+        const settings = await pb.collection("institution_settings").getFullList();
+        if (settings && settings.length > 0) {
+          const currencyCode = settings[0].currency || "INR";
+          const symbols: Record<string, string> = {
+            USD: "$", EUR: "€", GBP: "£", LKR: "Rs", 
+            AUD: "A$", CAD: "C$", INR: "₹", SGD: "S$", 
+            AED: "د.إ", ZAR: "R"
+          };
+          setCurrencySymbol(symbols[currencyCode] || "₹");
+        }
+      } catch (err) {
+        console.error("Error fetching currency settings:", err);
+      }
+
       setLoading(false);
     } catch (error) {
       if (!isSuperuserOnlyError(error)) {
@@ -1250,7 +1272,7 @@ export default function StudentDetail() {
             items={[{ label: "Students", href: "/dashboard/admin/students" }]}
           />
           <div className="flex items-center gap-3 md:ml-auto">
-            {activeTab === "payments" && <RecordPaymentControl />}
+            {activeTab === "payments" && <RecordPaymentControl currencySymbol={currencySymbol} />}
 
             {activeTab === "academic" && (
               <button
@@ -1763,7 +1785,7 @@ export default function StudentDetail() {
                           </td>
                           <td className="py-5">
                             <span className="text-sm font-black text-gray-900">
-                              ₹{payment.amount.toLocaleString()}
+                              {currencySymbol}{payment.amount.toLocaleString()}
                             </span>
                           </td>
                           <td className="py-5 text-center">
