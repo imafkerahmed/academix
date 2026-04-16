@@ -173,7 +173,7 @@ export default function StudentManagement() {
                 title: "Total Students",
                 value: totalItems,
                 icon: Users,
-                bgColor: "bg-blue-50",
+                bgColor: "bg-white",
                 iconColor: "text-blue-600",
               },
               {
@@ -181,7 +181,7 @@ export default function StudentManagement() {
                 value: students.filter((s) => s.accountStatus === "active")
                   .length,
                 icon: CheckCircle,
-                bgColor: "bg-green-50",
+                bgColor: "bg-white",
                 iconColor: "text-green-600",
               },
               {
@@ -189,7 +189,7 @@ export default function StudentManagement() {
                 value: students.filter((s) => s.accountStatus === "disabled")
                   .length,
                 icon: XCircle,
-                bgColor: "bg-red-50",
+                bgColor: "bg-white",
                 iconColor: "text-red-600",
               },
               {
@@ -199,7 +199,7 @@ export default function StudentManagement() {
                     new Date(s.created).getMonth() === new Date().getMonth(),
                 ).length,
                 icon: Calendar,
-                bgColor: "bg-indigo-50",
+                bgColor: "bg-white",
                 iconColor: "text-indigo-600",
               },
             ]}

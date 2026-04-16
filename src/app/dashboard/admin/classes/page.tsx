@@ -678,10 +678,10 @@ export default function ClassManagement() {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <StatsCarousel
             stats={[
-              { title: "Scheduled", value: stats.scheduled, icon: Calendar, bgColor: "bg-blue-50", iconColor: "text-blue-600" },
-              { title: "In Progress", value: stats.inProgress, icon: Play, bgColor: "bg-green-50", iconColor: "text-green-600" },
-              { title: "Completed", value: stats.completed, icon: CheckCircle, bgColor: "bg-gray-100", iconColor: "text-gray-600" },
-              { title: "Cancelled", value: stats.cancelled, icon: XCircle, bgColor: "bg-red-50", iconColor: "text-red-600" },
+              { title: "Scheduled", value: stats.scheduled, icon: Calendar, bgColor: "bg-white", iconColor: "text-blue-600" },
+              { title: "In Progress", value: stats.inProgress, icon: Play, bgColor: "bg-white", iconColor: "text-green-600" },
+              { title: "Completed", value: stats.completed, icon: CheckCircle, bgColor: "bg-white", iconColor: "text-gray-600" },
+              { title: "Cancelled", value: stats.cancelled, icon: XCircle, bgColor: "bg-white", iconColor: "text-red-600" },
             ]}
           />
         </div>
