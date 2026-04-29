@@ -36,19 +36,24 @@ export async function POST(request: Request) {
     const classRecord = await pb.collection("classes").getOne(classId);
 
     // Check authorization: Admin/Superuser OR the assigned Lecturer for this class
-    const isAdminAccount = 
-      ["admin", "superuser"].includes(userRole) || 
-      decoded.type === "admin";
-    
+    const isAdminAccount =
+      ["admin", "superuser"].includes(userRole) || decoded.type === "admin";
+
     const isAssignedLecturer = classRecord.lecturer === decoded.id;
 
     if (!isAdminAccount && !isAssignedLecturer) {
-      console.warn(`[Classroom] Unauthorized start attempt for class ${classId}`, { 
-        userId: decoded.id,
-        userRole: userRole,
-        assignedLecturer: classRecord.lecturer
-      });
-      return NextResponse.json({ error: "Forbidden: You are not authorized to start this class" }, { status: 403 });
+      console.warn(
+        `[Classroom] Unauthorized start attempt for class ${classId}`,
+        {
+          userId: decoded.id,
+          userRole: userRole,
+          assignedLecturer: classRecord.lecturer,
+        },
+      );
+      return NextResponse.json(
+        { error: "Forbidden: You are not authorized to start this class" },
+        { status: 403 },
+      );
     }
 
     // Update the status to in_progress
@@ -56,47 +61,6 @@ export async function POST(request: Request) {
       await pb.collection("classes").update(classId, {
         status: "in_progress",
       });
-    }
-
-    // Ensure Galene group configuration exists
-    if (classRecord.galene_group) {
-      const hostPassword = process.env.NEXT_PUBLIC_GALENE_HOST_PASSWORD || "lecturer123";
-      const studentPassword = process.env.NEXT_PUBLIC_GALENE_STUDENT_PASSWORD || "student123";
-      const duration = classRecord.duration || 60;
-
-      // Call our internal Galene management API
-      // This automatically handles local-to-production bridging and correct filesystem paths
-      const internalUrl = `${new URL(request.url).origin}/api/galene/group`;
-      
-      console.log(`[Classroom] Ensuring Galene group via bridge: ${internalUrl}`, {
-        classId: classRecord.galene_group,
-        remoteUrl: process.env.GALENE_REMOTE_MANAGEMENT_URL
-      });
-      
-      try {
-        const galeneRes = await fetch(internalUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-internal-secret": process.env.INTERNAL_SECRET || "",
-          },
-          body: JSON.stringify({
-            classId: classRecord.galene_group,
-            passwordHost: hostPassword,
-            passwordAttendee: studentPassword,
-            duration: duration,
-          }),
-        });
-
-        if (!galeneRes.ok) {
-          const errorData = await galeneRes.json();
-          console.error("[Classroom] Failed to ensure Galene group via bridge:", errorData);
-        } else {
-          console.log(`[Classroom] Galene group ${classRecord.galene_group} checked/created via bridge.`);
-        }
-      } catch (err) {
-        console.error("[Classroom] Network error calling Galene bridge:", err);
-      }
     }
 
     return NextResponse.json({ success: true });

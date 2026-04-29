@@ -5,11 +5,7 @@ services:
     container_name: academix-frontend
     ports:
       - "3000:3000"
-    volumes:
-      - /DATA/Web Projects/Academix/services/galene/groups:/app/services/galene/groups
     environment:
       - NEXT_PUBLIC_POCKETBASE_URL=https://academixdb.codix.site
-      - GALENE_GROUPS_PATH=/app/services/galene/groups
       - INTERNAL_SECRET=${INTERNAL_SECRET}
     restart: unless-stopped
-

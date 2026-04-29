@@ -34,7 +34,6 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/academix-app:latest
           build-args: |
             NEXT_PUBLIC_POCKETBASE_URL=https://academixdb.codix.site
-            NEXT_PUBLIC_GALENE_URL=https://academix-classroom.codix.site
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
