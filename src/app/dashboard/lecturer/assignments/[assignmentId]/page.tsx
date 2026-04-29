@@ -20,6 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import pb from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 interface Submission {
   id: string;
@@ -49,64 +51,6 @@ interface AssignmentDetails {
   assignmentSheetUrl?: string;
   submissions: Submission[];
 }
-
-// Temporary mock data. In the future, fetch from PocketBase by assignmentId.
-const mockAssignments: AssignmentDetails[] = [
-  {
-    id: "assign-1",
-    title: "Build a Calculator App",
-    subjectCode: "CS101",
-    subjectName: "Introduction to Programming",
-    courseName: "Computer Science Fundamentals",
-    intakeName: "January 2024 Intake",
-    dueDate: "2026-02-15",
-    maxMarks: 100,
-    description:
-      "Students should build a basic calculator that supports +, -, *, / and clear.",
-    assignmentSheetName: "Build a Calculator App - Assignment Sheet.pdf",
-    assignmentSheetUrl: "/Afker%20Ahmed%20Qatar%20cv%20copy.pdf",
-    submissions: [
-      {
-        id: "sub-1",
-        studentName: "Alice Johnson",
-        studentId: "S001",
-        status: "submitted",
-        submittedAt: "2026-02-10 14:20",
-        marks: 92,
-        grade: "A-",
-        feedback: "Great job, minor improvements suggested on error handling.",
-        filePlaceholder: "Afker Ahmed Qatar cv copy.pdf",
-        fileUrl: "/Afker%20Ahmed%20Qatar%20cv%20copy.pdf",
-      },
-      {
-        id: "sub-2",
-        studentName: "Brian Lee",
-        studentId: "S002",
-        status: "submitted",
-        submittedAt: "2026-02-12 09:05",
-        filePlaceholder: "brian-calculator.zip",
-      },
-      {
-        id: "sub-3",
-        studentName: "Carla Mendes",
-        studentId: "S003",
-        status: "not_submitted",
-      },
-      {
-        id: "sub-4",
-        studentName: "David Kim",
-        studentId: "S004",
-        status: "marked",
-        submittedAt: "2026-02-11 16:45",
-        marks: 85,
-        grade: "B+",
-        feedback: "Good structure, consider improving UI.",
-        filePlaceholder: "david-calculator.zip",
-      },
-    ],
-  },
-];
-
 
 function getGradeFromMarks(marks: number, maxMarks: number): string {
   if (!Number.isFinite(marks) || maxMarks <= 0) return "";
@@ -154,15 +98,8 @@ export default function AssignmentMarkingPage() {
   const searchParams = useSearchParams();
   const assignmentId = params?.assignmentId;
 
-  const initialAssignment = useMemo(
-    () =>
-      mockAssignments.find((a) => a.id === assignmentId) ?? mockAssignments[0],
-    [assignmentId],
-  );
-
-  const [assignment, setAssignment] = useState<AssignmentDetails | null>(
-    initialAssignment,
-  );
+  const [loading, setLoading] = useState(true);
+  const [assignment, setAssignment] = useState<AssignmentDetails | null>(null);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<
     string | null
   >(searchParams?.get("submissionId") ?? null);
@@ -173,8 +110,111 @@ export default function AssignmentMarkingPage() {
   const [isMobileMarkingModalOpen, setIsMobileMarkingModalOpen] =
     useState(false);
 
+  const fetchData = React.useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const assignmentRecord = await pb
+        .collection("assignments")
+        .getOne(assignmentId, {
+          expand:
+            "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
+        });
+
+      const courseSubject = (assignmentRecord as any).expand?.course_subject;
+      const courseIntake = courseSubject?.expand?.course_intake;
+      const course = courseIntake?.expand?.course;
+      const intake = courseIntake?.expand?.intake;
+      const subjectRecord = Array.isArray(courseSubject?.expand?.subject)
+        ? courseSubject.expand.subject[0]
+        : courseSubject?.expand?.subject;
+
+      const enrollments = await pb.collection("enrollments").getFullList({
+        filter: `course_intake = "${courseIntake?.id}"`,
+        expand: "student",
+        sort: "-created",
+      });
+
+      const submissionRecords = await pb
+        .collection("assignment_submissions")
+        .getFullList({
+          filter: `assignment = "${assignmentId}"`,
+          expand: "student",
+          sort: "-submitted_at",
+        });
+
+      const submissionByStudent = new Map<string, any>();
+      submissionRecords.forEach((submission: any) => {
+        const studentId = submission.expand?.student?.id || submission.student;
+        if (studentId && !submissionByStudent.has(studentId)) {
+          submissionByStudent.set(studentId, submission);
+        }
+      });
+
+      const submissions: Submission[] = enrollments.map((enrollment: any) => {
+        const student = enrollment.expand?.student;
+        const submission = student
+          ? submissionByStudent.get(student.id)
+          : undefined;
+        const isMarked = submission?.evaluation_status === "marked";
+        const hasSubmission = Boolean(submission);
+
+        return {
+          id: submission?.id || `missing-${student?.id || enrollment.id}`,
+          studentName:
+            student?.name || enrollment.registration_number || "Unknown",
+          studentId:
+            student?.id || enrollment.registration_number || enrollment.id,
+          status: isMarked
+            ? "marked"
+            : hasSubmission
+              ? "submitted"
+              : "not_submitted",
+          submittedAt: submission?.submitted_at,
+          marks: submission?.mark,
+          grade: submission?.grade,
+          feedback: submission?.feedback,
+          fileUrl: submission?.file
+            ? pb.files.getURL(submission, submission.file)
+            : undefined,
+          canResubmit:
+            submission?.evaluation_status === "marked" &&
+            submission?.grade === "F",
+        };
+      });
+
+      setAssignment({
+        id: assignmentRecord.id,
+        title: assignmentRecord.title,
+        subjectCode: subjectRecord?.code || "N/A",
+        subjectName: subjectRecord?.name || "Subject",
+        courseName: course?.name || "Course",
+        intakeName: intake?.code || "Intake",
+        dueDate: assignmentRecord.due_date,
+        maxMarks: assignmentRecord.total_marks || 100,
+        description: assignmentRecord.description,
+        assignmentSheetName: assignmentRecord.file || undefined,
+        assignmentSheetUrl: assignmentRecord.file
+          ? pb.files.getURL(assignmentRecord, assignmentRecord.file)
+          : undefined,
+        submissions,
+      });
+    } catch (error) {
+      console.error("Error fetching assignment details:", error);
+      toast.error("Failed to load assignment data");
+      setAssignment(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [assignmentId]);
+
   // Sync selectedSubmissionId with URL
   React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (selectedSubmissionId) {
       params.set("submissionId", selectedSubmissionId);
@@ -258,6 +298,11 @@ export default function AssignmentMarkingPage() {
     if (filter === "resubmission") {
       return assignment.submissions.filter((s) => s.canResubmit);
     }
+    if (filter === "submitted") {
+      return assignment.submissions.filter(
+        (s) => s.status === "submitted" || s.status === "marked",
+      );
+    }
     return assignment.submissions.filter((s) => s.status === filter);
   }, [assignment, filter]);
 
@@ -277,39 +322,35 @@ export default function AssignmentMarkingPage() {
     (s) => s.id === selectedSubmissionId,
   );
 
-
-  const handleSave = (grade: string, feedback: string) => {
+  const handleSave = async (grade: string, feedback: string) => {
     if (!selectedSubmission) return;
 
     // Require a numeric grade before saving
     if (!hasValidMarks) return;
 
-    setAssignment((prev) => {
-      if (!prev) return prev;
-      const numericMarks = Number(marksInput);
-      const safeMarks = Number.isFinite(numericMarks)
-        ? numericMarks
-        : undefined;
-      const autoGrade =
-        safeMarks != null
-          ? getEffectiveGrade(safeMarks, prev, selectedSubmission)
-          : grade || undefined;
-      const isFail = autoGrade === "F";
-      const updated = prev.submissions.map((s) =>
-        s.id === selectedSubmission.id
-          ? {
-              ...s,
-              marks: safeMarks,
-              grade: autoGrade || undefined,
-              feedback: feedback || undefined,
-              status: "marked" as const,
-              // Allow further resubmission only if still failing
-              canResubmit: isFail,
-            }
-          : s,
-      );
-      return { ...prev, submissions: updated };
-    });
+    const numericMarks = Number(marksInput);
+    const safeMarks = Number.isFinite(numericMarks) ? numericMarks : undefined;
+
+    try {
+      await pb
+        .collection("assignment_submissions")
+        .update(selectedSubmission.id, {
+          mark: safeMarks,
+          grade:
+            safeMarks != null
+              ? getEffectiveGrade(safeMarks, assignment!, selectedSubmission)
+              : grade || undefined,
+          feedback: feedback || undefined,
+          evaluation_status: "marked",
+          marked_at: new Date().toISOString(),
+          marked_by: pb.authStore.model?.id,
+        });
+
+      await fetchData();
+    } catch (error) {
+      console.error("Error saving grade:", error);
+      toast.error("Failed to save grade");
+    }
   };
 
   const [gradeInput, setGradeInput] = useState<string>(
@@ -343,7 +384,6 @@ export default function AssignmentMarkingPage() {
     Number.isFinite(numericMarksInput) &&
     numericMarksInput >= 0 &&
     numericMarksInput <= assignment.maxMarks;
-
 
   if (!assignment) {
     return (

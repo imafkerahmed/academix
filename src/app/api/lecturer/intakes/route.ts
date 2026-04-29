@@ -14,7 +14,9 @@ export async function GET(request: Request) {
     }
 
     const adminPb = await getAdminClient();
-    console.log(`[Lecturer API] Fetching course_subjects for lecturer: ${lecturerId}`);
+    console.log(
+      `[Lecturer API] Fetching course_subjects for lecturer: ${lecturerId}`,
+    );
 
     // Fetch all course_subjects for this lecturer with full expanded info
     const csRecords = await adminPb.collection("course_subjects").getFullList({
@@ -30,16 +32,20 @@ export async function GET(request: Request) {
     for (const cs of csRecords) {
       const ci = cs.expand?.course_intake;
       if (!ci) {
-        console.warn(`[Lecturer API] Missing expansion for course_intake on course_subject ${cs.id}`);
+        console.warn(
+          `[Lecturer API] Missing expansion for course_intake on course_subject ${cs.id}`,
+        );
         continue;
       }
-      
+
       const intake = ci.expand?.intake;
       const course = ci.expand?.course;
       const subjects = cs.expand?.subject;
 
       if (!intake || !course || !subjects) {
-        console.warn(`[Lecturer API] Missing expansion on course_intake ${ci.id}: intake=${!!intake}, course=${!!course}, subjects=${!!subjects}`);
+        console.warn(
+          `[Lecturer API] Missing expansion on course_intake ${ci.id}: intake=${!!intake}, course=${!!course}, subjects=${!!subjects}`,
+        );
         continue;
       }
 
@@ -65,10 +71,10 @@ export async function GET(request: Request) {
       }
 
       const courseData = intakeData.courses.get(course.id);
-      
+
       // subjects can be an array or a single object in PocketBase expand if specified
       const subjectArray = Array.isArray(subjects) ? subjects : [subjects];
-      
+
       for (const s of subjectArray) {
         // Avoid duplicate subjects in same course/intake view
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,13 +84,14 @@ export async function GET(request: Request) {
             name: s.name,
             code: s.code,
             assigned: true,
+            courseSubjectId: cs.id,
           });
         }
       }
     }
 
     // Convert Maps to Arrays
-    const result = Array.from(intakesMap.values()).map(intake => ({
+    const result = Array.from(intakesMap.values()).map((intake) => ({
       ...intake,
       courses: Array.from(intake.courses.values()),
     }));

@@ -18,20 +18,20 @@ import {
   ArrowLeft,
   Layout,
 } from "lucide-react";
-import {
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
 import { ModernModal } from "@/components/ui/modern-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
+import pb from "@/lib/pocketbase";
 
 export interface Subject {
   id: string;
   name: string;
   code: string;
   assigned: boolean;
+  courseSubjectId: string;
 }
 
 export interface Course {
@@ -60,6 +60,8 @@ interface SubjectMaterial {
   description: string;
   type: "document" | "youtube-link" | "video-link" | "video-upload";
   filePlaceholder?: string;
+  file?: string;
+  fileUrl?: string | null;
   videoUrl?: string;
   canDownload: boolean;
   visible: boolean;
@@ -72,6 +74,9 @@ interface SubjectAssignment {
   dueDate: string;
   pendingCount: number;
   markedCount: number;
+  status: "ongoing" | "grace-period" | "closed";
+  daysRemaining?: number;
+  daysOverdue?: number;
 }
 
 const mockMaterialsPerSubject: Record<string, SubjectMaterial[]> = {
@@ -157,6 +162,7 @@ const mockAssignmentsPerSubject: Record<string, SubjectAssignment[]> = {
       dueDate: "2026-02-15",
       pendingCount: 12,
       markedCount: 8,
+      status: "closed",
     },
     {
       id: "assign-2",
@@ -164,6 +170,7 @@ const mockAssignmentsPerSubject: Record<string, SubjectAssignment[]> = {
       dueDate: "2026-02-10",
       pendingCount: 3,
       markedCount: 17,
+      status: "closed",
     },
   ],
   "subject-2": [
@@ -173,6 +180,7 @@ const mockAssignmentsPerSubject: Record<string, SubjectAssignment[]> = {
       dueDate: "2026-02-20",
       pendingCount: 5,
       markedCount: 15,
+      status: "closed",
     },
   ],
 };
@@ -191,8 +199,10 @@ function SubjectDetailsView({
   onBack,
 }: SubjectDetailsViewProps) {
   const router = useRouter();
-  const allMaterials = React.useMemo(() => mockMaterialsPerSubject[subject.id] || [], [subject.id]);
-  const assignments = React.useMemo(() => mockAssignmentsPerSubject[subject.id] || [], [subject.id]);
+  const [assignments, setAssignments] = useState<SubjectAssignment[]>([]);
+  const [allMaterials, setAllMaterials] = useState<SubjectMaterial[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+  const [loadingMaterials, setLoadingMaterials] = useState(true);
   const [activeTab, setActiveTab] = useState("assignments");
 
   const [materials, setMaterials] = useState<SubjectMaterial[]>(allMaterials);
@@ -204,10 +214,85 @@ function SubjectDetailsView({
   const [newMaterialUrl, setNewMaterialUrl] = useState("");
   const [newMaterialCanDownload, setNewMaterialCanDownload] = useState(true);
   const [newMaterialFileName, setNewMaterialFileName] = useState("");
+  const [newMaterialFile, setNewMaterialFile] = useState<File | null>(null);
+  const [openMaterialSection, setOpenMaterialSection] = useState<
+    "study" | "video" | null
+  >(null);
 
   const [previewMaterial, setPreviewMaterial] =
     useState<SubjectMaterial | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const fetchMaterials = React.useCallback(async () => {
+    if (!subject.courseSubjectId) return;
+
+    try {
+      setLoadingMaterials(true);
+      const materialsData = await fetch(
+        `/api/lecturer/subjects?courseSubjectId=${subject.courseSubjectId}&type=materials`,
+      );
+      const materialsJson = await materialsData.json();
+
+      if (materialsData.ok && materialsJson.materials) {
+        setAllMaterials(
+          materialsJson.materials.map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            description: m.description,
+            type: m.type,
+            filePlaceholder: m.file,
+            file: m.file,
+            fileUrl: m.fileUrl,
+            videoUrl: m.video_url,
+            canDownload: m.can_download,
+            visible: m.visible,
+            createdAt: m.created,
+          })),
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching materials:", err);
+    } finally {
+      setLoadingMaterials(false);
+    }
+  }, [subject.courseSubjectId]);
+
+  // Fetch assignments and materials from PocketBase
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch assignments for this course_subject
+        const assignmentsData = await fetch(
+          `/api/lecturer/subjects?courseSubjectId=${subject.courseSubjectId}`,
+        );
+        const assignmentsJson = await assignmentsData.json();
+
+        if (assignmentsData.ok && assignmentsJson.assignments) {
+          setAssignments(
+            assignmentsJson.assignments.map((a: any) => ({
+              id: a.id,
+              title: a.title,
+              dueDate: a.due_date,
+              pendingCount: a.pendingSubmissions || 0,
+              markedCount: a.markedSubmissions || 0,
+              status: a.status,
+              daysRemaining: a.daysRemaining,
+              daysOverdue: a.daysOverdue,
+            })),
+          );
+        }
+      } catch (err) {
+        console.error("Error fetching assignments:", err);
+      } finally {
+        setLoadingAssignments(false);
+      }
+    };
+
+    if (subject.courseSubjectId) {
+      fetchData();
+      fetchMaterials();
+    }
+  }, [subject.courseSubjectId, fetchMaterials]);
 
   React.useEffect(() => {
     setMaterials(allMaterials);
@@ -218,49 +303,93 @@ function SubjectDetailsView({
     setNewMaterialCanDownload(true);
     setIsAddMaterialOpen(false);
     setNewMaterialFileName("");
+    setNewMaterialFile(null);
     setPreviewMaterial(null);
     setIsPreviewOpen(false);
-  }, [subject.id, allMaterials]);
+  }, [subject.courseSubjectId, allMaterials]);
 
-  const handleAddMaterial = (event: React.FormEvent) => {
+  const handleAddMaterial = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newMaterialTitle.trim()) return;
+    if (!newMaterialTitle.trim() || !subject.courseSubjectId) return;
 
-    const now = new Date().toISOString();
+    if (
+      (newMaterialType === "youtube-link" ||
+        newMaterialType === "video-link") &&
+      !newMaterialUrl.trim()
+    ) {
+      return;
+    }
 
-    const isDocument = newMaterialType === "document";
-    const isVideoUpload = newMaterialType === "video-upload";
-    const isVideoLinkType =
-      newMaterialType === "youtube-link" || newMaterialType === "video-link";
+    if (
+      (newMaterialType === "document" || newMaterialType === "video-upload") &&
+      !newMaterialFile
+    ) {
+      return;
+    }
 
-    const newMaterial: SubjectMaterial = {
-      id: `new-${Date.now()}`,
-      title: newMaterialTitle.trim(),
-      description: newMaterialDescription.trim(),
-      type: newMaterialType,
-      canDownload: newMaterialCanDownload,
-      visible: true,
-      createdAt: now,
-      ...(isDocument || isVideoUpload
-        ? {
-            filePlaceholder:
-              newMaterialFileName ||
-              (isDocument ? "document.pdf" : "video-file.mp4"),
-          }
-        : {}),
-      ...(isVideoLinkType && newMaterialUrl.trim()
-        ? { videoUrl: newMaterialUrl.trim() }
-        : {}),
-    };
+    try {
+      const formData = new FormData();
+      formData.append("course_subject", subject.courseSubjectId);
+      formData.append("title", newMaterialTitle.trim());
+      formData.append("description", newMaterialDescription.trim());
+      formData.append("type", newMaterialType);
+      formData.append("can_download", String(newMaterialCanDownload));
+      formData.append("visible", "true");
 
-    setMaterials((prev) => [newMaterial, ...prev]);
-    setIsAddMaterialOpen(false);
-    setNewMaterialTitle("");
-    setNewMaterialDescription("");
-    setNewMaterialUrl("");
-    setNewMaterialType("document");
-    setNewMaterialCanDownload(true);
-    setNewMaterialFileName("");
+      if (
+        newMaterialType === "youtube-link" ||
+        newMaterialType === "video-link"
+      ) {
+        formData.append("video_url", newMaterialUrl.trim());
+      }
+
+      if (newMaterialFile) {
+        formData.append("file", newMaterialFile);
+      }
+
+      const response = await fetch("/api/lecturer/subjects", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create material");
+      }
+
+      setIsAddMaterialOpen(false);
+      setNewMaterialTitle("");
+      setNewMaterialDescription("");
+      setNewMaterialUrl("");
+      setNewMaterialType("document");
+      setNewMaterialCanDownload(true);
+      setNewMaterialFileName("");
+      setNewMaterialFile(null);
+      await fetchMaterials();
+    } catch (error) {
+      console.error("Error creating material:", error);
+    }
+  };
+
+  const handleDeleteMaterial = async (materialId: string) => {
+    try {
+      const response = await fetch(
+        `/api/lecturer/subjects?materialId=${materialId}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete material");
+      }
+
+      setPreviewMaterial((current) =>
+        current?.id === materialId ? null : current,
+      );
+      await fetchMaterials();
+    } catch (error) {
+      console.error("Error deleting material:", error);
+    }
   };
 
   // Separate materials into study materials and video materials
@@ -290,10 +419,75 @@ function SubjectDetailsView({
   };
 
   const getYouTubeVideoId = (url: string) => {
-    const regExp =
-      /^.*(youtu.be\/.+|v\/.+|u\/\w\/.+|embed\/.+|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return match && match[2].length === 11 ? match[2] : null;
+    try {
+      const parsedUrl = new URL(url);
+      const host = parsedUrl.hostname.replace(/^www\./, "");
+
+      if (host === "youtu.be") {
+        const id = parsedUrl.pathname.split("/").filter(Boolean)[0];
+        return id && id.length === 11 ? id : null;
+      }
+
+      if (host === "youtube.com" || host === "m.youtube.com") {
+        const v = parsedUrl.searchParams.get("v");
+        if (v && v.length === 11) return v;
+
+        const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+        const candidate =
+          (pathParts[0] === "shorts" && pathParts[1]) ||
+          (pathParts[0] === "embed" && pathParts[1]) ||
+          (pathParts[0] === "live" && pathParts[1]) ||
+          null;
+
+        return candidate && candidate.length === 11 ? candidate : null;
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getVideoEmbedUrl = (url: string) => {
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      const videoId = getYouTubeVideoId(url);
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+
+    return url;
+  };
+
+  const isDirectVideoUrl = (url: string) =>
+    /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url);
+
+  const isPdfFile = (material: SubjectMaterial) => {
+    const fileName = (material.filePlaceholder || "").toLowerCase();
+    const fileUrl = (material.fileUrl || "").toLowerCase();
+    return fileName.endsWith(".pdf") || fileUrl.includes(".pdf");
+  };
+
+  const handleDownloadMaterial = async (material: SubjectMaterial) => {
+    if (material.type !== "document") {
+      return;
+    }
+
+    if (!material.fileUrl) return;
+
+    try {
+      const response = await fetch(material.fileUrl);
+      if (!response.ok) throw new Error("Failed to fetch file");
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = material.filePlaceholder || material.title || "download";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(material.fileUrl, "_blank", "noopener,noreferrer");
+    }
   };
 
   const openPreview = (material: SubjectMaterial) => {
@@ -314,12 +508,16 @@ function SubjectDetailsView({
           </div>
           Back to Intake
         </button>
-        <div className="flex items-center gap-4 mb-2">
-          <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_purple]" />
-          <h2 className="text-3xl font-black text-gray-900 tracking-tighter leading-none">
-            {subject.code}{" "}
-            <span className="text-indigo-600">{subject.name}</span>
-          </h2>
+        <div className="flex items-start gap-4 mb-2">
+          <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_purple] mt-4" />
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-[11px] font-black text-indigo-500 uppercase tracking-[0.35em]">
+              {subject.code}
+            </span>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tighter leading-none">
+              {subject.name}
+            </h2>
+          </div>
         </div>
         <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.25em] mt-3 flex items-center gap-2">
           <span className="text-indigo-400">{intakeCode}</span>
@@ -378,7 +576,11 @@ function SubjectDetailsView({
       <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
         {activeTab === "assignments" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {assignments.length === 0 ? (
+            {loadingAssignments ? (
+              <div className="flex items-center justify-center p-16">
+                <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : assignments.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-16 text-center bg-gray-50/50 rounded-[2.5rem] border border-dashed border-gray-200">
                 <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-50 flex items-center justify-center text-indigo-200 mb-4">
                   <FileEdit size={32} />
@@ -388,67 +590,198 @@ function SubjectDetailsView({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {assignments.map((assignment) => (
-                  <div
-                    key={assignment.id}
-                    className="group/assign relative overflow-hidden bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 active:scale-[0.98] border-b-4 border-b-indigo-500/10"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover/assign:bg-indigo-600 group-hover/assign:text-white transition-all duration-500 shadow-sm">
-                        <FileEdit size={24} />
-                      </div>
-                      <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 rounded-full border border-amber-100">
-                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">
-                          Active
-                        </span>
-                      </div>
-                    </div>
-
-                    <h4 className="font-black text-lg text-gray-900 tracking-tight mb-2 group-hover/assign:text-indigo-600 transition-colors leading-tight">
-                      {assignment.title}
-                    </h4>
-
-                    <div className="flex flex-wrap items-center gap-4 mb-6">
-                      <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gray-50 rounded-xl text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                        <Timer size={12} className="text-indigo-400" />
-                        Due: {new Date(assignment.dueDate).toLocaleDateString()}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      <div className="p-3 bg-red-50/50 rounded-2xl border border-red-100/50">
-                        <p className="text-[8px] font-black text-red-500 uppercase tracking-widest mb-1">
-                          Pending
-                        </p>
-                        <p className="text-xl font-black text-red-600 leading-none">
-                          {assignment.pendingCount}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
-                        <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">
-                          Marked
-                        </p>
-                        <p className="text-xl font-black text-emerald-600 leading-none">
-                          {assignment.markedCount}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      className="w-full py-4 bg-gray-900 group-hover/assign:bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-500 shadow-xl shadow-gray-200 group-hover/assign:shadow-indigo-200 flex items-center justify-center gap-2 hover:translate-y-[-2px] active:translate-y-[1px]"
-                      onClick={() =>
-                        router.push(
-                          `/dashboard/lecturer/assignments/${assignment.id}`,
-                        )
-                      }
-                    >
-                      Process Submissions
-                      <ChevronRight size={14} strokeWidth={3} />
-                    </button>
+              <div className="space-y-2">
+                {/* List Header */}
+                <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-gray-50 rounded-2xl mb-2 border border-gray-100">
+                  <div className="col-span-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                    Assignment
                   </div>
-                ))}
+                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                    Due Date
+                  </div>
+                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">
+                    Pending / Marked
+                  </div>
+                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">
+                    Status
+                  </div>
+                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">
+                    Action
+                  </div>
+                </div>
+
+                {/* List Items */}
+                <div className="space-y-2">
+                  {assignments.map((assignment) => {
+                    const statusColors = {
+                      ongoing: {
+                        bg: "bg-blue-50",
+                        border: "border-blue-100",
+                        badge: "bg-blue-100 text-blue-700",
+                        icon: "text-blue-500",
+                      },
+                      "grace-period": {
+                        bg: "bg-amber-50",
+                        border: "border-amber-100",
+                        badge: "bg-amber-100 text-amber-700",
+                        icon: "text-amber-500",
+                      },
+                      closed: {
+                        bg: "bg-gray-100",
+                        border: "border-gray-200",
+                        badge: "bg-gray-100 text-gray-700",
+                        icon: "text-gray-400",
+                      },
+                    }[assignment.status];
+
+                    const statusLabel = {
+                      ongoing: "Ongoing",
+                      "grace-period": "Late Submissions",
+                      closed: "Closed",
+                    }[assignment.status];
+
+                    return (
+                      <div
+                        key={assignment.id}
+                        className={`group/assign-row flex flex-col md:grid md:grid-cols-12 gap-4 px-6 py-4 bg-white border rounded-2xl transition-all duration-300 hover:shadow-lg ${statusColors.border}`}
+                      >
+                        {/* Mobile: Title and Status */}
+                        <div className="md:hidden flex items-start justify-between mb-4">
+                          <div>
+                            <h4 className="font-black text-base text-gray-900 group-hover/assign-row:text-indigo-600 transition-colors">
+                              {assignment.title}
+                            </h4>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Due:{" "}
+                              {new Date(
+                                assignment.dueDate,
+                              ).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <span
+                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${statusColors.badge}`}
+                          >
+                            {statusLabel}
+                          </span>
+                        </div>
+
+                        {/* Desktop: Assignment Title */}
+                        <div className="hidden md:block col-span-4">
+                          <h4 className="font-black text-base text-gray-900 group-hover/assign-row:text-indigo-600 transition-colors line-clamp-2">
+                            {assignment.title}
+                          </h4>
+                        </div>
+
+                        {/* Desktop: Due Date */}
+                        <div className="hidden md:block col-span-2">
+                          <p className="text-xs font-bold text-gray-600">
+                            {new Date(assignment.dueDate).toLocaleDateString()}
+                          </p>
+                        </div>
+
+                        {/* Desktop: Pending / Marked */}
+                        <div className="hidden md:block col-span-2">
+                          <div className="flex items-center justify-center gap-3">
+                            <div className="flex flex-col items-center">
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                P
+                              </span>
+                              <span className="text-lg font-black text-red-600">
+                                {assignment.pendingCount}
+                              </span>
+                            </div>
+                            <span className="text-gray-300">/</span>
+                            <div className="flex flex-col items-center">
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                M
+                              </span>
+                              <span className="text-lg font-black text-emerald-600">
+                                {assignment.markedCount}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Mobile: Pending / Marked */}
+                        <div className="md:hidden flex items-center gap-6 py-2 border-t border-gray-100 pt-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-gray-400 uppercase">
+                                Pending:
+                              </span>
+                              <span className="text-lg font-black text-red-600">
+                                {assignment.pendingCount}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-gray-400 uppercase">
+                                Marked:
+                              </span>
+                              <span className="text-lg font-black text-emerald-600">
+                                {assignment.markedCount}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop: Status */}
+                        <div className="hidden md:block col-span-2">
+                          <div className="flex items-center justify-center gap-2">
+                            <span
+                              className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${statusColors.badge}`}
+                            >
+                              {statusLabel}
+                            </span>
+                            {assignment.status === "ongoing" &&
+                              assignment.daysRemaining !== undefined && (
+                                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                                  {assignment.daysRemaining}d
+                                </span>
+                              )}
+                            {assignment.status === "grace-period" &&
+                              assignment.daysOverdue !== undefined && (
+                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+                                  +{assignment.daysOverdue}d
+                                </span>
+                              )}
+                          </div>
+                        </div>
+
+                        {/* Desktop: Action Button */}
+                        <div className="hidden md:block col-span-2">
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/dashboard/lecturer/assignments/${assignment.id}`,
+                              )
+                            }
+                            className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-[0.1em] transition-all duration-300 flex items-center justify-center gap-1"
+                          >
+                            View
+                            <ChevronRight size={12} strokeWidth={3} />
+                          </button>
+                        </div>
+
+                        {/* Mobile: Action Button */}
+                        <div className="md:hidden">
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/dashboard/lecturer/assignments/${assignment.id}`,
+                              )
+                            }
+                            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all duration-300 flex items-center justify-center gap-2"
+                          >
+                            Process Submissions
+                            <ChevronRight size={14} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -456,508 +789,569 @@ function SubjectDetailsView({
 
         {activeTab === "materials" && (
           <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Materials Header Actions */}
-            <div className="flex items-center justify-between p-6 bg-indigo-50/50 rounded-3xl border border-indigo-100/50">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100">
-                  <BookOpen size={24} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-gray-900 tracking-tight leading-tight">
-                    Resource <span className="text-indigo-600">Inventory</span>
-                  </h3>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
-                    Manage and share subject resources
-                  </p>
-                </div>
+            {loadingMaterials ? (
+              <div className="flex items-center justify-center p-16">
+                <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
               </div>
-              <Button
-                size="lg"
-                className="bg-gray-900 hover:bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-gray-200 transition-all duration-500 px-8"
-                onClick={() => setIsAddMaterialOpen(true)}
-              >
-                + NEW MATERIAL
-              </Button>
-
-              <ModernModal
-                open={isAddMaterialOpen}
-                onOpenChange={setIsAddMaterialOpen}
-                title="Publish Material"
-                subtitle="Share new resources with your students instantly."
-                avatarChar="+"
-              >
-                <form onSubmit={handleAddMaterial} className="space-y-5">
-                  <div className="rounded-[2rem] border border-gray-100 bg-gray-50/60 p-6 space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                        Material Identification
+            ) : (
+              <>
+                {/* Materials Header Actions */}
+                <div className="flex items-center justify-between p-6 bg-indigo-50/50 rounded-3xl border border-indigo-100/50">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100">
+                      <BookOpen size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 tracking-tight leading-tight">
+                        Resource{" "}
+                        <span className="text-indigo-600">Inventory</span>
+                      </h3>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                        Manage and share subject resources
                       </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="material-title"
-                        className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
-                      >
-                        Title
-                      </Label>
-                      <Input
-                        id="material-title"
-                        value={newMaterialTitle}
-                        onChange={(event) =>
-                          setNewMaterialTitle(event.target.value)
-                        }
-                        required
-                        className="rounded-2xl border-gray-100 focus:ring-indigo-500 h-12"
-                        placeholder="e.g. Week 1 Lecture Notes"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="material-description"
-                        className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
-                      >
-                        Context / Description
-                      </Label>
-                      <textarea
-                        id="material-description"
-                        className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-gray-100 min-h-[100px] w-full min-w-0 rounded-2xl border bg-white px-4 py-3 text-sm shadow-xs transition-all outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                        value={newMaterialDescription}
-                        onChange={(event) =>
-                          setNewMaterialDescription(event.target.value)
-                        }
-                        placeholder="Provide a short overview for students..."
-                      />
                     </div>
                   </div>
+                  <Button
+                    size="lg"
+                    className="bg-gray-900 hover:bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-gray-200 transition-all duration-500 px-8"
+                    onClick={() => setIsAddMaterialOpen(true)}
+                  >
+                    + NEW MATERIAL
+                  </Button>
 
-                  <div className="rounded-[2rem] border border-gray-100 bg-white p-6 space-y-4 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                        Content Asset
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="material-type"
-                          className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
-                        >
-                          Media Format
-                        </Label>
-                        <select
-                          id="material-type"
-                          className="border-gray-100 h-12 w-full rounded-2xl border bg-transparent px-4 text-sm shadow-xs outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L5%205L9%201%22%20stroke%3D%22%2394A3B8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:10px_6px] bg-[right_1rem_center] bg-no-repeat"
-                          value={newMaterialType}
-                          onChange={(event) =>
-                            setNewMaterialType(
-                              event.target.value as SubjectMaterial["type"],
-                            )
-                          }
-                        >
-                          <option value="document">PDF / Document</option>
-                          <option value="youtube-link">YouTube Stream</option>
-                          <option value="video-link">External Video</option>
-                          <option value="video-upload">
-                            Direct Video Upload
-                          </option>
-                        </select>
-                      </div>
-
-                      {(newMaterialType === "youtube-link" ||
-                        newMaterialType === "video-link") && (
-                        <div className="space-y-2 animate-in slide-in-from-right-4 duration-500">
+                  <ModernModal
+                    open={isAddMaterialOpen}
+                    onOpenChange={setIsAddMaterialOpen}
+                    title="Publish Material"
+                    subtitle="Share new resources with your students instantly."
+                    avatarChar="+"
+                  >
+                    <form onSubmit={handleAddMaterial} className="space-y-5">
+                      <div className="rounded-[2rem] border border-gray-100 bg-gray-50/60 p-6 space-y-4">
+                        <div className="space-y-2">
                           <Label
-                            htmlFor="material-url"
+                            htmlFor="material-title"
                             className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
                           >
-                            Source URL
+                            Title
                           </Label>
                           <Input
-                            id="material-url"
-                            value={newMaterialUrl}
+                            id="material-title"
+                            value={newMaterialTitle}
                             onChange={(event) =>
-                              setNewMaterialUrl(event.target.value)
+                              setNewMaterialTitle(event.target.value)
                             }
-                            className="rounded-2xl border-gray-100 h-12"
-                            placeholder="https://..."
+                            required
+                            className="rounded-2xl border-gray-100 focus:ring-indigo-500 h-12"
+                            placeholder="e.g. Week 1 Lecture Notes"
                           />
                         </div>
-                      )}
-
-                      {(newMaterialType === "document" ||
-                        newMaterialType === "video-upload") && (
-                        <div className="space-y-2 animate-in slide-in-from-right-4 duration-500">
+                        <div className="space-y-2">
                           <Label
-                            htmlFor="material-file"
+                            htmlFor="material-description"
                             className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
                           >
-                            Upload File
+                            Context / Description
                           </Label>
-                          <div className="relative">
-                            <input
-                              id="material-file"
-                              type="file"
-                              accept={
-                                newMaterialType === "document"
-                                  ? ".pdf,.doc,.docx,.ppt,.pptx,.txt"
-                                  : "video/*"
+                          <textarea
+                            id="material-description"
+                            className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-gray-100 min-h-[100px] w-full min-w-0 rounded-2xl border bg-white px-4 py-3 text-sm shadow-xs transition-all outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            value={newMaterialDescription}
+                            onChange={(event) =>
+                              setNewMaterialDescription(event.target.value)
+                            }
+                            placeholder="Provide a short overview for students..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="rounded-[2rem] border border-gray-100 bg-white p-6 space-y-4 shadow-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="material-type"
+                              className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
+                            >
+                              Media Format
+                            </Label>
+                            <select
+                              id="material-type"
+                              className="border-gray-100 h-12 w-full rounded-2xl border bg-transparent px-4 text-sm shadow-xs outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L5%205L9%201%22%20stroke%3D%22%2394A3B8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:10px_6px] bg-[right_1rem_center] bg-no-repeat"
+                              value={newMaterialType}
+                              onChange={(event) =>
+                                setNewMaterialType(
+                                  event.target.value as SubjectMaterial["type"],
+                                )
                               }
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                setNewMaterialFileName(file ? file.name : "");
-                              }}
-                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                            />
-                            <div className="h-12 border-2 border-dashed border-gray-100 rounded-2xl flex items-center px-4 bg-gray-50/50 group-hover:bg-indigo-50 transition-colors">
-                              <Download
-                                size={16}
-                                className="text-gray-400 mr-3"
-                              />
-                              <span className="text-xs text-gray-500 font-bold truncate">
-                                {newMaterialFileName || "Select file from disk"}
-                              </span>
-                            </div>
+                            >
+                              <option value="document">PDF / Document</option>
+                              <option value="youtube-link">
+                                YouTube Stream
+                              </option>
+                              <option value="video-link">External Video</option>
+                              <option value="video-upload">
+                                Direct Video Upload
+                              </option>
+                            </select>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-2">
-                    <div className="flex items-center gap-3">
-                      <div className="relative h-6 w-11 cursor-pointer">
-                        <input
-                          id="material-can-download"
-                          type="checkbox"
-                          checked={newMaterialCanDownload}
-                          onChange={(event) =>
-                            setNewMaterialCanDownload(event.target.checked)
-                          }
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                      </div>
-                      <Label
-                        htmlFor="material-can-download"
-                        className="m-0 text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer"
-                      >
-                        Enable Student Downloads
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="flex-1 sm:flex-none text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 rounded-2xl"
-                        onClick={() => setIsAddMaterialOpen(false)}
-                      >
-                        BACK
-                      </Button>
-                      <Button
-                        type="submit"
-                        className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-10 h-14 text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100"
-                      >
-                        PUBLISH ASSET
-                      </Button>
-                    </div>
-                  </div>
-                </form>
-              </ModernModal>
-            </div>
-
-            {previewMaterial && (
-              <ModernModal
-                open={isPreviewOpen}
-                onOpenChange={(open) => {
-                  setIsPreviewOpen(open);
-                  if (!open) {
-                    setPreviewMaterial(null);
-                  }
-                }}
-                title={previewMaterial.title}
-                subtitle={previewMaterial.description || "Asset Preview"}
-                avatarChar={previewMaterial.title.charAt(0)}
-              >
-                <>
-                  <div className="space-y-6 mt-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                          Media Type
-                        </p>
-                        <p className="text-xs font-black text-gray-900 uppercase tracking-widest">
-                          {previewMaterial.type.replace("-", " ")}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                          Created
-                        </p>
-                        <p className="text-xs font-black text-gray-900 uppercase tracking-widest">
-                          {new Date(
-                            previewMaterial.createdAt,
-                          ).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    {previewMaterial.type === "document" && (
-                      <div className="border-2 border-gray-100 rounded-[2.5rem] p-12 bg-white flex flex-col items-center text-center shadow-2xl shadow-gray-100/50 border-dashed">
-                        <div className="w-20 h-20 rounded-[2rem] bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6">
-                          <FileText size={40} />
-                        </div>
-                        <h4 className="text-lg font-black text-gray-900 mb-2">
-                          {previewMaterial.filePlaceholder ||
-                            "Electronic Document"}
-                        </h4>
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-8">
-                          Preview restricted to view-only mode
-                        </p>
-                        {previewMaterial.canDownload && (
-                          <Button
-                            type="button"
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.25rem] px-8 py-6 h-12 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20"
-                          >
-                            <Download size={16} className="mr-2" />
-                            Download Original
-                          </Button>
-                        )}
-                      </div>
-                    )}
-
-                    {(previewMaterial.type === "youtube-link" ||
-                      previewMaterial.type === "video-link" ||
-                      previewMaterial.type === "video-upload") && (
-                      <div className="relative group overflow-hidden rounded-[2.5rem] bg-black shadow-2xl shadow-indigo-500/10">
-                        {previewMaterial.type === "youtube-link" &&
-                          previewMaterial.videoUrl && (
-                            <div className="relative w-full pb-[56.25%] overflow-hidden">
-                              {getYouTubeVideoId(previewMaterial.videoUrl) ? (
-                                <iframe
-                                  className="absolute top-0 left-0 w-full h-full"
-                                  src={`https://www.youtube.com/embed/${getYouTubeVideoId(previewMaterial.videoUrl)}`}
-                                  title={previewMaterial.title}
-                                  frameBorder="0"
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                  allowFullScreen
-                                ></iframe>
-                              ) : (
-                                <div className="flex items-center justify-center h-48 text-xs font-black text-white/50 uppercase tracking-widest">
-                                  Invalid Stream Source
-                                </div>
-                              )}
+                          {(newMaterialType === "youtube-link" ||
+                            newMaterialType === "video-link") && (
+                            <div className="space-y-2 animate-in slide-in-from-right-4 duration-500">
+                              <Label
+                                htmlFor="material-url"
+                                className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
+                              >
+                                Source URL
+                              </Label>
+                              <Input
+                                id="material-url"
+                                value={newMaterialUrl}
+                                onChange={(event) =>
+                                  setNewMaterialUrl(event.target.value)
+                                }
+                                className="rounded-2xl border-gray-100 h-12"
+                                placeholder="https://..."
+                              />
                             </div>
                           )}
 
-                        {(previewMaterial.type === "video-link" ||
-                          previewMaterial.type === "video-upload") && (
-                          <div className="relative w-full overflow-hidden">
-                            {previewMaterial.videoUrl ? (
-                              <video
-                                className="w-full h-full block"
-                                controls
-                                controlsList="nodownload"
-                                src={previewMaterial.videoUrl}
+                          {(newMaterialType === "document" ||
+                            newMaterialType === "video-upload") && (
+                            <div className="space-y-2 animate-in slide-in-from-right-4 duration-500">
+                              <Label
+                                htmlFor="material-file"
+                                className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1"
                               >
-                                Your browser does not support the video tag.
-                              </video>
-                            ) : (
-                              <div className="flex items-center justify-center h-48 text-xs font-black text-white/50 uppercase tracking-widest">
-                                Source Media Unavailable
+                                Upload File
+                              </Label>
+                              <div className="relative">
+                                <input
+                                  id="material-file"
+                                  type="file"
+                                  accept={
+                                    newMaterialType === "document"
+                                      ? ".pdf,.doc,.docx,.ppt,.pptx,.txt"
+                                      : "video/*"
+                                  }
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    setNewMaterialFileName(
+                                      file ? file.name : "",
+                                    );
+                                    setNewMaterialFile(file || null);
+                                  }}
+                                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                />
+                                <div className="h-12 border-2 border-dashed border-gray-100 rounded-2xl flex items-center px-4 bg-gray-50/50 group-hover:bg-indigo-50 transition-colors">
+                                  <Download
+                                    size={16}
+                                    className="text-gray-400 mr-3"
+                                  />
+                                  <span className="text-xs text-gray-500 font-bold truncate">
+                                    {newMaterialFileName ||
+                                      "Select file from disk"}
+                                  </span>
+                                </div>
                               </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-2">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-6 w-11 cursor-pointer">
+                            <input
+                              id="material-can-download"
+                              type="checkbox"
+                              checked={newMaterialCanDownload}
+                              onChange={(event) =>
+                                setNewMaterialCanDownload(event.target.checked)
+                              }
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                          </div>
+                          <Label
+                            htmlFor="material-can-download"
+                            className="m-0 text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer"
+                          >
+                            Enable Student Downloads
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-4 w-full sm:w-auto">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="flex-1 sm:flex-none text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 rounded-2xl"
+                            onClick={() => setIsAddMaterialOpen(false)}
+                          >
+                            BACK
+                          </Button>
+                          <Button
+                            type="submit"
+                            className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-10 h-14 text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100"
+                          >
+                            PUBLISH ASSET
+                          </Button>
+                        </div>
+                      </div>
+                    </form>
+                  </ModernModal>
+                </div>
+
+                {previewMaterial && (
+                  <ModernModal
+                    open={isPreviewOpen}
+                    onOpenChange={(open) => {
+                      setIsPreviewOpen(open);
+                      if (!open) {
+                        setPreviewMaterial(null);
+                      }
+                    }}
+                    title={previewMaterial.title}
+                    subtitle={previewMaterial.description || "Asset Preview"}
+                    avatarChar={previewMaterial.title.charAt(0)}
+                  >
+                    <>
+                      <div className="space-y-6 mt-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100">
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                              Media Type
+                            </p>
+                            <p className="text-xs font-black text-gray-900 uppercase tracking-widest">
+                              {previewMaterial.type.replace("-", " ")}
+                            </p>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100">
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                              Created
+                            </p>
+                            <p className="text-xs font-black text-gray-900 uppercase tracking-widest">
+                              {new Date(
+                                previewMaterial.createdAt,
+                              ).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        {previewMaterial.type === "document" && (
+                          <div className="border-2 border-gray-100 rounded-[2.5rem] p-12 bg-white flex flex-col items-center text-center shadow-2xl shadow-gray-100/50 border-dashed">
+                            {isPdfFile(previewMaterial) &&
+                            previewMaterial.fileUrl ? (
+                              <div className="w-full mb-8">
+                                <iframe
+                                  src={`${previewMaterial.fileUrl}#toolbar=0&navpanes=0&scrollbar=1`}
+                                  title={previewMaterial.title}
+                                  className="w-full h-[460px] rounded-[1.5rem] border border-gray-100 bg-white"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-20 h-20 rounded-[2rem] bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6">
+                                <FileText size={40} />
+                              </div>
+                            )}
+                            <h4 className="text-lg font-black text-gray-900 mb-2 max-w-full break-all">
+                              {previewMaterial.filePlaceholder ||
+                                "Electronic Document"}
+                            </h4>
+                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-8">
+                              {isPdfFile(previewMaterial)
+                                ? "Inline PDF preview"
+                                : "Preview restricted to view-only mode"}
+                            </p>
+                            {previewMaterial.canDownload && (
+                              <Button
+                                type="button"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.25rem] px-8 py-6 h-12 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20"
+                                onClick={() =>
+                                  handleDownloadMaterial(previewMaterial)
+                                }
+                              >
+                                <Download size={16} className="mr-2" />
+                                Download Original
+                              </Button>
                             )}
                           </div>
                         )}
+
+                        {(previewMaterial.type === "youtube-link" ||
+                          previewMaterial.type === "video-link" ||
+                          previewMaterial.type === "video-upload") && (
+                          <div className="relative group overflow-hidden rounded-[2.5rem] bg-black shadow-2xl shadow-indigo-500/10">
+                            {previewMaterial.type === "youtube-link" &&
+                              previewMaterial.videoUrl && (
+                                <div className="relative w-full pb-[56.25%] overflow-hidden">
+                                  {getYouTubeVideoId(
+                                    previewMaterial.videoUrl,
+                                  ) ? (
+                                    <iframe
+                                      className="absolute top-0 left-0 w-full h-full"
+                                      src={`https://www.youtube.com/embed/${getYouTubeVideoId(previewMaterial.videoUrl)}`}
+                                      title={previewMaterial.title}
+                                      frameBorder="0"
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                    ></iframe>
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center gap-4 h-56 text-center px-6 text-xs font-black text-white/60 uppercase tracking-widest">
+                                      <span>Unsupported YouTube link</span>
+                                      <Button
+                                        type="button"
+                                        className="bg-white text-gray-900 hover:bg-gray-100 rounded-xl px-4 h-10 text-[10px] font-black uppercase tracking-widest"
+                                        onClick={() =>
+                                          window.open(
+                                            previewMaterial.videoUrl,
+                                            "_blank",
+                                            "noopener,noreferrer",
+                                          )
+                                        }
+                                      >
+                                        Open Source Link
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                            {previewMaterial.type === "video-link" &&
+                              previewMaterial.videoUrl && (
+                                <div className="relative w-full overflow-hidden">
+                                  {isDirectVideoUrl(
+                                    previewMaterial.videoUrl,
+                                  ) ? (
+                                    <video
+                                      className="w-full h-full block"
+                                      controls
+                                      controlsList="nodownload"
+                                      src={previewMaterial.videoUrl}
+                                    >
+                                      Your browser does not support the video
+                                      tag.
+                                    </video>
+                                  ) : getVideoEmbedUrl(
+                                      previewMaterial.videoUrl,
+                                    ) ? (
+                                    <iframe
+                                      className="w-full aspect-video block"
+                                      src={
+                                        getVideoEmbedUrl(
+                                          previewMaterial.videoUrl,
+                                        ) as string
+                                      }
+                                      title={previewMaterial.title}
+                                      frameBorder="0"
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                    ></iframe>
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center gap-4 h-56 text-center px-6 text-xs font-black text-white/60 uppercase tracking-widest">
+                                      <span>Unsupported video source</span>
+                                      <Button
+                                        type="button"
+                                        className="bg-white text-gray-900 hover:bg-gray-100 rounded-xl px-4 h-10 text-[10px] font-black uppercase tracking-widest"
+                                        onClick={() =>
+                                          window.open(
+                                            previewMaterial.videoUrl,
+                                            "_blank",
+                                            "noopener,noreferrer",
+                                          )
+                                        }
+                                      >
+                                        Open Source Link
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                            {previewMaterial.type === "video-upload" &&
+                              previewMaterial.fileUrl && (
+                                <div className="relative w-full overflow-hidden">
+                                  <video
+                                    className="w-full h-full block"
+                                    controls
+                                    controlsList="nodownload"
+                                    src={previewMaterial.fileUrl}
+                                  >
+                                    Your browser does not support the video tag.
+                                  </video>
+                                </div>
+                              )}
+                          </div>
+                        )}
+                      </div>
+                      <DialogFooter className="mt-8">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-[10px] font-black uppercase tracking-widest w-full py-6 rounded-2xl"
+                          onClick={() => {
+                            setIsPreviewOpen(false);
+                            setPreviewMaterial(null);
+                          }}
+                        >
+                          EXIT PREVIEW
+                        </Button>
+                      </DialogFooter>
+                    </>
+                  </ModernModal>
+                )}
+
+                {/* Materials Sections */}
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenMaterialSection((prev) =>
+                          prev === "study" ? null : "study",
+                        )
+                      }
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_emerald]" />
+                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.25em]">
+                          Study Materials ({studyMaterials.length})
+                        </h3>
+                      </div>
+                      <ChevronRight
+                        size={14}
+                        className={`text-gray-400 transition-transform ${
+                          openMaterialSection === "study" ? "rotate-90" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {openMaterialSection === "study" && (
+                      <div className="border-t border-gray-100 px-5 py-3">
+                        {studyMaterials.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center p-10 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                              Empty Repository
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {studyMaterials.map((material) => (
+                              <div
+                                key={material.id}
+                                className="group flex items-center gap-4 py-4 cursor-pointer"
+                                onClick={() => openPreview(material)}
+                              >
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                  {getTypeIcon(material.type)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-black text-gray-900 truncate">
+                                    {material.title}
+                                  </p>
+                                  <p className="text-[10px] font-bold text-gray-400 line-clamp-1">
+                                    {material.description}
+                                  </p>
+                                </div>
+                                <span className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] shrink-0">
+                                  {new Date(
+                                    material.createdAt,
+                                  ).toLocaleDateString()}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors shrink-0"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void handleDeleteMaterial(material.id);
+                                  }}
+                                >
+                                  <Ban size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                  <DialogFooter className="mt-8">
-                    <Button
+
+                  <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden">
+                    <button
                       type="button"
-                      variant="ghost"
-                      className="text-[10px] font-black uppercase tracking-widest w-full py-6 rounded-2xl"
-                      onClick={() => {
-                        setIsPreviewOpen(false);
-                        setPreviewMaterial(null);
-                      }}
+                      onClick={() =>
+                        setOpenMaterialSection((prev) =>
+                          prev === "video" ? null : "video",
+                        )
+                      }
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
                     >
-                      EXIT PREVIEW
-                    </Button>
-                  </DialogFooter>
-                </>
-              </ModernModal>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_purple]" />
+                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.25em]">
+                          Video Materials ({videoMaterials.length})
+                        </h3>
+                      </div>
+                      <ChevronRight
+                        size={14}
+                        className={`text-gray-400 transition-transform ${
+                          openMaterialSection === "video" ? "rotate-90" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {openMaterialSection === "video" && (
+                      <div className="border-t border-gray-100 px-5 py-3">
+                        {videoMaterials.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center p-10 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                              No streams recorded
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {videoMaterials.map((material) => (
+                              <div
+                                key={material.id}
+                                className="group flex items-center gap-4 py-4 cursor-pointer"
+                                onClick={() => openPreview(material)}
+                              >
+                                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                  {getTypeIcon(material.type)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-black text-gray-900 truncate">
+                                    {material.title}
+                                  </p>
+                                  <p className="text-[10px] font-bold text-gray-400 line-clamp-1">
+                                    {material.description}
+                                  </p>
+                                </div>
+                                <span className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] shrink-0">
+                                  {new Date(
+                                    material.createdAt,
+                                  ).toLocaleDateString()}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors shrink-0"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void handleDeleteMaterial(material.id);
+                                  }}
+                                >
+                                  <Ban size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
-
-            {/* Materials Sections */}
-            <div className="grid grid-cols-1 gap-12">
-              {/* Study Materials Section */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_emerald]" />
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.25em]">
-                    Study Materials ({studyMaterials.length})
-                  </h3>
-                </div>
-                {studyMaterials.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-12 text-center bg-gray-50/50 rounded-[2.5rem] border border-dashed border-gray-200">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      Empty Repository
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {studyMaterials.map((material) => (
-                      <div
-                        key={material.id}
-                        className="group/material relative overflow-hidden bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-500 cursor-pointer active:scale-[0.98]"
-                        onClick={() => openPreview(material)}
-                      >
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 group-hover/material:bg-emerald-600 group-hover/material:text-white transition-all duration-500 shadow-sm flex items-center justify-center">
-                            {getTypeIcon(material.type)}
-                          </div>
-                          <div className="flex gap-2 opacity-0 group-hover/material:opacity-100 transition-all duration-500 translate-y-[-10px] group-hover/material:translate-y-0">
-                            <button
-                              className="p-2 bg-yellow-50 text-yellow-600 rounded-xl hover:bg-yellow-500 hover:text-white transition-all shadow-sm"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                // edit logic here
-                              }}
-                            >
-                              <FileEdit size={14} />
-                            </button>
-                            <button
-                              className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                // delete logic here
-                              }}
-                            >
-                              <Ban size={14} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <h4 className="font-black text-sm text-gray-900 truncate tracking-tight mb-2 group-hover/material:text-emerald-600 transition-colors">
-                          {material.title}
-                        </h4>
-                        <p className="text-[10px] font-bold text-gray-400 line-clamp-2 leading-relaxed mb-6">
-                          {material.description}
-                        </p>
-
-                        <div className="flex items-center justify-between mt-auto pt-6 border-t border-gray-50">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border transition-all duration-500 ${
-                                material.visible
-                                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                  : "bg-gray-50 text-gray-400 border-gray-100"
-                              }`}
-                            ></span>
-                            <div className="w-1 h-1 rounded-full bg-gray-200" />
-                            <span className="text-[8px] font-black text-gray-300 uppercase tracking-[0.2em]">
-                              {new Date(
-                                material.createdAt,
-                              ).toLocaleDateString()}
-                            </span>
-                          </div>
-                          {material.canDownload && (
-                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                              <Download size={12} />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Video Materials Section */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_purple]" />
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.25em]">
-                    Video Materials ({videoMaterials.length})
-                  </h3>
-                </div>
-                {videoMaterials.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-12 text-center bg-gray-50/50 rounded-[2.5rem] border border-dashed border-gray-200">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      No streams recorded
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {videoMaterials.map((material) => (
-                      <div
-                        key={material.id}
-                        className="group/video relative overflow-hidden bg-white border border-gray-100 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 cursor-pointer active:scale-[0.98]"
-                        onClick={() => openPreview(material)}
-                      >
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 group-hover/video:bg-purple-600 group-hover/video:text-white transition-all duration-500 shadow-sm flex items-center justify-center">
-                            {getTypeIcon(material.type)}
-                          </div>
-                          <div className="flex gap-2 opacity-0 group-hover/video:opacity-100 transition-all duration-500 translate-y-[-10px] group-hover/video:translate-y-0">
-                            <button
-                              className="p-2 bg-yellow-50 text-yellow-600 rounded-xl hover:bg-yellow-500 hover:text-white transition-all shadow-sm"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                // edit logic here
-                              }}
-                            >
-                              <FileEdit size={14} />
-                            </button>
-                            <button
-                              className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                // delete logic here
-                              }}
-                            >
-                              <Ban size={14} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <h4 className="font-black text-sm text-gray-900 truncate tracking-tight mb-2 group-hover/video:text-purple-600 transition-colors">
-                          {material.title}
-                        </h4>
-                        <p className="text-[10px] font-bold text-gray-400 line-clamp-2 leading-relaxed mb-6">
-                          {material.description}
-                        </p>
-
-                        <div className="flex items-center justify-between mt-auto pt-6 border-t border-gray-50">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border transition-all duration-500 ${
-                                material.visible
-                                  ? "bg-purple-50 text-purple-600 border-purple-100"
-                                  : "bg-gray-50 text-gray-400 border-gray-100"
-                              }`}
-                            ></span>
-                            <div className="w-1 h-1 rounded-full bg-gray-200" />
-                            <span className="text-[8px] font-black text-gray-300 uppercase tracking-[0.2em]">
-                              {new Date(
-                                material.createdAt,
-                              ).toLocaleDateString()}
-                            </span>
-                          </div>
-                          {material.canDownload && (
-                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                              <Download size={12} />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -971,14 +1365,66 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedCourseCode, setSelectedCourseCode] = useState("");
   const [selectedIntakeCode, setSelectedIntakeCode] = useState("");
-
+  const restoredSelectionRef = React.useRef(false);
+  const selectionStorageKey = "academix:lecturer:intakes-selection";
 
   const persistSelection = (
-    _intakeId: string | null, // eslint-disable-line @typescript-eslint/no-unused-vars
+    intakeId: string | null,
+    subjectId: string | null = null,
+    courseCode = "",
+    intakeCode = "",
   ) => {
-    // Persistence disabled as per user request
+    if (typeof window === "undefined") return;
 
+    if (!intakeId) {
+      window.sessionStorage.removeItem(selectionStorageKey);
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      selectionStorageKey,
+      JSON.stringify({ intakeId, subjectId, courseCode, intakeCode }),
+    );
   };
+
+  React.useEffect(() => {
+    if (restoredSelectionRef.current) return;
+    if (typeof window === "undefined") return;
+
+    restoredSelectionRef.current = true;
+    const rawSelection = window.sessionStorage.getItem(selectionStorageKey);
+    if (!rawSelection) return;
+
+    try {
+      const parsed = JSON.parse(rawSelection) as {
+        intakeId?: string;
+        subjectId?: string;
+        courseCode?: string;
+        intakeCode?: string;
+      };
+
+      if (!parsed.intakeId) return;
+
+      const intake = intakes.find((item) => item.id === parsed.intakeId);
+      if (!intake) return;
+
+      setSelectedIntake(parsed.intakeId);
+      setSelectedCourseCode(parsed.courseCode || "");
+      setSelectedIntakeCode(parsed.intakeCode || "");
+
+      if (parsed.subjectId) {
+        const subject = intake.courses
+          .flatMap((course) => course.subjects)
+          .find((item) => item.id === parsed.subjectId);
+
+        if (subject) {
+          setSelectedSubject(subject);
+        }
+      }
+    } catch {
+      window.sessionStorage.removeItem(selectionStorageKey);
+    }
+  }, [intakes]);
 
   const toggleCourse = (courseId: string) => {
     setExpandedCourse((prev) => (prev === courseId ? null : courseId));
@@ -994,7 +1440,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     setSelectedSubject(subject);
     setSelectedCourseCode(courseCode);
     setSelectedIntakeCode(intakeCode);
-    persistSelection(intakeId);
+    persistSelection(intakeId, subject.id, courseCode, intakeCode);
   };
 
   const handleBackToIntake = () => {
@@ -1002,7 +1448,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     setSelectedCourseCode("");
     setSelectedIntakeCode("");
     if (selectedIntake) {
-      persistSelection(selectedIntake);
+      persistSelection(selectedIntake, null);
     }
   };
 
@@ -1019,8 +1465,6 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
     (intake) => intake.id === selectedIntake,
   );
 
-  // Persistence disabled as per user request
-
   return (
     <div className="flex flex-col lg:flex-row gap-8 lg:h-[750px] animate-in fade-in slide-in-from-bottom-8 duration-1000">
       {/* Left Panel - Intakes List */}
@@ -1030,11 +1474,11 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
         }`}
       >
         <div className="p-8 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-            <h2 className="font-black text-xs text-gray-400 uppercase tracking-widest">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_indigo]" />
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
               Academic Terms
-            </h2>
+            </p>
           </div>
           <h3 className="text-2xl font-black text-gray-900 tracking-tight">
             Your <span className="text-indigo-600">Intakes</span>
@@ -1061,7 +1505,7 @@ export default function IntakesTree({ intakes }: IntakesTreeProps) {
                   setSelectedSubject(null);
                   setSelectedCourseCode("");
                   setSelectedIntakeCode("");
-                  persistSelection(intake.id);
+                  persistSelection(intake.id, null);
                 }}
                 className={`group relative w-full text-left p-5 rounded-[1.8rem] transition-all duration-500 border ${
                   selectedIntake === intake.id

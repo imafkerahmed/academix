@@ -141,7 +141,6 @@ interface Material {
   created: string;
 }
 
-
 function formatDate(date: string) {
   const d = new Date(date);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -180,24 +179,30 @@ export default function CourseDetailsPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [intakeRecord, courseRecord, courseIntakesData, settingsData] = await Promise.all(
-        [
+      const [intakeRecord, courseRecord, courseIntakesData, settingsData] =
+        await Promise.all([
           pb.collection("intakes").getOne(intakeId),
           pb.collection("courses").getOne(courseId),
           pb.collection("course_intakes").getFullList({
             filter: `intake="${intakeId}"&&course="${courseId}"`,
           }),
           pb.collection("institution_settings").getFullList(),
-        ],
-      );
+        ]);
 
       const settings = settingsData as unknown as RecordModel[];
       if (settings && settings.length > 0) {
         const currencyCode = settings[0].currency || "INR";
         const symbols: Record<string, string> = {
-          USD: "$", EUR: "€", GBP: "£", LKR: "Rs", 
-          AUD: "A$", CAD: "C$", INR: "₹", SGD: "S$", 
-          AED: "د.إ", ZAR: "R"
+          USD: "$",
+          EUR: "€",
+          GBP: "£",
+          LKR: "Rs",
+          AUD: "A$",
+          CAD: "C$",
+          INR: "₹",
+          SGD: "S$",
+          AED: "د.إ",
+          ZAR: "R",
         };
         setCurrencySymbol(symbols[currencyCode] || "₹");
       }
@@ -263,7 +268,13 @@ export default function CourseDetailsPage() {
             sort: "semester,created",
           });
 
-        const formattedSubjects: CourseSubject[] = (subjectsData as unknown as Array<RecordModel & { expand?: { subject?: Subject | Subject[]; lecturer?: UserRecord } }>).map((cs) => {
+        const formattedSubjects: CourseSubject[] = (
+          subjectsData as unknown as Array<
+            RecordModel & {
+              expand?: { subject?: Subject | Subject[]; lecturer?: UserRecord };
+            }
+          >
+        ).map((cs) => {
           const subjects = Array.isArray(cs.expand?.subject)
             ? cs.expand.subject
             : cs.expand?.subject
@@ -272,8 +283,11 @@ export default function CourseDetailsPage() {
 
           return {
             id: cs.id,
-            name: (subjects as Subject[]).map((s) => s.name).join(", ") || "No Subject",
-            code: (subjects as Subject[]).map((s) => s.code).join(", ") || "N/A",
+            name:
+              (subjects as Subject[]).map((s) => s.name).join(", ") ||
+              "No Subject",
+            code:
+              (subjects as Subject[]).map((s) => s.code).join(", ") || "N/A",
             semester: cs.semester || "Semester 1",
             assignedLecturer: cs.expand?.lecturer?.name || "Not Assigned",
             credits: cs.credits || 0,
@@ -281,6 +295,58 @@ export default function CourseDetailsPage() {
         });
 
         setCourseSubjects(formattedSubjects);
+
+        const assignmentRecords = await pb
+          .collection("assignments")
+          .getFullList({
+            filter: `course_subject.course_intake="${courseIntakeRecord.id}"`,
+            expand:
+              "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
+            sort: "-created",
+          });
+
+        const formattedAssignments = (
+          assignmentRecords as unknown as Array<
+            RecordModel & {
+              title?: string;
+              description?: string;
+              due_date?: string;
+              total_marks?: number;
+              expand?: {
+                course_subject?: RecordModel & {
+                  semester?: string;
+                  expand?: {
+                    subject?: Subject | Subject[];
+                  };
+                };
+                marker?: UserRecord;
+              };
+            }
+          >
+        ).map((record) => {
+          const courseSubject = record.expand?.course_subject;
+          const subjects = Array.isArray(courseSubject?.expand?.subject)
+            ? courseSubject.expand.subject
+            : courseSubject?.expand?.subject
+              ? [courseSubject.expand.subject]
+              : [];
+          const subject = subjects[0];
+
+          return {
+            id: record.id,
+            title: record.title || "Untitled Assignment",
+            subject: subject?.name || "No Subject",
+            subjectCode: subject?.code || "N/A",
+            dueDate: record.due_date || "",
+            semester: courseSubject?.semester || "Semester 1",
+            totalMarks: record.total_marks || 0,
+            markingLecturer: record.expand?.marker?.name || "",
+            rules: record.description || "",
+            expand: record.expand,
+          };
+        });
+
+        setCourseAssignments(formattedAssignments);
 
         // Fetch all lecturers for the assignment modal
         const lecturersData = await pb.collection("users").getFullList({
@@ -303,6 +369,7 @@ export default function CourseDetailsPage() {
       toast.error("Failed to load course details");
       if (err?.status === 404)
         router.push(`/dashboard/admin/intakes/${intakeId}`);
+      setCourseAssignments([]);
     } finally {
       setLoading(false);
     }
@@ -385,6 +452,119 @@ export default function CourseDetailsPage() {
     }
   }
 
+  async function handleCreateAssignment() {
+    if (!assignmentForm.title.trim()) {
+      toast.error("Title is required");
+      return;
+    }
+    if (!assignmentForm.dueDate) {
+      toast.error("Due date is required");
+      return;
+    }
+    if (!assignmentModalSubject) {
+      toast.error("Please select a subject");
+      return;
+    }
+
+    try {
+      setAssignmentCreating(true);
+
+      // Find the course_subject ID that matches the selected semester + subject
+      const courseSubject = courseSubjects.find(
+        (cs) => cs.code === assignmentModalSubject,
+      );
+      if (!courseSubject) {
+        toast.error("Subject not found");
+        return;
+      }
+
+      // Create the assignment
+      await pb.collection("assignments").create({
+        title: assignmentForm.title.trim(),
+        description: assignmentForm.description,
+        total_marks: assignmentForm.totalMarks,
+        opens_at: assignmentForm.opensAt || null,
+        due_date: assignmentForm.dueDate,
+        course_subject: courseSubject.id,
+        marker: assignmentForm.marker || null,
+        assignment_status: true,
+      });
+
+      toast.success("Assignment created successfully!");
+
+      // Refresh assignments list
+      const updatedRecords = await pb.collection("assignments").getFullList({
+        filter: `course_subject.course_intake="${courseIntake?.id}"`,
+        expand:
+          "course_subject.subject,course_subject.course_intake.intake,course_subject.course_intake.course,marker",
+        sort: "-created",
+      });
+
+      const formattedAssignments = (
+        updatedRecords as unknown as Array<
+          RecordModel & {
+            title?: string;
+            description?: string;
+            due_date?: string;
+            total_marks?: number;
+            expand?: {
+              course_subject?: RecordModel & {
+                semester?: string;
+                expand?: {
+                  subject?: Subject | Subject[];
+                };
+              };
+              marker?: UserRecord;
+            };
+          }
+        >
+      ).map((record) => {
+        const courseSubject = record.expand?.course_subject;
+        const subjects = Array.isArray(courseSubject?.expand?.subject)
+          ? courseSubject.expand.subject
+          : courseSubject?.expand?.subject
+            ? [courseSubject.expand.subject]
+            : [];
+        const subject = subjects[0];
+
+        return {
+          id: record.id,
+          title: record.title || "Untitled Assignment",
+          subject: subject?.name || "No Subject",
+          subjectCode: subject?.code || "N/A",
+          dueDate: record.due_date || "",
+          semester: courseSubject?.semester || "Semester 1",
+          totalMarks: record.total_marks || 0,
+          markingLecturer: record.expand?.marker?.name || "",
+          rules: record.description || "",
+          expand: record.expand,
+        };
+      });
+
+      setCourseAssignments(formattedAssignments);
+
+      // Reset form and close modal
+      setAssignmentForm({
+        title: "",
+        totalMarks: 100,
+        marker: "",
+        opensAt: "",
+        dueDate: "",
+        description: "",
+      });
+      setAssignmentModalSubject(null);
+      setAssignmentModalSemester("Semester 1");
+      setShowAddAssignmentModal(false);
+      setAssignmentModalStage(1);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      console.error("Error creating assignment:", err);
+      toast.error("Failed to create assignment");
+    } finally {
+      setAssignmentCreating(false);
+    }
+  }
+
   const [activeTab, setActiveTab] = useState(0);
   const [studentsRefreshKey, setStudentsRefreshKey] = useState(0);
 
@@ -408,7 +588,7 @@ export default function CourseDetailsPage() {
   );
   const [lecturerSearchQuery, setLecturerSearchQuery] = useState("");
 
-  const [courseAssignments] = useState<Assignment[]>([]);
+  const [courseAssignments, setCourseAssignments] = useState<Assignment[]>([]);
   const [selectedAdminAssignment, setSelectedAdminAssignment] =
     useState<Assignment | null>(null);
   const [assignmentModalSemester, setAssignmentModalSemester] =
@@ -417,6 +597,15 @@ export default function CourseDetailsPage() {
     string | null
   >(null);
   const [assignmentModalStage, setAssignmentModalStage] = useState(1);
+  const [assignmentCreating, setAssignmentCreating] = useState(false);
+  const [assignmentForm, setAssignmentForm] = useState({
+    title: "",
+    totalMarks: 100,
+    marker: "",
+    opensAt: "",
+    dueDate: "",
+    description: "",
+  });
 
   if (loading) {
     return (
@@ -440,7 +629,8 @@ export default function CourseDetailsPage() {
             Course Not Found
           </h2>
           <p className="text-gray-500 mb-6">
-            Please double check all fields before saving. You can&apos;t undo once confirmed.
+            Please double check all fields before saving. You can&apos;t undo
+            once confirmed.
           </p>
           <button
             onClick={() => router.push(`/dashboard/admin/intakes/${intakeId}`)}
@@ -460,14 +650,13 @@ export default function CourseDetailsPage() {
     { label: "Materials", icon: Video },
   ];
 
-  const groupedSubjects = courseSubjects.reduce<Record<string, CourseSubject[]>>(
-    (acc, subj) => {
-      if (!acc[subj.semester]) acc[subj.semester] = [];
-      acc[subj.semester].push(subj);
-      return acc;
-    },
-    {},
-  );
+  const groupedSubjects = courseSubjects.reduce<
+    Record<string, CourseSubject[]>
+  >((acc, subj) => {
+    if (!acc[subj.semester]) acc[subj.semester] = [];
+    acc[subj.semester].push(subj);
+    return acc;
+  }, {});
 
   const groupedAssignments = courseAssignments.reduce<
     Record<string, Assignment[]>
@@ -615,7 +804,6 @@ export default function CourseDetailsPage() {
           />
         )}
       </div>
-
 
       {/* Edit Course Modal */}
       <ModernModal
@@ -1256,6 +1444,13 @@ export default function CourseDetailsPage() {
                   </label>
                   <input
                     type="text"
+                    value={assignmentForm.title}
+                    onChange={(e) =>
+                      setAssignmentForm({
+                        ...assignmentForm,
+                        title: e.target.value,
+                      })
+                    }
                     placeholder="Assignment Title"
                     className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-sm"
                   />
@@ -1267,7 +1462,13 @@ export default function CourseDetailsPage() {
                     </label>
                     <input
                       type="number"
-                      defaultValue={100}
+                      value={assignmentForm.totalMarks}
+                      onChange={(e) =>
+                        setAssignmentForm({
+                          ...assignmentForm,
+                          totalMarks: parseInt(e.target.value) || 100,
+                        })
+                      }
                       className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-sm"
                     />
                   </div>
@@ -1275,8 +1476,22 @@ export default function CourseDetailsPage() {
                     <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
                       Lecturer
                     </label>
-                    <select className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-sm">
-                      <option value="">-- No lecturers available --</option>
+                    <select
+                      value={assignmentForm.marker}
+                      onChange={(e) =>
+                        setAssignmentForm({
+                          ...assignmentForm,
+                          marker: e.target.value,
+                        })
+                      }
+                      className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-sm"
+                    >
+                      <option value="">-- Select Lecturer --</option>
+                      {allLecturers.map((lec) => (
+                        <option key={lec.id} value={lec.id}>
+                          {lec.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1287,6 +1502,13 @@ export default function CourseDetailsPage() {
                     </label>
                     <input
                       type="date"
+                      value={assignmentForm.opensAt}
+                      onChange={(e) =>
+                        setAssignmentForm({
+                          ...assignmentForm,
+                          opensAt: e.target.value,
+                        })
+                      }
                       className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-sm"
                     />
                   </div>
@@ -1296,6 +1518,13 @@ export default function CourseDetailsPage() {
                     </label>
                     <input
                       type="date"
+                      value={assignmentForm.dueDate}
+                      onChange={(e) =>
+                        setAssignmentForm({
+                          ...assignmentForm,
+                          dueDate: e.target.value,
+                        })
+                      }
                       className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-sm"
                     />
                   </div>
@@ -1306,20 +1535,33 @@ export default function CourseDetailsPage() {
                   </label>
                   <textarea
                     rows={3}
+                    value={assignmentForm.description}
+                    onChange={(e) =>
+                      setAssignmentForm({
+                        ...assignmentForm,
+                        description: e.target.value,
+                      })
+                    }
                     className="w-full px-5 py-4 bg-gray-100 border-none rounded-3xl font-medium text-sm resize-none"
                   />
                 </div>
               </div>
               <div className="pt-4 flex flex-col gap-3">
                 <button
-                  onClick={() => {
-                    toast.success("Assignment created!");
-                    setShowAddAssignmentModal(false);
-                    setAssignmentModalStage(1);
-                  }}
-                  className="w-full py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
+                  onClick={handleCreateAssignment}
+                  disabled={assignmentCreating || !assignmentForm.title.trim()}
+                  className="w-full py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Check size={18} /> CREATE NOW
+                  {assignmentCreating ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      CREATING...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={18} /> CREATE NOW
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => setAssignmentModalStage(1)}
@@ -1451,7 +1693,16 @@ function StudentsList({
 }) {
   const router = useRouter();
   const [students, setStudents] = React.useState<
-    { id: string; studentId: string; reg: string; name: string; avatar: string; collectionId: string; date: string; status: string; }[]
+    {
+      id: string;
+      studentId: string;
+      reg: string;
+      name: string;
+      avatar: string;
+      collectionId: string;
+      date: string;
+      status: string;
+    }[]
   >([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -1460,20 +1711,22 @@ function StudentsList({
 
     try {
       setLoading(true);
-      const enrollments = await pb.collection("enrollments").getFullList<RecordModel & { expand?: { student?: UserRecord } }>({
-        filter: `course_intake="${courseIntakeId}"`,
-        expand: "student",
-        sort: "-created",
-      });
+      const enrollments = await pb
+        .collection("enrollments")
+        .getFullList<RecordModel & { expand?: { student?: UserRecord } }>({
+          filter: `course_intake="${courseIntakeId}"`,
+          expand: "student",
+          sort: "-created",
+        });
 
       // Auto-complete: if course is over, batch-update any "enrolled" students to "completed"
       const courseOver = courseEndDate
         ? new Date() > new Date(courseEndDate)
         : false;
       if (courseOver) {
-        const toComplete = (enrollments as unknown as EnrollmentRecord[]).filter(
-          (e) => e.enrollement_status === "enrolled",
-        );
+        const toComplete = (
+          enrollments as unknown as EnrollmentRecord[]
+        ).filter((e) => e.enrollement_status === "enrolled");
         if (toComplete.length > 0) {
           await Promise.all(
             toComplete.map((e) =>
@@ -1485,7 +1738,9 @@ function StudentsList({
         }
       }
 
-      const formattedStudents = (enrollments as unknown as EnrollmentRecord[]).map((enrollment) => {
+      const formattedStudents = (
+        enrollments as unknown as EnrollmentRecord[]
+      ).map((enrollment) => {
         const student = enrollment.expand?.student;
         // If course is over and status was "enrolled", reflect as "completed"
         const status = enrollment.enrollement_status;
@@ -1823,7 +2078,7 @@ function AssignmentsTab({
                       {asgn.title}
                     </span>
                     <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
-                      {asgn.subjectCode}
+                      {asgn.subject}
                     </span>
                   </div>
                 </div>
@@ -1833,7 +2088,24 @@ function AssignmentsTab({
                       Deadline
                     </span>
                     <span className="text-sm font-bold text-gray-900">
-                      {asgn.dueDate}
+                      {asgn.dueDate
+                        ? (() => {
+                            const date = new Date(asgn.dueDate);
+                            return (
+                              date.toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                              }) +
+                              " " +
+                              date.toLocaleTimeString("en-US", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              })
+                            );
+                          })()
+                        : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2107,7 +2379,10 @@ function MaterialsTab({
   // File URL from PocketBase
   const getFileUrl = (record: Material) => {
     if (!record.file) return null;
-    return pb.files.getURL(record as unknown as RecordModel, record.file as string);
+    return pb.files.getURL(
+      record as unknown as RecordModel,
+      record.file as string,
+    );
   };
 
   // Type categories for accordion content
@@ -2765,7 +3040,10 @@ function MaterialsTab({
 
                 {mat.type === "document" && !isPdf && fileUrl && (
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
-                    <FileText size={32} className="text-blue-400 mx-auto mb-2" />
+                    <FileText
+                      size={32}
+                      className="text-blue-400 mx-auto mb-2"
+                    />
                     <p className="text-sm text-gray-500 mb-1 font-medium">
                       {mat.file}
                     </p>

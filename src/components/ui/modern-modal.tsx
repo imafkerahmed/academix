@@ -47,7 +47,7 @@ export function ModernModal({
           </DialogHeader>
 
           {/* Visual Header */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 min-w-0">
             {avatarChar && (
               <div
                 className={cn(
@@ -58,12 +58,12 @@ export function ModernModal({
                 {avatarChar}
               </div>
             )}
-            <div>
-              <h2 className="font-black text-gray-900 uppercase tracking-tight">
+            <div className="min-w-0">
+              <h2 className="font-black text-gray-900 uppercase tracking-tight break-words">
                 {title}
               </h2>
               {subtitle && (
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest break-words">
                   {subtitle}
                 </p>
               )}
