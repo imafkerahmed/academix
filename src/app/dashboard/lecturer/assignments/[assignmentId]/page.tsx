@@ -100,6 +100,7 @@ export default function AssignmentMarkingPage() {
 
   const [loading, setLoading] = useState(true);
   const [assignment, setAssignment] = useState<AssignmentDetails | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<
     string | null
   >(searchParams?.get("submissionId") ?? null);
@@ -113,6 +114,7 @@ export default function AssignmentMarkingPage() {
   const fetchData = React.useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
 
       const assignmentRecord = await pb
         .collection("assignments")
@@ -201,6 +203,7 @@ export default function AssignmentMarkingPage() {
       });
     } catch (error) {
       console.error("Error fetching assignment details:", error);
+      setLoadError("Failed to load assignment data");
       toast.error("Failed to load assignment data");
       setAssignment(null);
     } finally {
@@ -385,17 +388,19 @@ export default function AssignmentMarkingPage() {
     numericMarksInput >= 0 &&
     numericMarksInput <= assignment.maxMarks;
 
-  if (!assignment) {
+  if (loading || !assignment) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-xl shadow-md p-6 max-w-md w-full text-center border border-gray-200">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
           <h1 className="text-lg font-semibold text-gray-900 mb-2">
-            Assignment not found
+            Loading assignment
           </h1>
           <p className="text-sm text-gray-600 mb-4">
-            We could not find details for this assignment.
+            {loadError ??
+              "Fetching the latest submission data from the database."}
           </p>
-          <Button onClick={() => router.back()}>Back to Dashboard</Button>
+          <Button onClick={() => fetchData()}>Retry</Button>
         </div>
       </div>
     );
